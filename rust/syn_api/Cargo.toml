@@ -12,4 +12,5 @@ syn_sim = { path = "../syn_sim" }
 syn_query = { path = "../syn_query" }
 syn_memory = { path = "../syn_memory" }
 syn_director = { path = "../syn_director" }
+syn_content = { path = "../syn_content" }
 flutter_rust_bridge = "2"

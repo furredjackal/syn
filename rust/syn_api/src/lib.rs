@@ -5,6 +5,7 @@
 
 use flutter_rust_bridge::frb;
 use std::sync::Mutex;
+use syn_content::load_storylets_from_db;
 
 // Re-export core types for Dart
 pub use syn_core::{
@@ -24,16 +25,35 @@ pub struct GameEngine {
     memory: MemorySystem,
 }
 
+const DEFAULT_STORYLET_DB: &str = "storylets.sqlite";
+
+fn register_storylets_from_db(director: &mut EventDirector) {
+    let db_path = std::env::var("SYN_STORYLET_DB").unwrap_or_else(|_| DEFAULT_STORYLET_DB.to_string());
+    match load_storylets_from_db(&db_path) {
+        Ok(storylets) => {
+            for storylet in storylets {
+                director.register_storylet(storylet);
+            }
+        }
+        Err(err) => {
+            eprintln!("Warning: failed to load storylets from {}: {}", db_path, err);
+        }
+    }
+}
+
 impl GameEngine {
     pub fn new(seed: u64) -> Self {
         let world_seed = WorldSeed::new(seed);
         let player_id = NpcId(1);
         let world = WorldState::new(world_seed, player_id);
 
+        let mut director = EventDirector::new();
+        register_storylets_from_db(&mut director);
+
         GameEngine {
             world,
             simulator: Simulator::new(seed),
-            director: EventDirector::new(),
+            director,
             memory: MemorySystem::new(),
         }
     }
@@ -63,6 +83,21 @@ impl GameEngine {
     /// Get player karma.
     pub fn player_karma(&self) -> f32 {
         self.world.player_karma.0
+    }
+
+    /// Get current narrative heat.
+    pub fn narrative_heat(&self) -> f32 {
+        self.world.narrative_heat
+    }
+
+    /// Get textual heat level (Low/Medium/High/Critical).
+    pub fn narrative_heat_level(&self) -> String {
+        self.world.heat_level().to_string()
+    }
+
+    /// Get normalized trend for UI (–1.0 cooling .. +1.0 spiking).
+    pub fn narrative_heat_trend(&self) -> f32 {
+        self.world.heat_trend()
     }
 
     /// Get player stats (serialized for Dart).
@@ -145,13 +180,16 @@ impl GameEngine {
         familiarity: f32,
         resentment: f32,
     ) {
-        let rel = Relationship {
+        let mut rel = Relationship {
             affection: affection.clamp(-10.0, 10.0),
             trust: trust.clamp(-10.0, 10.0),
             attraction: attraction.clamp(-10.0, 10.0),
             familiarity: familiarity.clamp(-10.0, 10.0),
             resentment: resentment.clamp(-10.0, 10.0),
+            state: syn_core::RelationshipState::Stranger,
         };
+        // Compute the correct state based on axes
+        rel.state = rel.compute_next_state();
         self.world
             .set_relationship(NpcId(from_npc_id), NpcId(to_npc_id), rel);
     }
@@ -223,6 +261,10 @@ impl GameEngine {
                 stat_conditions: std::collections::HashMap::new(),
                 life_stages: vec![],
                 tags: vec![],
+                relationship_states: vec![],
+                memory_tags_required: vec![],
+                memory_tags_forbidden: vec![],
+                memory_recency_ticks: None,
             },
             heat,
             weight,
@@ -235,7 +277,7 @@ impl GameEngine {
     /// Select and return the next eligible event.
     pub fn select_next_event(&self) -> Option<EventDto> {
         self.director
-            .select_next_event(&self.world, self.world.current_tick)
+            .select_next_event(&self.world, &self.memory, self.world.current_tick)
             .map(|s| EventDto {
                 id: s.id.clone(),
                 name: s.name.clone(),
@@ -334,6 +376,33 @@ pub fn engine_player_mood() -> f32 {
         .unwrap_or(0.0)
 }
 
+/// Get current narrative heat value.
+#[frb(sync)]
+pub fn engine_narrative_heat() -> f32 {
+    let engine = ENGINE.lock().unwrap();
+    engine.as_ref().map(|e| e.narrative_heat()).unwrap_or(0.0)
+}
+
+/// Get current narrative heat level label.
+#[frb(sync)]
+pub fn engine_narrative_heat_level() -> String {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.narrative_heat_level())
+        .unwrap_or_else(|| "Low".to_string())
+}
+
+/// Get normalized heat trend (-1.0..1.0).
+#[frb(sync)]
+pub fn engine_narrative_heat_trend() -> f32 {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.narrative_heat_trend())
+        .unwrap_or(0.0)
+}
+
 /// Get all NPC IDs.
 #[frb(sync)]
 pub fn engine_list_npcs() -> Vec<u64> {
@@ -388,5 +457,13 @@ mod tests {
         let mut engine = GameEngine::new(42);
         let mem_id = engine.record_memory(1, "event_test".to_string(), 0.8);
         assert!(!mem_id.is_empty());
+    }
+
+    #[test]
+    fn test_narrative_heat_accessors() {
+        let engine = GameEngine::new(42);
+        assert_eq!(engine.narrative_heat(), 0.0);
+        assert_eq!(engine.narrative_heat_level(), "Low");
+        assert_eq!(engine.narrative_heat_trend(), 0.0);
     }
 }

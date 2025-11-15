@@ -3,8 +3,7 @@
 //! Handles the core simulation loop, NPC updates, time progression, and LOD tier management.
 
 use syn_core::{
-    AbstractNpc, DeterministicRng, NpcId, Relationship, SimTick, Stats, Traits, WorldSeed,
-    WorldState,
+    AbstractNpc, BehaviorAction, BehaviorNeed, DeterministicRng, NpcId, Stats, WorldState,
 };
 use std::collections::HashMap;
 
@@ -82,7 +81,36 @@ impl SimulatedNpc {
         let recognition_mood = self.mood.max(0.0) / 10.0;
         needs.insert("recognition".to_string(), (recognition_base + recognition_mood).clamp(0.0, 1.0));
 
+        // Comfort need: mood dips + stability
+        let comfort_base = ((0.0 - self.mood).max(0.0) / 10.0) + ((100.0 - self.abstract_npc.traits.stability) / 200.0);
+        needs.insert("comfort".to_string(), comfort_base.clamp(0.0, 1.0));
+
         self.needs = needs;
+    }
+
+    fn need_value(&self, need: BehaviorNeed) -> f32 {
+        let value = self
+            .needs
+            .get(need.as_key())
+            .copied()
+            .unwrap_or(0.5);
+        (0.8 + value).clamp(0.4, 1.8)
+    }
+
+    /// Score a behavior action using the full utility equation.
+    pub fn score_action(&self, action: BehaviorAction, world: &WorldState) -> f32 {
+        let base = action.base_weight();
+        let trait_bias = action.trait_bias(&self.abstract_npc.traits);
+        let attachment_bias = action.attachment_bias(self.abstract_npc.attachment_style);
+        let primary = self.need_value(action.primary_need());
+        let need_component = if let Some(secondary) = action.secondary_need() {
+            (primary + self.need_value(secondary)) / 2.0
+        } else {
+            primary
+        };
+        let mood_mult = action.mood_multiplier(self.mood);
+        let context = action.context_fit(world);
+        (base * trait_bias * attachment_bias * need_component * mood_mult * context).clamp(0.0, 100.0)
     }
 }
 
@@ -138,7 +166,7 @@ impl Simulator {
     }
 
     /// Advance all active NPCs by one tick.
-    fn tick_npcs(&mut self, world: &WorldState) {
+    fn tick_npcs(&mut self, _world: &WorldState) {
         for (_npc_id, simulated_npc) in &mut self.active_npcs {
             // High fidelity: full mood and need updates
             if simulated_npc.lod_tier == LodTier::High {
@@ -212,7 +240,7 @@ impl Simulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn_core::{AttachmentStyle, WorldSeed};
+    use syn_core::{AttachmentStyle, BehaviorAction, Relationship, Traits, WorldSeed};
 
     #[test]
     fn test_simulated_npc_mood_decay() {
@@ -252,6 +280,40 @@ mod tests {
 
         assert!(!sim_npc.needs.is_empty());
         assert!(sim_npc.needs.contains_key("social"));
+    }
+
+    #[test]
+    fn test_behavior_action_scoring_deterministic() {
+        let abstract_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 28,
+            job: "Analyst".to_string(),
+            district: "Midtown".to_string(),
+            household_id: 1,
+            traits: Traits {
+                stability: 40.0,
+                confidence: 60.0,
+                sociability: 65.0,
+                empathy: 55.0,
+                impulsivity: 45.0,
+                ambition: 70.0,
+                charm: 50.0,
+            },
+            seed: 999,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        let mut sim_npc = SimulatedNpc::new(abstract_npc);
+        sim_npc.mood = 2.0;
+        sim_npc.stats.health = 80.0;
+        sim_npc.update_needs();
+
+        let mut world = WorldState::new(WorldSeed(42), NpcId(99));
+        world.narrative_heat = 30.0;
+
+        let first = sim_npc.score_action(BehaviorAction::Work, &world);
+        let second = sim_npc.score_action(BehaviorAction::Work, &world);
+        assert!((first - second).abs() < f32::EPSILON);
+        assert!(first > 0.0);
     }
 
     #[test]

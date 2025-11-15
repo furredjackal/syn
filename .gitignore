@@ -40,3 +40,5 @@ Thumbs.db
 *.log
 /docs/SYN_ Simulate Your Narrative.md
 /.github/copilot-instructions.md
+/IMPLEMENTATION_GAP_ANALYSIS.md
+/docs/GDD_GAP_STATUS.md

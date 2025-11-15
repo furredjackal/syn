@@ -33,6 +33,8 @@ impl Persistence {
                 player_age INTEGER NOT NULL,
                 player_life_stage TEXT NOT NULL,
                 player_karma REAL NOT NULL,
+                narrative_heat REAL NOT NULL DEFAULT 0.0,
+                heat_momentum REAL NOT NULL DEFAULT 0.0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -66,11 +68,28 @@ impl Persistence {
                 FOREIGN KEY(world_seed) REFERENCES world_state(seed)
             );
 
+            CREATE TABLE IF NOT EXISTS storylets (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                json_data TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_relationships ON relationships(world_seed, from_npc_id);
             CREATE INDEX IF NOT EXISTS idx_npcs ON npcs(world_seed, npc_id);
             CREATE INDEX IF NOT EXISTS idx_memories ON memory_entries(world_seed, npc_id);
             ",
         )?;
+        // Backfill columns if schema existed before heat support. SQLite errors are ignored if columns already exist.
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN narrative_heat REAL NOT NULL DEFAULT 0.0",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN heat_momentum REAL NOT NULL DEFAULT 0.0",
+            params![],
+        );
         Ok(())
     }
 
@@ -82,8 +101,8 @@ impl Persistence {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO world_state 
-             (seed, player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+             (seed, player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
             params![
                 world.seed.0,
                 world.player_id.0,
@@ -92,6 +111,8 @@ impl Persistence {
                 world.player_age,
                 format!("{:?}", world.player_life_stage),
                 player_karma_json,
+                world.narrative_heat,
+                world.heat_momentum,
             ],
         )?;
 
@@ -122,7 +143,7 @@ impl Persistence {
     /// Load world state from database.
     pub fn load_world(&mut self, seed: WorldSeed) -> SqlResult<WorldState> {
         let mut stmt = self.conn.prepare(
-            "SELECT player_id, current_tick, player_stats, player_age, player_life_stage, player_karma 
+            "SELECT player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum
              FROM world_state WHERE seed = ?",
         )?;
 
@@ -133,6 +154,8 @@ impl Persistence {
             let player_age: u32 = row.get(3)?;
             let life_stage_str: String = row.get(4)?;
             let karma_value: f32 = row.get(5)?;
+            let heat_value: f32 = row.get(6).unwrap_or(0.0);
+            let heat_momentum: f32 = row.get(7).unwrap_or(0.0);
 
             let player_stats: Stats = serde_json::from_str(&stats_json)
                 .unwrap_or_default();
@@ -154,6 +177,8 @@ impl Persistence {
                 player_age,
                 player_life_stage,
                 player_karma: Karma(karma_value),
+                narrative_heat: heat_value,
+                heat_momentum,
                 relationships: Default::default(),
                 npcs: Default::default(),
             };
@@ -236,6 +261,51 @@ impl Persistence {
         let exists = stmt.exists(params![seed.0])?;
         Ok(exists)
     }
+
+    /// Insert or update a storylet record stored as JSON.
+    pub fn upsert_storylet_record(&mut self, record: &StoryletRecord) -> SqlResult<()> {
+        self.conn.execute(
+            "INSERT INTO storylets (id, name, json_data, created_at, updated_at)
+             VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 json_data = excluded.json_data,
+                 updated_at = CURRENT_TIMESTAMP",
+            params![record.id, record.name, record.json_data],
+        )?;
+        Ok(())
+    }
+
+    /// Load every storylet JSON blob from SQLite.
+    pub fn load_storylet_records(&mut self) -> SqlResult<Vec<StoryletRecord>> {
+        let mut stmt = self.conn.prepare("SELECT id, name, json_data FROM storylets")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(StoryletRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                json_data: row.get(2)?,
+            })
+        })?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
+
+    /// Remove all stored storylets (used by tooling before re-importing).
+    pub fn clear_storylets(&mut self) -> SqlResult<()> {
+        self.conn.execute("DELETE FROM storylets", [])?;
+        Ok(())
+    }
+}
+
+/// Serialized storylet entry stored in SQLite.
+#[derive(Debug, Clone)]
+pub struct StoryletRecord {
+    pub id: String,
+    pub name: String,
+    pub json_data: String,
 }
 
 #[cfg(test)]
@@ -251,12 +321,16 @@ mod tests {
         let mut db = Persistence::new(db_path).expect("Failed to create persistence");
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
         world.player_age = 25;
+        world.narrative_heat = 40.0;
+        world.heat_momentum = 5.0;
 
         db.save_world(&world).expect("Failed to save world");
         let loaded = db.load_world(WorldSeed(42)).expect("Failed to load world");
 
         assert_eq!(loaded.player_age, 25);
         assert_eq!(loaded.seed, WorldSeed(42));
+        assert_eq!(loaded.narrative_heat, 40.0);
+        assert_eq!(loaded.heat_momentum, 5.0);
 
         let _ = fs::remove_file(db_path);
     }

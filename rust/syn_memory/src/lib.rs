@@ -45,8 +45,11 @@ impl MemoryEntry {
     }
 
     /// Add tags to categorize the memory.
-    pub fn with_tags(mut self, tags: Vec<&str>) -> Self {
-        self.tags = tags.iter().map(|t| t.to_string()).collect();
+    pub fn with_tags<T>(mut self, tags: Vec<T>) -> Self
+    where
+        T: Into<String>,
+    {
+        self.tags = tags.into_iter().map(|t| t.into()).collect();
         self
     }
 }

@@ -6,5 +6,6 @@ members = [
     "syn_memory",
     "syn_director",
     "syn_api",
+    "syn_content",
 ]
 resolver = "2"
