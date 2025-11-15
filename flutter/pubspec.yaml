@@ -10,6 +10,10 @@ dependencies:
     sdk: flutter
   flutter_rust_bridge: ^2.0.0
   ffi: ^2.0.0
+  flame: ^1.10.0
+  flame_audio: ^2.1.0
+  google_fonts: ^6.1.0
+  provider: ^6.0.0
 
 dev_dependencies:
   flutter_test:

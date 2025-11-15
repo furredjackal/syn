@@ -42,3 +42,25 @@ Thumbs.db
 /.github/copilot-instructions.md
 /IMPLEMENTATION_GAP_ANALYSIS.md
 /docs/GDD_GAP_STATUS.md
+/flutter/analysis_options.yaml
+/flutter/linux/flutter/CMakeLists.txt
+/flutter/linux/runner/CMakeLists.txt
+/flutter/IMPLEMENTATION_SUMMARY.md
+/flutter/linux/flutter/generated_plugins.cmake
+/flutter/FILE_INVENTORY.md
+/rust/syn_content/src/bin/import_storylets.rs
+/flutter/linux/flutter/generated_plugin_registrant.h
+/flutter/linux/CMakeLists.txt
+/flutter/linux/flutter/generated_plugin_registrant.cc
+/flutter/linux/runner/my_application.h
+/flutter/linux/runner/my_application.cc
+/flutter/linux/runner/main.cc
+/flutter/QUICK_START.md
+/flutter/PROJECT_STATUS.txt
+/storylets/sample_slice_of_life.json
+/flutter/README.md
+/docs/storylet_authoring.md
+/docs/SYN_ Complete UI Design & Implementation Guide.md
+/docs/UI_IMPLEMENTATION_STATUS.md
+/flutter/WIDGET_REFERENCE.md
+/docs/WIDGETS_REFERENCE.md
