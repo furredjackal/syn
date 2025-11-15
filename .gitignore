@@ -38,3 +38,5 @@ Thumbs.db
 
 # Logs
 *.log
+/docs/SYN_ Simulate Your Narrative.md
+/.github/copilot-instructions.md
