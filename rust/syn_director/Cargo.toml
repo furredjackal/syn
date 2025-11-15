@@ -1,0 +1,9 @@
+[package]
+name = "syn_director"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syn_core = { path = "../syn_core" }
+syn_query = { path = "../syn_query" }
+serde = { version = "1.0", features = ["derive"] }

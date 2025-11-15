@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "syn_core",
+    "syn_sim",
+    "syn_query",
+    "syn_memory",
+    "syn_director",
+    "syn_api",
+]
+resolver = "2"
