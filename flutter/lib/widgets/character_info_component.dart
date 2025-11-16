@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../syn_game.dart';
 
-class CharacterInfoComponent extends PositionComponent with HasGameRef<SynGame> {
+class CharacterInfoComponent extends PositionComponent
+    with HasGameReference<SynGame> {
   final RelationshipData relationship;
 
   CharacterInfoComponent({

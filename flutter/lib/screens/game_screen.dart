@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../models/game_state.dart';
 import '../theme/theme.dart';
 import '../widgets/stat_bar.dart';
-import '../widgets/event_card.dart';
 import '../widgets/character_info.dart';
 import '../widgets/particle_system.dart';
 
@@ -112,17 +111,7 @@ class _GameScreenState extends State<GameScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             flex: 2,
-                            child: gameState.currentEvent != null
-                                ? EventCard(
-                                    event: gameState.currentEvent!,
-                                    onChoice: _handleChoice,
-                                  )
-                                : const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFF00D9FF)),
-                                    ),
-                                  ),
+                            child: _buildLegacyEventPanel(gameState),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -232,6 +221,99 @@ class _GameScreenState extends State<GameScreen> {
               icon: const Icon(Icons.menu),
               color: const Color(0xFF00D9FF)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyEventPanel(GameState gameState) {
+    final event = gameState.currentEvent;
+    if (event == null) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00D9FF)),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF00D9FF).withValues(alpha: 0.8)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              event.title.toUpperCase(),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: const Color(0xFF00D9FF),
+                    letterSpacing: 1.5,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              event.description,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+            ),
+            const SizedBox(height: 24),
+            ...List.generate(event.choices.length, (index) {
+              final choice = event.choices[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF00D9FF)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  onPressed: () => _handleChoice(index),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        choice.text.toUpperCase(),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(color: Colors.white),
+                      ),
+                      if (choice.statChanges.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: choice.statChanges.entries
+                              .map(
+                                (entry) => Text(
+                                  '${entry.value >= 0 ? '+' : ''}${entry.value} ${entry.key}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                        color: entry.value >= 0
+                                            ? Colors.greenAccent
+                                            : Colors.redAccent,
+                                      ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

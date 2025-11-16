@@ -96,7 +96,7 @@ class _WorldMapScreenState extends State<WorldMapScreen> {
             ),
           ),
           if (selectedDistrict != null) ...[
-            Divider(color: Colors.white10),
+            const Divider(color: Colors.white10),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

@@ -144,7 +144,7 @@ class ParticlePainter extends CustomPainter {
 
     for (var particle in particles) {
       paint
-        ..color = particle.color.withOpacity(
+        .color = particle.color.withOpacity(
           particle.opacity * 0.8,
         );
 

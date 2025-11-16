@@ -43,14 +43,14 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
       body: Stack(
         children: [
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF0A0E27),
-                  const Color(0xFF1A1F3A),
-                  const Color(0xFF2D1B4E),
+                  Color(0xFF0A0E27),
+                  Color(0xFF1A1F3A),
+                  Color(0xFF2D1B4E),
                 ],
               ),
             ),
@@ -91,8 +91,8 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
                                 ?.copyWith(
                                   color: Colors.white.withOpacity(0.3),
                                 ),
-                            border: OutlineInputBorder(
-                              borderSide: const BorderSide(
+                            border: const OutlineInputBorder(
+                              borderSide: BorderSide(
                                 color: Color(0xFF00D9FF),
                               ),
                             ),

@@ -54,26 +54,26 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           // Background gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF0A0E27),
-                  const Color(0xFF1A1F3A),
-                  const Color(0xFF2D1B4E),
+                  Color(0xFF0A0E27),
+                  Color(0xFF1A1F3A),
+                  Color(0xFF2D1B4E),
                 ],
               ),
             ),
           ),
 
           // Particle effects
-          Positioned.fill(
+          const Positioned.fill(
             child: ParticleSystemWidget(
               particleCount: 40,
-              particleColor: const Color(0xFF00D9FF),
+              particleColor: Color(0xFF00D9FF),
               particleSize: 2,
-              emitterPosition: const Offset(0.5, 0.3),
+              emitterPosition: Offset(0.5, 0.3),
               emissionRate: 15,
               lifetime: 3.0,
             ),

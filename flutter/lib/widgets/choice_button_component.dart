@@ -12,7 +12,7 @@ import 'stat_change_indicators_component.dart';
 /// - Scale animation on press (1.0 → 0.95 → 1.0 over 300ms)
 /// - Keyboard shortcut display in top-right box
 /// - Stat change indicators below choice text
-class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
+class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynGame> {
   final GameChoice choice;
   final int index;
   final VoidCallback onPressed;
@@ -40,7 +40,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
   Future<void> onLoad() async {
     // Background rectangle (will change opacity on hover)
     _background = RectangleComponent(
-      paint: Paint()..color = Colors.black.withOpacity(0.3),
+      paint: Paint()..color = Colors.black.withValues(alpha: 0.3),
       size: size,
     );
     add(_background);
@@ -78,7 +78,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
     // Keyboard shortcut box (top-right)
     _shortcutBox = RectangleComponent(
       paint: Paint()
-        ..color = Colors.black.withOpacity(0.5)
+        ..color = Colors.black.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
       size: Vector2(32, 32),
@@ -91,7 +91,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
       text: choice.keyboardShortcut.toString(),
       textRenderer: TextPaint(
         style: TextStyle(
-          color: Colors.white.withOpacity(0.7),
+          color: Colors.white.withValues(alpha: 0.7),
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -129,10 +129,10 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
     final isActive = _isHovered || _pressAnimationValue > 0.0;
     final borderColor = isActive
         ? const Color(0xFF00D9FF)
-        : const Color(0xFF00D9FF).withOpacity(0.3);
+        : const Color(0xFF00D9FF).withValues(alpha: 0.3);
     final backgroundColor = isActive
-        ? const Color(0xFF00D9FF).withOpacity(0.1)
-        : Colors.black.withOpacity(0.3);
+        ? const Color(0xFF00D9FF).withValues(alpha: 0.1)
+        : Colors.black.withValues(alpha: 0.3);
 
     // Update border
     _borderComponent.paint = Paint()
@@ -160,8 +160,9 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
 
     _shortcutText.textRenderer = TextPaint(
       style: TextStyle(
-        color:
-            isActive ? const Color(0xFF00D9FF) : Colors.white.withOpacity(0.7),
+        color: isActive
+            ? const Color(0xFF00D9FF)
+            : Colors.white.withValues(alpha: 0.7),
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
@@ -179,6 +180,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
   }
 
   /// Check if a point is within this component's bounds
+  @override
   bool containsPoint(Vector2 point) {
     return point.x >= 0 &&
         point.x <= size.x &&

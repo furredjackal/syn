@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'models/game_state.dart';
 import 'syn_game.dart';
 import 'widgets/event_card_component.dart';
@@ -16,7 +17,20 @@ import 'widgets/top_bar_component.dart';
 /// - EventCard (center: current event with choices)
 /// - RelationshipPanel (right side: active relationships)
 /// - QuickMenuBar (bottom: memory, save, settings, menu buttons)
-class GameScreenComponent extends PositionComponent with HasGameRef<SynGame> {
+class GameScreenComponent extends PositionComponent
+    with HasGameReference<SynGame>, KeyboardHandler {
+  static final Map<int, Set<LogicalKeyboardKey>> _shortcutKeyMap = {
+    0: {LogicalKeyboardKey.digit0, LogicalKeyboardKey.numpad0},
+    1: {LogicalKeyboardKey.digit1, LogicalKeyboardKey.numpad1},
+    2: {LogicalKeyboardKey.digit2, LogicalKeyboardKey.numpad2},
+    3: {LogicalKeyboardKey.digit3, LogicalKeyboardKey.numpad3},
+    4: {LogicalKeyboardKey.digit4, LogicalKeyboardKey.numpad4},
+    5: {LogicalKeyboardKey.digit5, LogicalKeyboardKey.numpad5},
+    6: {LogicalKeyboardKey.digit6, LogicalKeyboardKey.numpad6},
+    7: {LogicalKeyboardKey.digit7, LogicalKeyboardKey.numpad7},
+    8: {LogicalKeyboardKey.digit8, LogicalKeyboardKey.numpad8},
+    9: {LogicalKeyboardKey.digit9, LogicalKeyboardKey.numpad9},
+  };
   late TopBarComponent topBar;
   late StatPanelComponent statPanel;
   late RelationshipPanelComponent relationshipPanel;
@@ -36,8 +50,8 @@ class GameScreenComponent extends PositionComponent with HasGameRef<SynGame> {
     ));
 
     // Calculate layout dimensions
-    final topBarHeight = 80.0;
-    final bottomBarHeight = 80.0;
+    const topBarHeight = 80.0;
+    const bottomBarHeight = 80.0;
     final panelWidth = size.x * 0.2;
     final contentHeight = size.y - topBarHeight - bottomBarHeight;
 
@@ -104,8 +118,8 @@ class GameScreenComponent extends PositionComponent with HasGameRef<SynGame> {
 
     final event = game.gameState.currentEvent;
     if (event != null) {
-      final topBarHeight = 80.0;
-      final bottomBarHeight = 80.0;
+      const topBarHeight = 80.0;
+      const bottomBarHeight = 80.0;
       final panelWidth = size.x * 0.2;
       final contentHeight = size.y - topBarHeight - bottomBarHeight;
       final centerWidth = size.x - (panelWidth * 2);
@@ -147,6 +161,29 @@ class GameScreenComponent extends PositionComponent with HasGameRef<SynGame> {
     Future.delayed(const Duration(milliseconds: 500), () {
       _loadNextEvent();
     });
+  }
+
+  @override
+  bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    if (event is! KeyDownEvent) {
+      return false;
+    }
+
+    final currentEvent = game.gameState.currentEvent;
+    if (currentEvent == null) {
+      return false;
+    }
+
+    final pressedKey = event.logicalKey;
+    for (var i = 0; i < currentEvent.choices.length; i++) {
+      final shortcut = currentEvent.choices[i].keyboardShortcut;
+      final keySet = _shortcutKeyMap[shortcut];
+      if (keySet != null && keySet.contains(pressedKey)) {
+        _handleChoice(i);
+        return true;
+      }
+    }
+    return false;
   }
 
   @override

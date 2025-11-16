@@ -4,7 +4,7 @@ import '../syn_game.dart';
 import 'character_info_component.dart';
 
 class RelationshipPanelComponent extends PositionComponent
-    with HasGameRef<SynGame> {
+    with HasGameReference<SynGame> {
   @override
   Future<void> onLoad() async {
     final gameState = game.gameState;

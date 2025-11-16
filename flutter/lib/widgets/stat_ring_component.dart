@@ -1,8 +1,9 @@
 import 'package:flame/components.dart';
+import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 import '../syn_game.dart';
 
-class StatRingComponent extends PositionComponent with HasGameRef<SynGame> {
+class StatRingComponent extends PositionComponent with HasGameReference<SynGame> {
   final String label;
   final double value;
   final double maxValue;

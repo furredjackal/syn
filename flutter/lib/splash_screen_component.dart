@@ -1,53 +1,88 @@
+import 'dart:ui';
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'syn_game.dart';
 
-class SplashScreenComponent extends PositionComponent with HasGameRef<SynGame> {
+class SplashScreenComponent extends PositionComponent
+    with HasGameReference<SynGame> {
   @override
   Future<void> onLoad() async {
-    super.onLoad();
-    
-    size = gameRef.size;
+    size = game.size;
+    add(_SplashBackground()..size = size);
 
-    // Add background
-    add(RectangleComponent(
-      paint: Paint()..color = const Color(0xFF0A0E27),
-      size: size,
-    ));
-
-    // Add title text
-    add(TextComponent(
-      text: 'SYN',
-      textRenderer: TextPaint(
-        style: GoogleFonts.audiowide(
-          fontSize: 80,
-          color: const Color(0xFF00D9FF),
-          fontWeight: FontWeight.bold,
+    add(
+      TextComponent(
+        text: 'S Y N',
+        anchor: Anchor.center,
+        position: size / 2,
+        textRenderer: TextPaint(
+          style: const TextStyle(
+            fontSize: 96,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 24,
+            color: Color(0xFFFFFFFF),
+          ),
         ),
       ),
-      position: size / 2,
-      anchor: Anchor.center,
-    ));
+    );
 
-    // Add subtitle
-    add(TextComponent(
-      text: 'Simulate Your Narrative',
-      textRenderer: TextPaint(
-        style: GoogleFonts.roboto(
-          fontSize: 18,
-          color: Colors.white,
-          letterSpacing: 2,
+    add(
+      TextComponent(
+        text: 'Simulate Your Narrative',
+        anchor: Anchor.center,
+        position: Vector2(size.x / 2, size.y / 2 + 80),
+        textRenderer: TextPaint(
+          style: const TextStyle(
+            color: Color(0xFFEEEEEE),
+            fontSize: 20,
+            letterSpacing: 4,
+          ),
         ),
       ),
-      position: Vector2(size.x / 2, size.y / 2 + 60),
-      anchor: Anchor.center,
-    ));
+    );
 
-    // Navigate after delay
-    Future.delayed(const Duration(seconds: 3), () {
-      // TODO: Navigate to menu when router is available
-    });
+    add(
+      TimerComponent(
+        period: 2.4,
+        onTick: () {
+          game.showMainMenu();
+        },
+      ),
+    );
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    this.size = size;
   }
 }
 
+class _SplashBackground extends PositionComponent {
+  @override
+  void render(Canvas canvas) {
+    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
+    final gradient = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0xFF050505),
+          Color(0xFF101010),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(rect);
+    canvas.drawRect(rect, gradient);
+
+    for (int i = 0; i < 30; i++) {
+      final y = i * size.y / 30;
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.x, y),
+        Paint()
+          ..color = const Color(0x1100D9FF)
+          ..strokeWidth = 1,
+      );
+    }
+  }
+}

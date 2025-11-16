@@ -18,11 +18,11 @@ class MoodColors {
   }
 
   static Color moodGradientLight(double mood) {
-    if (mood <= -6) return Color(0xFF4A1A7A);
-    if (mood <= -1) return Color(0xFF2D5A7A);
-    if (mood <= 1) return Color(0xFF1A7F8F);
-    if (mood <= 5) return Color(0xFFA87F3F);
-    return Color(0xFFFFE55C);
+    if (mood <= -6) return const Color(0xFF4A1A7A);
+    if (mood <= -1) return const Color(0xFF2D5A7A);
+    if (mood <= 1) return const Color(0xFF1A7F8F);
+    if (mood <= 5) return const Color(0xFFA87F3F);
+    return const Color(0xFFFFE55C);
   }
 }
 
@@ -53,35 +53,35 @@ class LifeStageTheme {
     required this.badge,
   });
 
-  static final child = LifeStageTheme(
+  static const child = LifeStageTheme(
     name: 'Child',
     primaryColor: Color(0xFF00D9FF), // Cyan
     secondaryColor: Color(0xFFFFD700), // Yellow
     badge: '👶',
   );
 
-  static final teen = LifeStageTheme(
+  static const teen = LifeStageTheme(
     name: 'Teen',
     primaryColor: Color(0xFF9D4EDD), // Purple
     secondaryColor: Color(0xFFFF006E), // Pink
     badge: '🎓',
   );
 
-  static final adult = LifeStageTheme(
+  static const adult = LifeStageTheme(
     name: 'Adult',
     primaryColor: Color(0xFF3A86FF), // Blue
     secondaryColor: Color(0xFF8338EC), // Purple
     badge: '💼',
   );
 
-  static final elder = LifeStageTheme(
+  static const elder = LifeStageTheme(
     name: 'Elder',
     primaryColor: Color(0xFFB8860B), // Gold
     secondaryColor: Color(0xFF8B7355), // Brown
     badge: '🧙',
   );
 
-  static final digital = LifeStageTheme(
+  static const digital = LifeStageTheme(
     name: 'Digital',
     primaryColor: Color(0xFF00D9FF), // Cyan
     secondaryColor: Color(0xFFFFFFFF), // White
@@ -177,9 +177,9 @@ class SynTheme {
   static final ThemeData dark = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    scaffoldBackgroundColor: Color(0xFF0A0E27),
-    primaryColor: Color(0xFF00D9FF),
-    secondaryHeaderColor: Color(0xFF9D4EDD),
+    scaffoldBackgroundColor: const Color(0xFF0A0E27),
+    primaryColor: const Color(0xFF00D9FF),
+    secondaryHeaderColor: const Color(0xFF9D4EDD),
     fontFamily: GoogleFonts.roboto().fontFamily,
     textTheme: TextTheme(
       displayLarge: SynTypography.titleLarge,
@@ -191,9 +191,9 @@ class SynTheme {
       labelMedium: SynTypography.label,
       labelSmall: SynTypography.label,
     ),
-    canvasColor: Color(0xFF1A1F3A),
-    cardColor: Color(0xFF15192E),
-    dividerColor: Color(0xFF00D9FF).withOpacity(0.3),
+    canvasColor: const Color(0xFF1A1F3A),
+    cardColor: const Color(0xFF15192E),
+    dividerColor: const Color(0xFF00D9FF).withOpacity(0.3),
   );
 }
 

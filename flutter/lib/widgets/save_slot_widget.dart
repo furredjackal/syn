@@ -80,7 +80,7 @@ class _SaveSlotWidgetState extends State<SaveSlotWidget> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.add,
             color: Colors.grey,
             size: 32,
@@ -133,7 +133,7 @@ class _SaveSlotWidgetState extends State<SaveSlotWidget> {
             if (_isHovering)
               GestureDetector(
                 onTap: widget.onDelete,
-                child: Tooltip(
+                child: const Tooltip(
                   message: 'Delete Save',
                   child: Icon(
                     Icons.delete,
@@ -150,7 +150,7 @@ class _SaveSlotWidgetState extends State<SaveSlotWidget> {
         if (widget.location != null) ...[
           Row(
             children: [
-              Icon(Icons.location_on, color: Colors.purple, size: 14),
+              const Icon(Icons.location_on, color: Colors.purple, size: 14),
               const SizedBox(width: 6),
               Text(
                 widget.location!,
@@ -165,7 +165,7 @@ class _SaveSlotWidgetState extends State<SaveSlotWidget> {
         if (widget.playtimeMinutes != null) ...[
           Row(
             children: [
-              Icon(Icons.timer, color: Colors.amber, size: 14),
+              const Icon(Icons.timer, color: Colors.amber, size: 14),
               const SizedBox(width: 6),
               Text(
                 _formatPlaytime(widget.playtimeMinutes!),
@@ -180,7 +180,7 @@ class _SaveSlotWidgetState extends State<SaveSlotWidget> {
         if (widget.lastSaved != null) ...[
           Row(
             children: [
-              Icon(Icons.access_time, color: Colors.green, size: 14),
+              const Icon(Icons.access_time, color: Colors.green, size: 14),
               const SizedBox(width: 6),
               Text(
                 _formatDate(widget.lastSaved!),

@@ -1,10 +1,12 @@
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../syn_game.dart';
 import 'choice_button_component.dart';
 
-class EventCardComponent extends PositionComponent with HasGameRef<SynGame> {
+class EventCardComponent extends PositionComponent
+    with HasGameReference<SynGame> {
   final GameEvent event;
   final Function(int) onChoice;
   late List<ChoiceButtonComponent> choiceButtons;
@@ -23,7 +25,7 @@ class EventCardComponent extends PositionComponent with HasGameRef<SynGame> {
 
     // Add background
     final background = RectangleComponent(
-      paint: Paint()..color = Colors.black.withOpacity(0.4),
+      paint: Paint()..color = Colors.black.withValues(alpha: 0.4),
       size: size,
     );
     add(background);
@@ -105,7 +107,8 @@ class EventCardComponent extends PositionComponent with HasGameRef<SynGame> {
 }
 
 /// Wrapper component to handle taps and animate button entrance with stagger
-class _TappableButtonWrapper extends PositionComponent {
+class _TappableButtonWrapper extends PositionComponent
+    with HasGameReference<SynGame>, TapCallbacks {
   final ChoiceButtonComponent child;
   final double staggerDelay;
   final VoidCallback onTap;
@@ -144,25 +147,47 @@ class _TappableButtonWrapper extends PositionComponent {
       child.scale.x = 1;
       child.scale.y = 1;
     }
+
+    _updateHoverState();
   }
 
   @override
   void render(Canvas canvas) {
     canvas.saveLayer(
       Rect.fromLTWH(0, 0, size.x, size.y),
-      Paint()..color = Colors.white.withOpacity(fadeOpacity),
+      Paint()..color = Colors.white.withValues(alpha: fadeOpacity),
     );
     super.render(canvas);
     canvas.restore();
   }
 
-  /// Handle pointer down - check if within button bounds and trigger tap
-  void onPointerDown(Vector2 globalPosition) {
-    // Convert global position to local component space
-    final localPosition = globalPosition - position;
-    if (child.containsPoint(localPosition)) {
-      onTap();
+  void _updateHoverState() {
+    final pointer = game.mousePosition;
+    if (pointer == null) {
+      child.setHovered(false);
+      return;
     }
+    final localPointer = absoluteToLocal(pointer);
+    child.setHovered(containsLocalPoint(localPointer));
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    super.onTapDown(event);
+    child.setHovered(true);
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    super.onTapUp(event);
+    child.setHovered(false);
+    onTap();
+  }
+
+  @override
+  void onTapCancel(TapCancelEvent event) {
+    super.onTapCancel(event);
+    child.setHovered(false);
   }
 }
 
@@ -222,7 +247,7 @@ class _SlashTransition extends PositionComponent {
     final currentX = startX + (endX - startX) * progress;
 
     // Create diagonal path (slash)
-    final slashWidth = 40.0;
+    const slashWidth = 40.0;
     final path = Path()
       ..moveTo(currentX - slashWidth, -size.y)
       ..lineTo(currentX + slashWidth, size.y * 2)
@@ -234,7 +259,7 @@ class _SlashTransition extends PositionComponent {
     canvas.drawPath(
       path,
       Paint()
-        ..color = const Color(0xFF00D9FF).withOpacity(0.6)
+        ..color = const Color(0xFF00D9FF).withValues(alpha: 0.6)
         ..style = PaintingStyle.fill,
     );
 

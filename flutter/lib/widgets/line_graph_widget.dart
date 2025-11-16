@@ -66,7 +66,7 @@ class LineGraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (dataPoints.isEmpty) return;
 
-    final padding = 40.0;
+    const padding = 40.0;
     final graphWidth = size.width - (padding * 2);
     final graphHeight = size.height - (padding * 2);
 

@@ -79,7 +79,7 @@ class _StatRingState extends State<StatRing>
                 alignment: Alignment.center,
                 children: [
                   // Background ring
-                  SizedBox.expand(
+                  const SizedBox.expand(
                     child: CircularProgressIndicator(
                       value: 1.0,
                       strokeWidth: 4,

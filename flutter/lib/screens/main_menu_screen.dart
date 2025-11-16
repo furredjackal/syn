@@ -122,26 +122,26 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         children: [
           // Background with gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF0A0E27),
-                  const Color(0xFF1A1F3A),
-                  const Color(0xFF2D1B4E),
+                  Color(0xFF0A0E27),
+                  Color(0xFF1A1F3A),
+                  Color(0xFF2D1B4E),
                 ],
               ),
             ),
           ),
 
           // Particle effects
-          Positioned.fill(
+          const Positioned.fill(
             child: ParticleSystemWidget(
               particleCount: 50,
-              particleColor: const Color(0xFF9D4EDD),
+              particleColor: Color(0xFF9D4EDD),
               particleSize: 2.5,
-              emitterPosition: const Offset(0.5, 0.4),
+              emitterPosition: Offset(0.5, 0.4),
               emissionRate: 12,
               lifetime: 4.0,
             ),

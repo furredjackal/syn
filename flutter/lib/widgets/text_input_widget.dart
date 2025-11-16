@@ -24,8 +24,6 @@ class TextInputWidget extends StatefulWidget {
 
 class _TextInputWidgetState extends State<TextInputWidget> {
   late TextEditingController _controller;
-  bool _isFocused = false;
-
   @override
   void initState() {
     super.initState();
@@ -50,7 +48,6 @@ class _TextInputWidgetState extends State<TextInputWidget> {
           keyboardType: widget.inputType,
           maxLines: widget.maxLines,
           onChanged: widget.onChanged,
-          onFocusChange: (focused) => setState(() => _isFocused = focused),
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white),
           decoration: InputDecoration(
             hintText: widget.hint,

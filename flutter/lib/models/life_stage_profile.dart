@@ -46,12 +46,12 @@ class LifeStageProfile {
       bounceAmount: 0.2,
       particleType: 'sparkles',
       particleEmissionRate: 12.0,
-      headingStyle: TextStyle(
+      headingStyle: const TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w900,
         letterSpacing: 2,
       ),
-      bodyStyle: TextStyle(
+      bodyStyle: const TextStyle(
         fontSize: 14,
         letterSpacing: 1,
       ),
@@ -71,13 +71,13 @@ class LifeStageProfile {
       bounceAmount: 0.15,
       particleType: 'lightning',
       particleEmissionRate: 15.0,
-      headingStyle: TextStyle(
+      headingStyle: const TextStyle(
         fontSize: 32,
         fontWeight: FontWeight.w900,
         letterSpacing: 3,
         fontStyle: FontStyle.italic,
       ),
-      bodyStyle: TextStyle(
+      bodyStyle: const TextStyle(
         fontSize: 15,
         letterSpacing: 1.5,
         fontStyle: FontStyle.italic,
@@ -98,12 +98,12 @@ class LifeStageProfile {
       bounceAmount: 0.05,
       particleType: 'coins',
       particleEmissionRate: 5.0,
-      headingStyle: TextStyle(
+      headingStyle: const TextStyle(
         fontSize: 26,
         fontWeight: FontWeight.w700,
         letterSpacing: 2,
       ),
-      bodyStyle: TextStyle(
+      bodyStyle: const TextStyle(
         fontSize: 14,
         letterSpacing: 0.5,
       ),
@@ -123,12 +123,12 @@ class LifeStageProfile {
       bounceAmount: 0.0,
       particleType: 'leaves',
       particleEmissionRate: 3.0,
-      headingStyle: TextStyle(
+      headingStyle: const TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
         letterSpacing: 2,
       ),
-      bodyStyle: TextStyle(
+      bodyStyle: const TextStyle(
         fontSize: 16,
         letterSpacing: 0.5,
       ),
@@ -148,13 +148,13 @@ class LifeStageProfile {
       bounceAmount: 0.1,
       particleType: 'data_streams',
       particleEmissionRate: 20.0,
-      headingStyle: TextStyle(
+      headingStyle: const TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w900,
         letterSpacing: 4,
         fontFamily: 'monospace',
       ),
-      bodyStyle: TextStyle(
+      bodyStyle: const TextStyle(
         fontSize: 12,
         letterSpacing: 2,
         fontFamily: 'monospace',

@@ -5,7 +5,8 @@ import 'syn_game.dart';
 /// Global UI effect layer that applies mood-based visual filters to the entire game.
 /// Renders vignette, saturation, brightness, and blur adjustments based on current mood.
 /// Mood range: -10 (despair) to +10 (euphoria)
-class UIEffectLayer extends PositionComponent with HasGameRef<SynGame> {
+class UIEffectLayer extends PositionComponent with HasGameReference<SynGame> {
+  bool isEnabled = true;
   // Effect parameters interpolated from mood
   double vignetteOpacity = 0.2;
   double saturation = 1.0;
@@ -71,6 +72,9 @@ class UIEffectLayer extends PositionComponent with HasGameRef<SynGame> {
 
   @override
   void update(double dt) {
+    if (!isEnabled) {
+      return;
+    }
     super.update(dt);
 
     // Update effect parameters based on current mood
@@ -79,6 +83,9 @@ class UIEffectLayer extends PositionComponent with HasGameRef<SynGame> {
 
   @override
   void render(Canvas canvas) {
+    if (!isEnabled) {
+      return;
+    }
     // Apply effects in order: vignette, scanlines (optional), grain (optional)
     _renderVignette(canvas);
     _renderSaturationBrightnessOverlay(canvas);
@@ -178,7 +185,7 @@ class UIEffectLayer extends PositionComponent with HasGameRef<SynGame> {
         Colors.black.withOpacity(vignetteOpacity * 0.5),
         Colors.black.withOpacity(vignetteOpacity),
       ],
-      stops: [0.3, 0.7, 1.0],
+      stops: const [0.3, 0.7, 1.0],
     );
 
     canvas.drawCircle(
@@ -245,4 +252,8 @@ class UIEffectLayer extends PositionComponent with HasGameRef<SynGame> {
   /// Gets current animation speed multiplier (for use by child components).
   /// Components can call this to adjust their animation durations.
   double getAnimationSpeedMultiplier() => animationSpeed;
+
+  void setActive(bool active) {
+    isEnabled = active;
+  }
 }

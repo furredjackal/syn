@@ -1,37 +1,36 @@
 import 'package:flame/components.dart';
-import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../syn_game.dart';
 
-class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
+class StatBarComponent extends PositionComponent with HasGameReference<SynGame> {
   final String label;
-  final int value;
+  int value;
   final int maxValue;
   final Color? customColor;
-  final int? previousValue; // Track previous value for delta animation
 
   // Animation state
   late int displayedValue;
   late RectangleComponent foregroundBar;
   late TextComponent valueText;
-  double counterAnimationTime = 0;
-  int counterTargetValue = 0;
-  double counterAnimationDuration = 0;
+  double _counterElapsed = 0;
+  double _counterDuration = 0;
+  int _counterStartValue = 0;
+  int _counterEndValue = 0;
 
   StatBarComponent({
     required this.label,
-    required this.value,
+    required int value,
     this.maxValue = 100,
     this.customColor,
-    this.previousValue,
     Vector2? position,
     Vector2? size,
-  }) : super(position: position, size: size);
+  })  : value = value,
+        super(position: position, size: size);
 
   @override
   Future<void> onLoad() async {
-    displayedValue = previousValue ?? value;
+    displayedValue = value;
     final barColor = _getBarColor();
 
     final textStyle = TextPaint(
@@ -77,28 +76,34 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
     );
     add(foregroundBar);
 
-    // Trigger animations if value changed
-    if (previousValue != null && previousValue != value) {
-      _animateValueChange();
-    }
+    _counterStartValue = value;
+    _counterEndValue = value;
+  }
+
+  void updateValue(int newValue) {
+    final clampedValue = newValue.clamp(0, maxValue).toInt();
+    if (clampedValue == value) return;
+    final previous = value;
+    value = clampedValue;
+    _animateValueChange(previous, clampedValue);
   }
 
   /// Animates the transition from previous value to new value.
   /// Includes counter tick animation, bar fill, and delta indicator.
-  void _animateValueChange() {
-    final delta = value - (previousValue ?? value);
+  void _animateValueChange(int from, int to) {
+    final delta = to - from;
     if (delta == 0) return;
 
-    final barColor = _getBarColor();
+    final barColor = _getBarColor(to);
     final isIncrease = delta > 0;
     final deltaColor =
         isIncrease ? const Color(0xFF00FF00) : const Color(0xFFFF4444);
 
     // 1. Animate value counter (0.5s tick animation)
-    _animateCounter(displayedValue, value, 0.5);
+    _animateCounter(from, to, 0.5);
 
     // 2. Animate bar fill (parallel with counter, 0.5s)
-    _animateBarFill(value, 0.5, barColor);
+    _animateBarFill(to, 0.5, barColor);
 
     // 3. Show floating delta indicator (1.0s float-up animation)
     _showDeltaIndicator(delta, deltaColor);
@@ -111,9 +116,10 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
 
   /// Counter tick animation: interpolates displayed value smoothly.
   void _animateCounter(int from, int to, double duration) {
-    counterAnimationTime = 0;
-    counterTargetValue = to;
-    counterAnimationDuration = duration;
+    _counterElapsed = 0;
+    _counterDuration = duration;
+    _counterStartValue = from;
+    _counterEndValue = to;
   }
 
   /// Bar fill animation: extends/shrinks the foreground bar width.
@@ -134,43 +140,28 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
     // Attach to a temporary component for update calls
     final animator = _BarAnimator(barUpdate, duration);
     add(animator);
+    foregroundBar.paint.color = targetColor;
   }
 
   /// Shows a floating delta indicator (e.g., "+10") that floats up and fades.
   void _showDeltaIndicator(int delta, Color color) {
     final sign = delta > 0 ? '+' : '';
-    final deltaText = TextComponent(
+    final deltaText = _FloatingDeltaText(
       text: '$sign$delta',
-      textRenderer: TextPaint(
-        style: TextStyle(
-          color: color,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      position: Vector2(size.x / 2, 28), // Start at bar middle-bottom
-      anchor: Anchor.center,
+      color: color,
+      duration: 1.0,
+      floatDistance: 20,
+      startPosition: Vector2(size.x / 2, 28),
     );
 
     add(deltaText);
-
-    // Float up + fade out (1.0s)
-    deltaText.add(MoveEffect.by(
-      Vector2(0, -20),
-      EffectController(duration: 1.0, curve: Curves.easeOut),
-    ));
-
-    deltaText.add(OpacityEffect.fadeOut(
-      EffectController(duration: 1.0),
-      onComplete: () => deltaText.removeFromParent(),
-    ));
   }
 
   /// Spawns particle burst at the bar location.
   void _burstParticles(int delta, Color color) {
     final particleCount = (delta.abs() / 5).ceil().clamp(3, 12);
     final isIncrease = delta > 0;
-    final burstRadius = 8.0;
+    const burstRadius = 8.0;
 
     for (int i = 0; i < particleCount; i++) {
       final angle = (i / particleCount) * 2 * math.pi;
@@ -194,10 +185,11 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
     return 1 - math.pow(1 - t, 3) as double;
   }
 
-  Color _getBarColor() {
+  Color _getBarColor([int? valueOverride]) {
     if (customColor != null) return customColor!;
 
-    final percentage = (value / maxValue).clamp(0.0, 1.0);
+    final currentValue = valueOverride ?? value;
+    final percentage = (currentValue / maxValue).clamp(0.0, 1.0);
     if (percentage < 0.33) {
       return const Color(0xFFFF4444);
     } else if (percentage < 0.66) {
@@ -212,20 +204,18 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
     super.update(dt);
 
     // Handle counter animation
-    if (counterAnimationDuration > 0 &&
-        counterAnimationTime < counterAnimationDuration) {
-      counterAnimationTime += dt;
-      final progress =
-          (counterAnimationTime / counterAnimationDuration).clamp(0.0, 1.0);
+    if (_counterDuration > 0 && _counterElapsed < _counterDuration) {
+      _counterElapsed += dt;
+      final progress = (_counterElapsed / _counterDuration).clamp(0.0, 1.0);
       final easeProgress = _easeOutCubic(progress);
-      displayedValue = (displayedValue +
-              (counterTargetValue - displayedValue) * easeProgress * 0.1)
-          .toInt();
+      displayedValue =
+          (_counterStartValue + (_counterEndValue - _counterStartValue) * easeProgress)
+              .round();
 
       // Update text
       final valueTextStyle = TextPaint(
         style: TextStyle(
-          color: _getBarColor(),
+          color: _getBarColor(displayedValue),
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
@@ -233,10 +223,69 @@ class StatBarComponent extends PositionComponent with HasGameRef<SynGame> {
       valueText.textRenderer = valueTextStyle;
       valueText.text = '$displayedValue/$maxValue';
 
-      if (counterAnimationTime >= counterAnimationDuration) {
-        displayedValue = counterTargetValue;
-        counterAnimationDuration = 0;
+      if (_counterElapsed >= _counterDuration) {
+        displayedValue = _counterEndValue;
+        _counterDuration = 0;
       }
+    }
+  }
+}
+
+class _FloatingDeltaText extends PositionComponent {
+  final String text;
+  final Color color;
+  final double duration;
+  final double floatDistance;
+  final Vector2 startPosition;
+  late TextComponent _textComponent;
+  double _elapsed = 0;
+
+  _FloatingDeltaText({
+    required this.text,
+    required this.color,
+    required this.duration,
+    required this.floatDistance,
+    required this.startPosition,
+  }) : super(
+          position: startPosition.clone(),
+          size: Vector2.zero(),
+          anchor: Anchor.center,
+        );
+
+  @override
+  Future<void> onLoad() async {
+    _textComponent = TextComponent(
+      text: text,
+      textRenderer: TextPaint(
+        style: TextStyle(
+          color: color,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      anchor: Anchor.center,
+    );
+    add(_textComponent);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    _elapsed += dt;
+    final progress = (_elapsed / duration).clamp(0.0, 1.0);
+    position = Vector2(startPosition.x, startPosition.y - floatDistance * progress);
+
+    final opacity = 1.0 - progress;
+    _textComponent.textRenderer = TextPaint(
+      style: TextStyle(
+        color: color.withOpacity(opacity),
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+
+    if (_elapsed >= duration) {
+      removeFromParent();
     }
   }
 }
@@ -280,7 +329,7 @@ class _Particle extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    final opacity = 1.0 - (elapsedTime / lifetime);
+    final opacity = (1.0 - (elapsedTime / lifetime)).clamp(0.0, 1.0);
     canvas.drawCircle(
       Offset(size.x / 2, size.y / 2),
       2,

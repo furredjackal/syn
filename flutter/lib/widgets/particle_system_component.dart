@@ -6,7 +6,8 @@ import '../models/life_stage_profile.dart';
 
 /// Flame-based particle system component for mood-driven environmental effects
 class ParticleSystemComponent extends PositionComponent
-    with HasGameRef<SynGame> {
+    with HasGameReference<SynGame> {
+  bool isEnabled = true;
   /// Current mood value (-10 to +10)
   int currentMood = 0;
 
@@ -27,11 +28,14 @@ class ParticleSystemComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     // Set up initial size to match game bounds
-    size = gameRef.size;
+    size = game.size;
   }
 
   @override
   void update(double dt) {
+    if (!isEnabled) {
+      return;
+    }
     super.update(dt);
 
     // Update emission rate based on mood and life stage
@@ -197,12 +201,19 @@ class ParticleSystemComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    if (!isEnabled) {
+      return;
+    }
     super.render(canvas);
 
     // Draw all particles
     for (var particle in particles) {
       particle.render(canvas);
     }
+  }
+
+  void setActive(bool active) {
+    isEnabled = active;
   }
 }
 
