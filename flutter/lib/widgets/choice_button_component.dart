@@ -1,13 +1,18 @@
 import 'package:flame/components.dart';
-import 'package:flame/effects.dart';
-import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
-import 'package:syn/flutter/lib/models/game_state.dart';
-import 'package:syn/flutter/lib/syn_game.dart';
-import 'package:syn/flutter/lib/widgets/stat_change_indicators_component.dart';
+import '../models/game_state.dart';
+import '../syn_game.dart';
+import 'stat_change_indicators_component.dart';
 
-class ChoiceButtonComponent extends PositionComponent
-    with HasGameRef<SynGame>, Tappable {
+/// Flame component for displaying a choice button with interactive feedback.
+///
+/// Features:
+/// - Cyan border styling that brightens on hover/press
+/// - Semi-transparent background that appears on hover/press
+/// - Scale animation on press (1.0 → 0.95 → 1.0 over 300ms)
+/// - Keyboard shortcut display in top-right box
+/// - Stat change indicators below choice text
+class ChoiceButtonComponent extends PositionComponent with HasGameRef<SynGame> {
   final GameChoice choice;
   final int index;
   final VoidCallback onPressed;
@@ -20,59 +25,176 @@ class ChoiceButtonComponent extends PositionComponent
     Vector2? size,
   }) : super(position: position, size: size);
 
-  final _background = RectangleComponent();
-  final _text = TextComponent();
-  final _shortcut = TextComponent();
+  // State for interactivity
+  bool _isHovered = false;
+  double _pressAnimationValue = 0.0; // 0.0 to 1.0
+  double _pressAnimationDirection = 0.0; // For animating press feedback
+
+  late RectangleComponent _background;
+  late RectangleComponent _borderComponent;
+  late RectangleComponent _shortcutBox;
+  late TextComponent _choiceText;
+  late TextComponent _shortcutText;
 
   @override
   Future<void> onLoad() async {
-    _background.paint = Paint()..color = Colors.transparent;
-    _background.size = size;
+    // Background rectangle (will change opacity on hover)
+    _background = RectangleComponent(
+      paint: Paint()..color = Colors.black.withOpacity(0.3),
+      size: size,
+    );
     add(_background);
 
-    _text.text = choice.text.toUpperCase();
-    _text.textRenderer = TextPaint(
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 16,
-      ),
+    // Cyan border rectangle
+    _borderComponent = RectangleComponent(
+      paint: Paint()
+        ..color = Colors.transparent
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+      size: size,
     );
-    _text.position = Vector2(16, 16);
-    add(_text);
+    add(_borderComponent);
 
+    // Main choice text
+    _choiceText = TextComponent(
+      text: choice.text.toUpperCase(),
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      position: Vector2(16, 12),
+    );
+    add(_choiceText);
+
+    // Stat change indicators below text
     add(StatChangeIndicatorsComponent(
       statChanges: choice.statChanges,
-      position: Vector2(16, 40),
+      position: Vector2(16, 36),
     ));
 
-    _shortcut.text = choice.keyboardShortcut.toString();
-    _shortcut.textRenderer = TextPaint(
+    // Keyboard shortcut box (top-right)
+    _shortcutBox = RectangleComponent(
+      paint: Paint()
+        ..color = Colors.black.withOpacity(0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+      size: Vector2(32, 32),
+      position: Vector2(size.x - 48, 8),
+    );
+    add(_shortcutBox);
+
+    // Keyboard shortcut text (centered in box)
+    _shortcutText = TextComponent(
+      text: choice.keyboardShortcut.toString(),
+      textRenderer: TextPaint(
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      position: Vector2(size.x - 32, 24),
+      anchor: Anchor.center,
+    );
+    add(_shortcutText);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    // Animate press feedback (scale effect)
+    if (_pressAnimationValue > 0.0 && _pressAnimationDirection < 0.0) {
+      // Animating back to normal after press
+      _pressAnimationValue -= dt * 3.0; // 3.0 units/sec = ~333ms animation
+      if (_pressAnimationValue <= 0.0) {
+        _pressAnimationValue = 0.0;
+        _pressAnimationDirection = 0.0;
+      }
+    }
+
+    // Update scale based on press animation
+    final pressScale = 1.0 - (_pressAnimationValue * 0.05);
+    scale.setValues(pressScale, pressScale);
+
+    // Update visual feedback colors based on hover/press state
+    _updateHoverColors();
+  }
+
+  /// Update button colors based on hover and press state
+  void _updateHoverColors() {
+    final isActive = _isHovered || _pressAnimationValue > 0.0;
+    final borderColor = isActive
+        ? const Color(0xFF00D9FF)
+        : const Color(0xFF00D9FF).withOpacity(0.3);
+    final backgroundColor = isActive
+        ? const Color(0xFF00D9FF).withOpacity(0.1)
+        : Colors.black.withOpacity(0.3);
+
+    // Update border
+    _borderComponent.paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = borderColor;
+
+    // Update background
+    _background.paint = Paint()..color = backgroundColor;
+
+    // Update text color
+    _choiceText.textRenderer = TextPaint(
       style: TextStyle(
-        color: Colors.white.withOpacity(0.7),
-        fontSize: 14,
+        color: isActive ? const Color(0xFF00D9FF) : Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
       ),
     );
-    _shortcut.position = Vector2(size.x - 16, 16);
-    _shortcut.anchor = Anchor.topRight;
-    add(_shortcut);
+
+    // Update shortcut box and text colors
+    _shortcutBox.paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = borderColor;
+
+    _shortcutText.textRenderer = TextPaint(
+      style: TextStyle(
+        color:
+            isActive ? const Color(0xFF00D9FF) : Colors.white.withOpacity(0.7),
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+    );
   }
 
-  @override
-  bool onTapDown(TapDownInfo info) {
-    add(ScaleEffect.to(
-      Vector2.all(0.95),
-      EffectController(duration: 0.1),
-    ));
-    return true;
+  /// Trigger press animation when user selects this choice
+  void simulateTap() {
+    // Start press animation
+    _pressAnimationValue = 1.0;
+    _pressAnimationDirection = -1.0; // Animating downward (releasing)
+
+    // Fire the callback after a short delay to show animation
+    Future.delayed(const Duration(milliseconds: 150), onPressed);
   }
 
-  @override
-  bool onTapUp(TapUpInfo info) {
-    add(ScaleEffect.to(
-      Vector2.all(1.0),
-      EffectController(duration: 0.1),
-    ));
-    onPressed();
-    return true;
+  /// Check if a point is within this component's bounds
+  bool containsPoint(Vector2 point) {
+    return point.x >= 0 &&
+        point.x <= size.x &&
+        point.y >= 0 &&
+        point.y <= size.y;
+  }
+
+  /// Handle tap at a local coordinate
+  void handleTap(Vector2 tapPosition) {
+    if (containsPoint(tapPosition)) {
+      simulateTap();
+    }
+  }
+
+  /// Set hover state (can be called from parent during collision detection)
+  void setHovered(bool hovered) {
+    _isHovered = hovered;
   }
 }

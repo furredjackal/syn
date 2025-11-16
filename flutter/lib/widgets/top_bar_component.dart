@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'package:syn/flutter/lib/syn_game.dart';
-import 'package:syn/flutter/lib/theme/theme.dart';
+import '../syn_game.dart';
+import '../theme/theme.dart';
 
 class TopBarComponent extends PositionComponent with HasGameRef<SynGame> {
   @override

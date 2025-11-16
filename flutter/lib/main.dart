@@ -1,6 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'game/syn_game.dart';
+import 'syn_game.dart';
 import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_menu_screen.dart';

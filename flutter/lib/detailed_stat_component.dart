@@ -1,3 +1,5 @@
-import 'package.dart';
+import 'package:flame/components.dart';
 
-class DetailedStatComponent extends Component {}
+class DetailedStatComponent extends PositionComponent {
+  // TODO: Implement detailed stat component
+}

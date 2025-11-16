@@ -1,7 +1,6 @@
 import 'package:flame/components.dart';
-import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
-import 'package:syn/flutter/lib/syn_game.dart';
+import '../syn_game.dart';
 
 class QuickMenuBarComponent extends PositionComponent with HasGameRef<SynGame> {
   @override
@@ -12,30 +11,14 @@ class QuickMenuBarComponent extends PositionComponent with HasGameRef<SynGame> {
     );
     add(background);
 
-    double xOffset = size.x / 4;
-    _addButton('MEMORY (M)', () => game.router.pushNamed('journal'), xOffset);
-    xOffset += size.x / 4;
-    _addButton('SAVE (Ctrl+S)', () {
-      // TODO: Implement save
-    }, xOffset);
-    xOffset += size.x / 4;
-    _addButton(
-        'SETTINGS (ESC)', () => game.router.pushNamed('settings'), xOffset);
-    xOffset += size.x / 4;
-    _addButton('MENU', () => game.router.pushReplacementNamed('menu'), xOffset);
-  }
-
-  void _addButton(String label, VoidCallback onPressed, double x) {
-    add(QuickMenuButton(
-      label: label,
-      onPressed: onPressed,
-      position: Vector2(x, size.y / 2),
-      anchor: Anchor.center,
-    ));
+    // TODO: Implement quick menu buttons with proper navigation
+    // For now, just show placeholder
   }
 }
 
-class QuickMenuButton extends PositionComponent with Tappable {
+// TODO: Implement QuickMenuButton when Flutter routing is integrated
+/* 
+class QuickMenuButton extends PositionComponent {
   final String label;
   final VoidCallback onPressed;
 
@@ -47,7 +30,6 @@ class QuickMenuButton extends PositionComponent with Tappable {
   }) : super(position: position, anchor: anchor);
 
   final _text = TextComponent();
-  bool _isHovered = false;
 
   @override
   Future<void> onLoad() async {
@@ -60,12 +42,5 @@ class QuickMenuButton extends PositionComponent with Tappable {
     _text.anchor = Anchor.center;
     add(_text);
   }
-
-  @override
-  bool onTapDown(TapDownInfo info) {
-    onPressed();
-    return true;
-  }
-
-  // TODO: Add hover effect
 }
+*/

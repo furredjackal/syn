@@ -1,6 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'package:syn/flutter/lib/syn_game.dart';
+import '../syn_game.dart';
 
 class StatRingComponent extends PositionComponent with HasGameRef<SynGame> {
   final String label;

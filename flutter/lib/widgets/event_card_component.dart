@@ -78,10 +78,11 @@ class EventCardComponent extends PositionComponent with HasGameRef<SynGame> {
         size: Vector2(size.x - 48, 80),
       );
 
-      // Create wrapper to control opacity via custom component
-      final buttonWrapper = _AnimatingButtonWrapper(
+      // Wrap button with tap detector
+      final buttonWrapper = _TappableButtonWrapper(
         child: choiceButton,
         staggerDelay: 0.2 + (i * 0.1),
+        onTap: () => choiceButton.simulateTap(),
       );
       add(buttonWrapper);
       choiceButtons.add(choiceButton);
@@ -103,16 +104,18 @@ class EventCardComponent extends PositionComponent with HasGameRef<SynGame> {
   }
 }
 
-/// Wrapper component to animate button entrance with stagger
-class _AnimatingButtonWrapper extends PositionComponent {
+/// Wrapper component to handle taps and animate button entrance with stagger
+class _TappableButtonWrapper extends PositionComponent {
   final ChoiceButtonComponent child;
   final double staggerDelay;
+  final VoidCallback onTap;
   double elapsedTime = 0;
   double fadeOpacity = 0;
 
-  _AnimatingButtonWrapper({
+  _TappableButtonWrapper({
     required this.child,
     required this.staggerDelay,
+    required this.onTap,
   }) : super(size: child.size, position: child.position);
 
   @override
@@ -151,6 +154,15 @@ class _AnimatingButtonWrapper extends PositionComponent {
     );
     super.render(canvas);
     canvas.restore();
+  }
+
+  /// Handle pointer down - check if within button bounds and trigger tap
+  void onPointerDown(Vector2 globalPosition) {
+    // Convert global position to local component space
+    final localPosition = globalPosition - position;
+    if (child.containsPoint(localPosition)) {
+      onTap();
+    }
   }
 }
 

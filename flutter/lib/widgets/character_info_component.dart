@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'package:syn/flutter/lib/models/game_state.dart';
-import 'package:syn/flutter/lib/syn_game.dart';
+import '../models/game_state.dart';
+import '../syn_game.dart';
 
 class CharacterInfoComponent extends PositionComponent with HasGameRef<SynGame> {
   final RelationshipData relationship;
