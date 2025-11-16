@@ -1,6 +1,8 @@
 import 'package:flame/game.dart';
 import 'package:flame/route.dart';
 import 'models/game_state.dart';
+import 'ui_effect_layer.dart';
+import 'widgets/particle_system_component.dart';
 import 'character_creation_component.dart';
 import 'debug_console_component.dart';
 import 'detailed_stat_component.dart';
@@ -15,8 +17,10 @@ import 'settings_screen_component.dart';
 import 'splash_screen_component.dart';
 import 'world_map_component.dart';
 
-class SynGame extends FlameGame with HasRouter {
+class SynGame extends FlameGame {
   late final GameState gameState;
+  late UIEffectLayer uiEffectLayer;
+  late ParticleSystemComponent particleSystem;
 
   SynGame() {
     gameState = GameState();
@@ -24,6 +28,15 @@ class SynGame extends FlameGame with HasRouter {
 
   @override
   void onMount() {
+    // Add global UI effect layer (renders on top of all game components)
+    uiEffectLayer = UIEffectLayer();
+    add(uiEffectLayer);
+
+    // Add particle system for mood-driven environmental effects
+    particleSystem = ParticleSystemComponent();
+    add(particleSystem);
+
+    // Add router for screen management
     add(
       RouterComponent(
         initialRoute: 'splash',
