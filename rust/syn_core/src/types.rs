@@ -436,53 +436,65 @@ impl Relationship {
 
     /// Compute the next state based on relationship axes.
     /// Called after event outcomes to update relationship state automatically.
+    /// States are checked from most specific to least specific to ensure correct categorization.
     pub fn compute_next_state(&self) -> RelationshipState {
-        // High resentment + low trust → Rival
-        if self.resentment > 5.0 && self.trust < -2.0 {
-            return RelationshipState::Rival;
+        let ordered_checks = [
+            (
+                RelationshipState::Spouse,
+                self.trust > 8.0
+                    && self.affection > 8.0
+                    && self.familiarity > 8.0
+                    && self.attraction > 6.0,
+            ),
+            (
+                RelationshipState::Partner,
+                self.attraction > 7.0 && self.trust > 6.0 && self.affection > 7.0,
+            ),
+            (
+                RelationshipState::RomanticInterest,
+                self.attraction > 4.0 && self.trust > 2.0 && self.affection > 3.0,
+            ),
+            (
+                RelationshipState::BestFriend,
+                self.affection > 8.0
+                    && self.familiarity > 8.0
+                    && self.trust > 8.0
+                    && self.attraction < 2.0,
+            ),
+            (
+                RelationshipState::CloseFriend,
+                self.affection > 6.0
+                    && self.familiarity > 6.0
+                    && self.trust > 5.0
+                    && self.attraction < 3.0,
+            ),
+            (
+                RelationshipState::Friend,
+                self.affection > 3.0
+                    && self.familiarity > 2.0
+                    && self.trust > 1.0
+                    && self.resentment < 2.0,
+            ),
+            (
+                RelationshipState::Rival,
+                self.resentment > 5.0 && self.trust < -2.0,
+            ),
+            (
+                RelationshipState::Estranged,
+                self.resentment > 5.0 && self.familiarity > 5.0,
+            ),
+            (
+                RelationshipState::Acquaintance,
+                self.affection > 0.0 && self.affection <= 3.0 && self.familiarity > 0.0,
+            ),
+        ];
+
+        for (state, condition) in ordered_checks {
+            if condition {
+                return state;
+            }
         }
 
-        // High resentment + was close → Estranged
-        if self.resentment > 5.0 && self.familiarity > 5.0 {
-            return RelationshipState::Estranged;
-        }
-
-        // High attraction + moderate trust + high affection → RomanticInterest
-        if self.attraction > 4.0 && self.trust > 2.0 && self.affection > 3.0 {
-            return RelationshipState::RomanticInterest;
-        }
-
-        // Very high attraction + very high trust + very high affection → Partner
-        if self.attraction > 7.0 && self.trust > 6.0 && self.affection > 7.0 {
-            return RelationshipState::Partner;
-        }
-
-        // Extreme commitment markers → Spouse
-        if self.trust > 8.0 && self.affection > 8.0 && self.familiarity > 8.0 && self.attraction > 6.0 {
-            return RelationshipState::Spouse;
-        }
-
-        // High affection + high familiarity + high trust → CloseFriend
-        if self.affection > 6.0 && self.familiarity > 6.0 && self.trust > 5.0 && self.attraction < 3.0 {
-            return RelationshipState::CloseFriend;
-        }
-
-        // Extremely close platonic → BestFriend
-        if self.affection > 8.0 && self.familiarity > 8.0 && self.trust > 8.0 && self.attraction < 2.0 {
-            return RelationshipState::BestFriend;
-        }
-
-        // Moderate affection + decent familiarity + trust → Friend
-        if self.affection > 3.0 && self.familiarity > 2.0 && self.trust > 1.0 && self.resentment < 2.0 {
-            return RelationshipState::Friend;
-        }
-
-        // Low warmth but known → Acquaintance
-        if self.affection > 0.0 && self.affection <= 3.0 && self.familiarity > 0.0 {
-            return RelationshipState::Acquaintance;
-        }
-
-        // Otherwise remain/become Stranger
         RelationshipState::Stranger
     }
 }
@@ -907,9 +919,10 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn test_relationship_state_partner_to_spouse() {
-        // Similar issue: Spouse requires very high values but RomanticInterest triggers first.
-        // Test that high romantic values correctly trigger RomanticInterest state.
+        // Test that very high values across all axes correctly trigger Spouse state.
+        // Spouse is the most specific romantic state and should be checked first.
         let rel = Relationship {
             affection: 9.0,
             trust: 9.0,
@@ -919,8 +932,9 @@ mod tests {
             ..Default::default()
         };
         let next_state = rel.compute_next_state();
-        // This will be RomanticInterest due to check order, which is the most specific state reachable
-        assert_eq!(next_state, RelationshipState::RomanticInterest);
+        // With extreme commitment markers (trust > 8, affection > 8, familiarity > 8, attraction > 6),
+        // the relationship should be correctly identified as Spouse.
+        assert_eq!(next_state, RelationshipState::Spouse);
     }
 
     #[test]

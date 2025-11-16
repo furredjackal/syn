@@ -26,7 +26,10 @@ class LineGraphWidget extends StatelessWidget {
         if (title.isNotEmpty)
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.cyan),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: Colors.cyan),
           ),
         if (title.isNotEmpty) const SizedBox(height: 8),
         SizedBox(
@@ -80,13 +83,19 @@ class LineGraphPainter extends CustomPainter {
 
     for (int i = 0; i <= 4; i++) {
       final y = padding + (graphHeight / 4) * i;
-      canvas.drawLine(Offset(padding, y), Offset(size.width - padding, y), gridPaint);
+      canvas.drawLine(
+          Offset(padding, y), Offset(size.width - padding, y), gridPaint);
     }
 
     // Find min and max
-    final minValue = dataPoints.reduce((a, b) => a < b ? a : b);
-    final maxValue = dataPoints.reduce((a, b) => a > b ? a : b);
-    final range = maxValue - minValue + 1;
+    double minValue = 0;
+    double maxValue = 0;
+    if (dataPoints.isNotEmpty) {
+      minValue = dataPoints.reduce((a, b) => a < b ? a : b);
+      maxValue = dataPoints.reduce((a, b) => a > b ? a : b);
+    }
+    // Add a small epsilon to avoid division by zero if all points are the same
+    final range = (maxValue - minValue).abs() < 0.001 ? 1 : maxValue - minValue;
 
     // Draw line
     final linePaint = Paint()
@@ -97,8 +106,11 @@ class LineGraphPainter extends CustomPainter {
 
     final path = Path();
     for (int i = 0; i < dataPoints.length; i++) {
-      final x = padding + (graphWidth / (dataPoints.length - 1 > 0 ? dataPoints.length - 1 : 1)) * i;
-      final normalizedValue = (dataPoints[i] - minValue) / range;
+      final x = padding +
+          (graphWidth / (dataPoints.length > 1 ? dataPoints.length - 1 : 1)) *
+              i;
+      final normalizedValue =
+          range > 0 ? (dataPoints[i] - minValue) / range : 0.5;
       final y = size.height - padding - (graphHeight * normalizedValue);
 
       if (i == 0) {
@@ -116,8 +128,11 @@ class LineGraphPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (int i = 0; i < dataPoints.length; i++) {
-      final x = padding + (graphWidth / (dataPoints.length - 1 > 0 ? dataPoints.length - 1 : 1)) * i;
-      final normalizedValue = (dataPoints[i] - minValue) / range;
+      final x = padding +
+          (graphWidth / (dataPoints.length > 1 ? dataPoints.length - 1 : 1)) *
+              i;
+      final normalizedValue =
+          range > 0 ? (dataPoints[i] - minValue) / range : 0.5;
       final y = size.height - padding - (graphHeight * normalizedValue);
       canvas.drawCircle(Offset(x, y), 4, pointPaint);
     }
@@ -127,20 +142,25 @@ class LineGraphPainter extends CustomPainter {
       ..color = Colors.grey
       ..strokeWidth = 1;
 
-    canvas.drawLine(Offset(padding, padding), Offset(padding, size.height - padding), axisPaint);
-    canvas.drawLine(Offset(padding, size.height - padding), Offset(size.width - padding, size.height - padding), axisPaint);
+    canvas.drawLine(Offset(padding, padding),
+        Offset(padding, size.height - padding), axisPaint);
+    canvas.drawLine(Offset(padding, size.height - padding),
+        Offset(size.width - padding, size.height - padding), axisPaint);
 
     // Draw labels
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
     if (labels.isNotEmpty) {
       for (int i = 0; i < labels.length && i < dataPoints.length; i++) {
-        final x = padding + (graphWidth / (dataPoints.length - 1 > 0 ? dataPoints.length - 1 : 1)) * i;
+        final x = padding +
+            (graphWidth / (dataPoints.length > 1 ? dataPoints.length - 1 : 1)) *
+                i;
         textPainter.text = TextSpan(
           text: labels[i],
           style: const TextStyle(color: Colors.grey, fontSize: 8),
         );
         textPainter.layout();
-        textPainter.paint(canvas, Offset(x - textPainter.width / 2, size.height - padding + 5));
+        textPainter.paint(canvas,
+            Offset(x - textPainter.width / 2, size.height - padding + 5));
       }
     }
   }

@@ -1,6 +1,6 @@
+import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'models/game_state.dart';
+import 'game/syn_game.dart';
 import 'theme/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_menu_screen.dart';
@@ -17,14 +17,7 @@ import 'screens/end_of_life_screen.dart';
 import 'screens/debug_console_screen.dart';
 
 void main() {
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => GameState()),
-      ],
-      child: const SynApp(),
-    ),
-  );
+  runApp(const SynApp());
 }
 
 class SynApp extends StatelessWidget {
@@ -35,7 +28,9 @@ class SynApp extends StatelessWidget {
     return MaterialApp(
       title: 'SYN: Simulate Your Narrative',
       theme: SynTheme.dark,
-      home: const SplashScreen(),
+      home: Scaffold(
+        body: GameWidget(game: SynGame()),
+      ),
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/menu': (context) => const MainMenuScreen(),

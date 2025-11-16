@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+
 
 /// Game event choice
 class GameChoice {
@@ -77,7 +77,7 @@ class MemoryEntry {
 }
 
 /// Main game state
-class GameState extends ChangeNotifier {
+class GameState {
   // Player info
   String playerName = '';
   int age = 6;
@@ -137,14 +137,12 @@ class GameState extends ChangeNotifier {
   // Update player name
   void setPlayerName(String name) {
     playerName = name;
-    notifyListeners();
   }
 
   // Update age and life stage
   void advanceAge(int years) {
     age += years;
     _updateLifeStage();
-    notifyListeners();
   }
 
   void _updateLifeStage() {
@@ -162,18 +160,15 @@ class GameState extends ChangeNotifier {
   // Update mood
   void setMood(int newMood) {
     mood = newMood.clamp(-10, 10);
-    notifyListeners();
   }
 
   // Update narrative heat
   void addNarrativeHeat(double amount) {
     narrativeHeat = (narrativeHeat + amount).clamp(0, 200);
-    notifyListeners();
   }
 
   void setNarrativeHeat(double value) {
     narrativeHeat = value.clamp(0, 200);
-    notifyListeners();
   }
 
   // Update stats
@@ -201,19 +196,16 @@ class GameState extends ChangeNotifier {
         stability = (stability + change).clamp(0, 100);
         break;
     }
-    notifyListeners();
   }
 
   // Update karma
   void addKarma(int amount) {
     karma += amount;
-    notifyListeners();
   }
 
   // Set current event
   void setCurrentEvent(GameEvent? event) {
     currentEvent = event;
-    notifyListeners();
   }
 
   // Apply choice effects
@@ -221,13 +213,11 @@ class GameState extends ChangeNotifier {
     choice.statChanges.forEach((stat, change) {
       updateStat(stat, change);
     });
-    notifyListeners();
   }
 
   // Add memory
   void addMemory(MemoryEntry memory) {
     memories.add(memory);
-    notifyListeners();
   }
 
   // Update relationship
@@ -238,43 +228,35 @@ class GameState extends ChangeNotifier {
     } else {
       relationships.add(updated);
     }
-    notifyListeners();
   }
 
   // Settings
   void toggleSound() {
     soundEnabled = !soundEnabled;
-    notifyListeners();
   }
 
   void toggleMusic() {
     musicEnabled = !musicEnabled;
-    notifyListeners();
   }
 
   void setMasterVolume(double volume) {
     masterVolume = volume.clamp(0.0, 1.0);
-    notifyListeners();
   }
 
   void toggleColorBlindMode() {
     colorBlindMode = !colorBlindMode;
-    notifyListeners();
   }
 
   void toggleReducedMotion() {
     reducedMotion = !reducedMotion;
-    notifyListeners();
   }
 
   void setFontSize(double scale) {
     fontSize = scale;
-    notifyListeners();
   }
 
   // Save/Load
   void markSaveExists() {
     hasActiveSave = true;
-    notifyListeners();
   }
 }

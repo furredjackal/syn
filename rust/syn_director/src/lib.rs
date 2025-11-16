@@ -712,7 +712,9 @@ mod tests {
         // Current: affection 5.0, trust 3.0, attraction 2.0, familiarity 4.0
         // Delta: affection 3.0, trust 4.0, attraction 6.0, familiarity 3.0
         // Result: affection 8.0, trust 7.0, attraction 8.0, familiarity 7.0
-        // This triggers RomanticInterest due to check order (attraction > 4 && trust > 2 && affection > 3)
+        // With the refactored check order (most specific first):
+        // - Not Spouse: trust 7.0 < 8.0
+        // - Is Partner: attraction 8.0 > 7.0 && trust 7.0 > 6.0 && affection 8.0 > 7.0 ✓
         let mut outcome = StoryletOutcome::default();
         outcome.relationship_deltas.push((
             NpcId(1),
@@ -729,9 +731,9 @@ mod tests {
 
         director.fire_storylet(&storylet, &mut world, &mut memory, outcome, SimTick(0));
 
-        // Check that relationship state transitioned to RomanticInterest (due to check order)
+        // Check that relationship state transitioned to Partner (the most specific state for these values)
         let updated_rel = world.get_relationship(NpcId(1), NpcId(2));
-        assert_eq!(updated_rel.state, RelationshipState::RomanticInterest);
+        assert_eq!(updated_rel.state, RelationshipState::Partner);
     }
 
     #[test]
