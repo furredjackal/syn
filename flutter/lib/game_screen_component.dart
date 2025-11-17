@@ -4,19 +4,23 @@ import 'package:flutter/services.dart';
 import 'models/game_state.dart';
 import 'syn_game.dart';
 import 'widgets/event_card_component.dart';
+import 'widgets/persona_background.dart';
 import 'widgets/quick_menu_bar_component.dart';
 import 'widgets/relationship_panel_component.dart';
 import 'widgets/stat_panel_component.dart';
 import 'widgets/top_bar_component.dart';
 
-/// Main game screen component using Flame components instead of Flutter widgets.
+/// Main game screen component using Flame components as floating canvas.
 ///
-/// Follows the Flame Engine UI architecture with a layout of:
-/// - TopBar (age, mood, life stage display)
-/// - StatPanel (left side: health, wealth, charisma, etc.)
-/// - EventCard (center: current event with choices)
-/// - RelationshipPanel (right side: active relationships)
-/// - QuickMenuBar (bottom: memory, save, settings, menu buttons)
+/// Floating Persona UI model:
+/// - EventCard: Centered focal point (max 60% width, angled Persona style)
+/// - StatPanel: Floats left (compact ~250-300px, minimal footprint)
+/// - RelationshipPanel: Floats right (compact ~250-300px, minimal footprint)
+/// - TopBar: Thin strip at top
+/// - QuickMenuBar: Thin strip at bottom
+///
+/// NO rigid layout frames. Each component defines its own position and shape.
+/// Follows floating canvas model from design docs.
 class GameScreenComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
   static final Map<int, Set<LogicalKeyboardKey>> _shortcutKeyMap = {
@@ -31,6 +35,10 @@ class GameScreenComponent extends PositionComponent
     8: {LogicalKeyboardKey.digit8, LogicalKeyboardKey.numpad8},
     9: {LogicalKeyboardKey.digit9, LogicalKeyboardKey.numpad9},
   };
+
+  late final PersonaBackground _background;
+  late final PositionComponent _componentLayer;
+
   late TopBarComponent topBar;
   late StatPanelComponent statPanel;
   late RelationshipPanelComponent relationshipPanel;
@@ -40,44 +48,70 @@ class GameScreenComponent extends PositionComponent
 
   @override
   Future<void> onLoad() async {
-    // Set component to fill entire screen
     size = game.size;
 
-    // Background gradient (dark theme)
-    add(RectangleComponent(
-      paint: Paint()..color = const Color(0xFF0A0E27),
-      size: size,
-    ));
+    // Background (Persona-style canvas)
+    _background = PersonaBackground()..size = size;
+    add(_background);
 
-    // Calculate layout dimensions
-    const topBarHeight = 80.0;
-    const bottomBarHeight = 80.0;
-    final panelWidth = size.x * 0.2;
-    final contentHeight = size.y - topBarHeight - bottomBarHeight;
+    // Single component layer (no rigid frame structure)
+    _componentLayer = PositionComponent()..size = size;
+    add(_componentLayer);
 
-    // Add top bar
+    // Position components according to floating canvas model
+    // Top bar: thin strip at top
     topBar = TopBarComponent()
-      ..position = Vector2(0, 0)
-      ..size = Vector2(size.x, topBarHeight);
-    add(topBar);
+      ..position = Vector2(40, 25)
+      ..size = Vector2(size.x - 80, 60);
+    _componentLayer.add(topBar);
 
-    // Add left stat panel
+    // Event card: centered focal point (max 60% of screen width)
+    final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
+    final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
+
+    // Create a placeholder event for initial display
+    final initialEvent = GameEvent(
+      id: 'placeholder',
+      title: 'Loading...',
+      description: '',
+      choices: [],
+      lifeStage: 'Loading',
+      age: 0,
+    );
+
+    final eventCard = EventCardComponent(
+      event: initialEvent,
+      onChoice: _handleChoice,
+      position: Vector2(
+        (size.x - eventWidth) / 2,
+        (size.y - eventHeight) / 2 - 40,
+      ),
+      size: Vector2(eventWidth, eventHeight),
+    );
+    _componentLayer.add(eventCard);
+    currentEventCard = eventCard;
+
+    // Stat panel: floats left (compact ~250px width, 250-300px height)
+    const statPanelWidth = 280.0;
+    const statPanelHeight = 280.0;
     statPanel = StatPanelComponent()
-      ..position = Vector2(0, topBarHeight)
-      ..size = Vector2(panelWidth, contentHeight);
-    add(statPanel);
+      ..position = Vector2(55, size.y * 0.30)
+      ..size = Vector2(statPanelWidth, statPanelHeight);
+    _componentLayer.add(statPanel);
 
-    // Add right relationship panel
+    // Relationship panel: floats right (compact ~250px width, 250-300px height)
+    const relPanelWidth = 280.0;
+    const relPanelHeight = 280.0;
     relationshipPanel = RelationshipPanelComponent()
-      ..position = Vector2(size.x - panelWidth, topBarHeight)
-      ..size = Vector2(panelWidth, contentHeight);
-    add(relationshipPanel);
+      ..position = Vector2(size.x - relPanelWidth - 55, size.y * 0.30)
+      ..size = Vector2(relPanelWidth, relPanelHeight);
+    _componentLayer.add(relationshipPanel);
 
-    // Add bottom quick menu bar
+    // Quick menu bar: thin strip at bottom
     quickMenuBar = QuickMenuBarComponent()
-      ..position = Vector2(0, size.y - bottomBarHeight)
-      ..size = Vector2(size.x, bottomBarHeight);
-    add(quickMenuBar);
+      ..position = Vector2(40, size.y - 120)
+      ..size = Vector2(size.x - 80, 100);
+    _componentLayer.add(quickMenuBar);
 
     // Load and display initial event
     _loadNextEvent();
@@ -113,25 +147,22 @@ class GameScreenComponent extends PositionComponent
 
   /// Display the current event card in the center of the screen
   void _showEvent() {
-    // Remove previous event card if it exists
     currentEventCard?.removeFromParent();
 
     final event = game.gameState.currentEvent;
     if (event != null) {
-      const topBarHeight = 80.0;
-      const bottomBarHeight = 80.0;
-      final panelWidth = size.x * 0.2;
-      final contentHeight = size.y - topBarHeight - bottomBarHeight;
-      final centerWidth = size.x - (panelWidth * 2);
-
-      // Create and position event card in center panel
+      final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
+      final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
       currentEventCard = EventCardComponent(
         event: event,
         onChoice: _handleChoice,
-        position: Vector2(panelWidth, topBarHeight),
-        size: Vector2(centerWidth, contentHeight),
+        position: Vector2(
+          (size.x - eventWidth) / 2,
+          (size.y - eventHeight) / 2 - 40,
+        ),
+        size: Vector2(eventWidth, eventHeight),
       );
-      add(currentEventCard!);
+      _componentLayer.add(currentEventCard!);
     }
   }
 
@@ -184,6 +215,56 @@ class GameScreenComponent extends PositionComponent
       }
     }
     return false;
+  }
+
+  void _updateFloatingLayout() {
+    // Recalculate positions for floating components (called on resize)
+    const statPanelWidth = 280.0;
+    const statPanelHeight = 280.0;
+    const relPanelWidth = 280.0;
+    const relPanelHeight = 280.0;
+
+    topBar
+      ..position = Vector2(40, 25)
+      ..size = Vector2(size.x - 80, 60);
+
+    final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
+    final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
+    currentEventCard
+      ?..position = Vector2(
+        (size.x - eventWidth) / 2,
+        (size.y - eventHeight) / 2 - 40,
+      )
+      ..size = Vector2(eventWidth, eventHeight);
+
+    statPanel
+      ..position = Vector2(55, size.y * 0.30)
+      ..size = Vector2(statPanelWidth, statPanelHeight);
+
+    relationshipPanel
+      ..position = Vector2(size.x - relPanelWidth - 55, size.y * 0.30)
+      ..size = Vector2(relPanelWidth, relPanelHeight);
+
+    quickMenuBar
+      ..position = Vector2(40, size.y - 120)
+      ..size = Vector2(size.x - 80, 100);
+  }
+
+  @override
+  void onGameResize(Vector2 newSize) {
+    super.onGameResize(newSize);
+    size = newSize;
+    if (!isLoaded) {
+      return;
+    }
+
+    _background.size = newSize;
+    _componentLayer.size = newSize;
+
+    _updateFloatingLayout();
+    if (game.gameState.currentEvent != null) {
+      _showEvent();
+    }
   }
 
   @override

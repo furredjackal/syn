@@ -1,38 +1,39 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import '../syn_game.dart';
 
-class StatChangeIndicatorsComponent extends PositionComponent
-    with HasGameReference<SynGame> {
+class StatChangeIndicatorsComponent extends PositionComponent {
   final Map<String, int> statChanges;
 
   StatChangeIndicatorsComponent({
     required this.statChanges,
     Vector2? position,
-    Vector2? size,
-  }) : super(position: position, size: size);
+  }) : super(position: position ?? Vector2.zero());
 
   @override
   Future<void> onLoad() async {
-    double xOffset = 0;
-    for (var entry in statChanges.entries) {
-      final isPositive = entry.value > 0;
-      final color =
-          isPositive ? const Color(0xFF00FF00) : const Color(0xFFFF0000);
+    if (statChanges.isEmpty) {
+      return;
+    }
 
+    double yOffset = 0;
+    for (final entry in statChanges.entries) {
+      final isPositive = entry.value >= 0;
+      final color =
+          isPositive ? const Color(0xFF52FF6D) : const Color(0xFFFF4F4F);
       final text = TextComponent(
         text: '${isPositive ? '+' : ''}${entry.value} ${entry.key}',
         textRenderer: TextPaint(
           style: TextStyle(
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w400,
+            fontSize: 14,
             color: color,
-            fontSize: 11,
           ),
         ),
-        position: Vector2(xOffset, 0),
+        position: Vector2(0, yOffset),
       );
-
-      add(text);
-      xOffset += text.width + 8;
+      await add(text);
+      yOffset += text.size.y + 2;
     }
   }
 }

@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -53,7 +52,8 @@ class SettingsScreenComponent extends PositionComponent
     );
     add(title);
     final subtitle = TextComponent(
-      text: 'Control the experience. Persona-style options tuned to our neon noir.',
+      text:
+          'Control the experience. Persona-style options tuned to our neon noir.',
       textRenderer: TextPaint(
         style: const TextStyle(
           color: Color(0xFFB7B7B7),
@@ -86,9 +86,10 @@ class SettingsScreenComponent extends PositionComponent
     final contentTop = size.y * 0.22;
     final content = _content!..position = Vector2(horizontalMargin, contentTop);
     content.removeAll(content.children.toList());
-    content.size = Vector2(_contentWidth, size.y * 0.62);
+    content.size = Vector2(_contentWidth, size.y * 0.58);
 
     double y = 0;
+    double lastSectionBottom = 0;
     final sectionSpacing = 40 * _scaleY;
     final sections = [
       _createAudioSection(_contentWidth),
@@ -97,18 +98,34 @@ class SettingsScreenComponent extends PositionComponent
     for (final section in sections) {
       section.position = Vector2(0, y);
       content.add(section);
+
+      // track the true bottom of each section; last one will be ACCESSIBILITY
+      lastSectionBottom = section.position.y + section.size.y;
+
       y += section.size.y + sectionSpacing;
     }
     content.size = Vector2(_contentWidth, y);
 
     final infoWidth = (size.x * 0.28).clamp(300.0, size.x * 0.38);
     final infoX = size.x - infoWidth - horizontalMargin;
+
     _infoPanel!
       ..updateWidth(infoWidth)
       ..position = Vector2(infoX, size.y * 0.24);
 
-    _backButton!
-      ..position = Vector2(horizontalMargin, size.y * 0.86);
+    // Right edge of the notes panel
+    final infoRight = _infoPanel!.position.x + _infoPanel!.size.x;
+
+    // Bottom edge of the ACCESSIBILITY panel (not including extra spacing)
+    final accessibilityBottom = contentTop + lastSectionBottom;
+
+    // Align BACK TO MENU:
+    // - bottom with ACCESSIBILITY bottom
+    // - right edge with NOTES right edge
+    final backButtonX = infoRight - _backButton!.size.x;
+    final backButtonY = accessibilityBottom - _backButton!.size.y;
+
+    _backButton!..position = Vector2(backButtonX, backButtonY);
   }
 
   @override
@@ -351,19 +368,18 @@ class _ToggleSetting extends PositionComponent with TapCallbacks {
     )..layout(maxWidth: size.x - 160);
     descPainter.paint(canvas, const Offset(28, 28));
 
-    final toggleRect =
-        RRect.fromRectAndRadius(Rect.fromLTWH(size.x - 110, 18, 70, 32), const Radius.circular(18));
+    final toggleRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.x - 110, 18, 70, 32), const Radius.circular(18));
     canvas.drawRRect(
       toggleRect,
       Paint()
-        ..color = _isActive
-            ? const Color(0xFF00D9FF)
-            : const Color(0x44000000),
+        ..color = _isActive ? const Color(0xFF00D9FF) : const Color(0x44000000),
     );
     canvas.drawCircle(
       Offset(_isActive ? size.x - 46 : size.x - 94, 34),
       14,
-      Paint()..color = _isActive ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
+      Paint()
+        ..color = _isActive ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
     );
     final statePainter = TextPainter(
       text: TextSpan(
@@ -464,8 +480,7 @@ class _SliderSetting extends PositionComponent
         ..strokeCap = StrokeCap.round,
     );
 
-    final handleX =
-        trackStart.dx + (trackEnd.dx - trackStart.dx) * _ratio;
+    final handleX = trackStart.dx + (trackEnd.dx - trackStart.dx) * _ratio;
     canvas.drawCircle(
       Offset(handleX, trackY),
       10,

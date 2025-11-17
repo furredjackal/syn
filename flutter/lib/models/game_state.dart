@@ -1,5 +1,3 @@
-
-
 /// Game event choice
 class GameChoice {
   final String text;
@@ -22,6 +20,8 @@ class GameEvent {
   final List<GameChoice> choices;
   final String lifeStage;
   final int age;
+  final List<String> tags;
+  final Map<String, int> deltas;
 
   GameEvent({
     required this.id,
@@ -31,6 +31,8 @@ class GameEvent {
     required this.choices,
     required this.lifeStage,
     required this.age,
+    this.tags = const [],
+    this.deltas = const {},
   });
 }
 
@@ -80,6 +82,8 @@ class MemoryEntry {
 class GameState {
   // Player info
   String playerName = '';
+  String archetype = 'STORYTELLER';
+  String difficulty = 'BALANCED';
   int age = 6;
   String lifeStage = 'Child';
   int year = 0;
@@ -137,6 +141,16 @@ class GameState {
   // Update player name
   void setPlayerName(String name) {
     playerName = name;
+  }
+
+  // Update archetype
+  void setArchetype(String newArchetype) {
+    archetype = newArchetype;
+  }
+
+  // Update difficulty
+  void setDifficulty(String newDifficulty) {
+    difficulty = newDifficulty;
   }
 
   // Update age and life stage

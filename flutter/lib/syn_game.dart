@@ -35,8 +35,7 @@ class SynGame extends FlameGame
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    camera.viewport =
-        FixedResolutionViewport(resolution: Vector2(1280, 720));
+    camera.viewport = FixedResolutionViewport(resolution: Vector2(1280, 720));
 
     _uiEffectLayer
       ..size = size
@@ -96,6 +95,20 @@ class SynGame extends FlameGame
   }
 
   void startGameplay() {
+    _router.pushReplacementNamed('gameplay');
+    _setGameSystemsVisible(true);
+  }
+
+  void startGameplayWithCharacter({
+    required String name,
+    required String archetype,
+    required bool sfwMode,
+    required String difficulty,
+  }) {
+    gameState.setPlayerName(name);
+    gameState.setArchetype(archetype);
+    gameState.sfwMode = sfwMode;
+    gameState.setDifficulty(difficulty);
     _router.pushReplacementNamed('gameplay');
     _setGameSystemsVisible(true);
   }

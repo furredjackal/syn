@@ -35,17 +35,16 @@ class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynG
   late RectangleComponent _shortcutBox;
   late TextComponent _choiceText;
   late TextComponent _shortcutText;
+  late StatChangeIndicatorsComponent _statChanges;
 
   @override
   Future<void> onLoad() async {
-    // Background rectangle (will change opacity on hover)
     _background = RectangleComponent(
       paint: Paint()..color = Colors.black.withValues(alpha: 0.3),
       size: size,
     );
     add(_background);
 
-    // Cyan border rectangle
     _borderComponent = RectangleComponent(
       paint: Paint()
         ..color = Colors.transparent
@@ -55,48 +54,36 @@ class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynG
     );
     add(_borderComponent);
 
-    // Main choice text
     _choiceText = TextComponent(
-      text: choice.text.toUpperCase(),
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      position: Vector2(16, 12),
+      text: choice.text,
+      textRenderer: _choiceTextPaint(isActive: false),
+      position: Vector2(24, 14),
     );
-    add(_choiceText);
+    await add(_choiceText);
 
-    // Stat change indicators below text
-    add(StatChangeIndicatorsComponent(
+    _statChanges = StatChangeIndicatorsComponent(
       statChanges: choice.statChanges,
-      position: Vector2(16, 36),
-    ));
+      position: Vector2(
+        _choiceText.position.x + 12,
+        _choiceText.position.y + _choiceText.size.y + 6,
+      ),
+    );
+    add(_statChanges);
 
-    // Keyboard shortcut box (top-right)
     _shortcutBox = RectangleComponent(
       paint: Paint()
         ..color = Colors.black.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
       size: Vector2(32, 32),
-      position: Vector2(size.x - 48, 8),
+      position: Vector2(size.x - 48, 10),
     );
     add(_shortcutBox);
 
-    // Keyboard shortcut text (centered in box)
     _shortcutText = TextComponent(
       text: choice.keyboardShortcut.toString(),
-      textRenderer: TextPaint(
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.7),
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      position: Vector2(size.x - 32, 24),
+      textRenderer: _shortcutPaint(isActive: false),
+      position: Vector2(size.x - 32, 26),
       anchor: Anchor.center,
     );
     add(_shortcutText);
@@ -144,13 +131,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynG
     _background.paint = Paint()..color = backgroundColor;
 
     // Update text color
-    _choiceText.textRenderer = TextPaint(
-      style: TextStyle(
-        color: isActive ? const Color(0xFF00D9FF) : Colors.white,
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
-      ),
-    );
+    _choiceText.textRenderer = _choiceTextPaint(isActive: isActive);
 
     // Update shortcut box and text colors
     _shortcutBox.paint = Paint()
@@ -158,15 +139,7 @@ class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynG
       ..strokeWidth = 2
       ..color = borderColor;
 
-    _shortcutText.textRenderer = TextPaint(
-      style: TextStyle(
-        color: isActive
-            ? const Color(0xFF00D9FF)
-            : Colors.white.withValues(alpha: 0.7),
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+    _shortcutText.textRenderer = _shortcutPaint(isActive: isActive);
   }
 
   /// Trigger press animation when user selects this choice
@@ -198,5 +171,30 @@ class ChoiceButtonComponent extends PositionComponent with HasGameReference<SynG
   /// Set hover state (can be called from parent during collision detection)
   void setHovered(bool hovered) {
     _isHovered = hovered;
+  }
+
+  TextPaint _choiceTextPaint({required bool isActive}) {
+    return TextPaint(
+      style: TextStyle(
+        fontFamily: 'Montserrat',
+        fontWeight: FontWeight.w500,
+        fontSize: 20,
+        color: isActive
+            ? const Color(0xFF00D9FF)
+            : Colors.white.withValues(alpha: 0.9),
+      ),
+    );
+  }
+
+  TextPaint _shortcutPaint({required bool isActive}) {
+    return TextPaint(
+      style: TextStyle(
+        fontFamily: 'Montserrat',
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+        color:
+            isActive ? const Color(0xFF00D9FF) : Colors.white.withValues(alpha: 0.7),
+      ),
+    );
   }
 }
