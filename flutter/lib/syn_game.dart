@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flame/camera.dart';
@@ -5,7 +6,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
-    show TextAlign, TextDirection, TextPainter, TextSpan, TextStyle;
+    show TextDirection, TextPainter, TextSpan, TextStyle;
 import 'package:flutter/services.dart';
 import 'models/game_state.dart';
 import 'game_screen_component.dart';
@@ -85,37 +86,56 @@ class SynGame extends FlameGame
   }
 
   void showMainMenu() {
-    _setGameSystemsVisible(false);
-    _router.pushReplacementNamed('menu');
+    unawaited(_navigateToMenu());
+  }
+
+  Future<void> _navigateToMenu() async {
+    await _performSceneTransition(() async {
+      _setGameSystemsVisible(false);
+      _router.pushReplacementNamed('menu');
+    });
   }
 
   void showCharacterCreation() {
-    _setGameSystemsVisible(false);
-    _router.pushReplacementNamed('character_creation');
+    unawaited(_navigateToCharacterCreation());
   }
 
-  void startGameplay() {
-    _router.pushReplacementNamed('gameplay');
-    _setGameSystemsVisible(true);
+  Future<void> _navigateToCharacterCreation() async {
+    await _performSceneTransition(() async {
+      _setGameSystemsVisible(false);
+      _router.pushReplacementNamed('character_creation');
+    });
   }
 
-  void startGameplayWithCharacter({
+  Future<void> startGameplay() async {
+    await _runWithLoadingOverlay(() async {
+      await _performSceneTransition(() async {
+        _router.pushReplacementNamed('gameplay');
+        _setGameSystemsVisible(true);
+      });
+    });
+  }
+
+  Future<void> startGameplayWithCharacter({
     required String name,
     required String archetype,
     required bool sfwMode,
     required String difficulty,
-  }) {
-    gameState.setPlayerName(name);
-    gameState.setArchetype(archetype);
-    gameState.sfwMode = sfwMode;
-    gameState.setDifficulty(difficulty);
-    _router.pushReplacementNamed('gameplay');
-    _setGameSystemsVisible(true);
+  }) async {
+    await _runWithLoadingOverlay(() async {
+      gameState.setPlayerName(name);
+      gameState.setArchetype(archetype);
+      gameState.sfwMode = sfwMode;
+      gameState.setDifficulty(difficulty);
+      await _performSceneTransition(() async {
+        _router.pushReplacementNamed('gameplay');
+        _setGameSystemsVisible(true);
+      });
+    });
   }
 
   void returnToTitle() {
-    _setGameSystemsVisible(false);
-    _router.pushReplacementNamed('menu');
+    showMainMenu();
   }
 
   void showSettings() {
@@ -150,15 +170,112 @@ class SynGame extends FlameGame
     add(banner);
   }
 
-  void showPauseOverlay() {
-    pauseEngine();
-    add(_PauseOverlay(onResume: () {
+  void togglePauseOverlay() {
+    if (overlays.isActive('PauseMenuOverlay')) {
+      overlays.remove('PauseMenuOverlay');
       resumeEngine();
-    }));
+    } else {
+      pauseEngine();
+      overlays.add('PauseMenuOverlay');
+    }
+  }
+
+  void showPauseOverlay() {
+    togglePauseOverlay();
   }
 
   custom.ParticleSystemComponent get particleSystem => _particleSystem;
   UIEffectLayer get uiEffectLayer => _uiEffectLayer;
+  ConfirmationRequest? get pendingConfirmation => _pendingConfirmation;
+
+  Future<void> _runWithLoadingOverlay(Future<void> Function() action) async {
+    overlays.add('LoadingScreenOverlay');
+    pauseEngine();
+    try {
+      await action();
+    } finally {
+      overlays.remove('LoadingScreenOverlay');
+      resumeEngine();
+    }
+  }
+
+  Future<void> _performSceneTransition(Future<void> Function() change) async {
+    final completer = Completer<void>();
+    _pendingTransitionCallback = () {
+      change().whenComplete(() {
+        overlays.remove('TransitionOverlay');
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      });
+    };
+    overlays.add('TransitionOverlay');
+    return completer.future;
+  }
+
+  void onTransitionOverlayComplete() {
+    final callback = _pendingTransitionCallback;
+    _pendingTransitionCallback = null;
+    if (callback != null) {
+      callback();
+    } else {
+      overlays.remove('TransitionOverlay');
+    }
+  }
+
+  void showConfirmationDialog({
+    required String title,
+    required String message,
+    String confirmLabel = 'Confirm',
+    String cancelLabel = 'Cancel',
+    required VoidCallback onConfirm,
+    VoidCallback? onCancel,
+  }) {
+    _pendingConfirmation = ConfirmationRequest(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      onConfirm: onConfirm,
+      onCancel: onCancel,
+    );
+    overlays.add('ConfirmationDialogOverlay');
+  }
+
+  void confirmCurrentDialog() {
+    final request = _pendingConfirmation;
+    if (request == null) {
+      overlays.remove('ConfirmationDialogOverlay');
+      return;
+    }
+    _pendingConfirmation = null;
+    overlays.remove('ConfirmationDialogOverlay');
+    request.onConfirm();
+  }
+
+  void cancelCurrentDialog() {
+    final request = _pendingConfirmation;
+    _pendingConfirmation = null;
+    overlays.remove('ConfirmationDialogOverlay');
+    request?.onCancel?.call();
+  }
+
+  void promptQuitToMenu() {
+    showConfirmationDialog(
+      title: 'Quit to Main Menu?',
+      message: 'Any unsaved progress will be lost.',
+      confirmLabel: 'Quit',
+      cancelLabel: 'Stay',
+      onConfirm: () {
+        overlays.remove('PauseMenuOverlay');
+        resumeEngine();
+        unawaited(_navigateToMenu());
+      },
+    );
+  }
+
+  VoidCallback? _pendingTransitionCallback;
+  ConfirmationRequest? _pendingConfirmation;
 }
 
 class _NotificationBanner extends PositionComponent {
@@ -206,66 +323,20 @@ class _NotificationBanner extends PositionComponent {
   }
 }
 
-class _PauseOverlay extends PositionComponent
-    with TapCallbacks, KeyboardHandler, HasGameReference<SynGame> {
-  _PauseOverlay({required this.onResume});
+class ConfirmationRequest {
+  ConfirmationRequest({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.cancelLabel,
+    required this.onConfirm,
+    this.onCancel,
+  });
 
-  final VoidCallback onResume;
-
-  @override
-  Future<void> onLoad() async {
-    size = game.size;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    canvas.drawRect(rect, Paint()..color = const Color(0xAA000000));
-    final textPainter = TextPainter(
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-      text: const TextSpan(
-        text: 'PAUSED\nTap anywhere or press Enter to resume',
-        style: TextStyle(
-          color: Color(0xFFFFFFFF),
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    )..layout(maxWidth: size.x);
-    textPainter.paint(
-      canvas,
-      Offset(
-        (size.x - textPainter.width) / 2,
-        (size.y - textPainter.height) / 2,
-      ),
-    );
-  }
-
-  void _close() {
-    removeFromParent();
-    onResume();
-  }
-
-  @override
-  void onTapUp(TapUpEvent event) {
-    _close();
-  }
-
-  @override
-  bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
-    if (event is KeyDownEvent &&
-        (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.space)) {
-      _close();
-      return true;
-    }
-    return false;
-  }
-
-  @override
-  void onGameResize(Vector2 size) {
-    super.onGameResize(size);
-    this.size = size;
-  }
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final String cancelLabel;
+  final VoidCallback onConfirm;
+  final VoidCallback? onCancel;
 }

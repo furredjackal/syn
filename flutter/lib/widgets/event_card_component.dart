@@ -1,3 +1,4 @@
+// flutter/lib/widgets/event_card_component.dart
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../syn_game.dart';
 import 'choice_button_component.dart';
+import '../ui/syn_theme.dart';
 
 /// EventCanvas: Centered focal point with Persona-style slash transitions.
 ///
@@ -57,15 +59,18 @@ class EventCardComponent extends PositionComponent
     const double horizontalPadding = 36.0;
     const double spacingAfterHeader = 24.0;
     const double bannerBottomGap = 12.0;
+    const double tagRowBottomGap = 12.0;
     const double descriptionBottomGap = 14.0;
     const double dividerBottomGap = 26.0;
+    const double impactSummaryBottomGap = 20.0;
     const double choiceGap = 12.0;
 
     // Track running vertical position for content below the header badge
     double layoutY = header.position.y + header.size.y + spacingAfterHeader;
-    layoutY = math.max(layoutY, 72.0);
+    layoutY = math.max(layoutY, 72.0).toDouble();
 
-    final bannerMaxWidth = math.max(size.x - horizontalPadding * 2, 0);
+    final bannerMaxWidth =
+        math.max(size.x - horizontalPadding * 2, 0).toDouble();
     final titleBanner = _EventTitleBanner(
       title: event.title,
       position: Vector2(horizontalPadding, layoutY),
@@ -75,18 +80,26 @@ class EventCardComponent extends PositionComponent
 
     layoutY += titleBanner.size.y + bannerBottomGap;
 
+    if (event.tags.isNotEmpty) {
+      final tagsRow = _EventTagChipRow(
+        tags: event.tags,
+        maxWidth: bannerMaxWidth,
+        position: Vector2(horizontalPadding, layoutY),
+      );
+      await add(tagsRow);
+      layoutY += tagsRow.size.y + tagRowBottomGap;
+    }
+
     // Description text anchors directly under the banner
     final descriptionMaxWidth =
         (size.x * 0.65).clamp(0.0, size.x - horizontalPadding * 2);
     final descriptionPainter = TextPainter(
       text: TextSpan(
         text: event.description,
-        style: const TextStyle(
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w400,
+        style: SynTextStyles.body.copyWith(
           fontSize: 18,
           height: 1.45,
-          color: Color(0xFFEEEEEE),
+          color: SynColors.textPrimary.withOpacity(0.9),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -106,6 +119,16 @@ class EventCardComponent extends PositionComponent
 
     layoutY += accentDivider.size.y + dividerBottomGap;
 
+    if (event.deltas.isNotEmpty) {
+      final impactRow = _ImpactSummaryRow(
+        stats: event.deltas.keys.toList(),
+        maxWidth: bannerMaxWidth,
+        position: Vector2(horizontalPadding, layoutY),
+      );
+      await add(impactRow);
+      layoutY += impactRow.size.y + impactSummaryBottomGap;
+    }
+
     // Choices run full width with even gaps
     double yOffset = layoutY;
     final buttonWidth = math.max(size.x - horizontalPadding * 2, 0);
@@ -116,12 +139,12 @@ class EventCardComponent extends PositionComponent
         index: i,
         onPressed: () => onChoice(i),
         position: Vector2(horizontalPadding, yOffset),
-        size: Vector2(buttonWidth, 76),
+        size: Vector2(buttonWidth.toDouble(), 76),
       );
 
       final buttonWrapper = _TappableButtonWrapper(
         child: choiceButton,
-        staggerDelay: 0.25 + (i * 0.12),
+        staggerDelay: 0.25 + (i.toDouble() * 0.12),
         onTap: () => choiceButton.simulateTap(),
       );
       add(buttonWrapper);
@@ -460,6 +483,216 @@ class _EventTitleBanner extends PositionComponent {
     final textOffset = Offset(20, h / 2 - titlePainter.height / 2);
     titlePainter.paint(canvas, textOffset);
   }
+}
+
+class _EventTagChipRow extends PositionComponent {
+  final List<String> tags;
+  final double maxWidth;
+
+  static const double _chipHeight = 26.0;
+  static const double _chipPaddingX = 12.0;
+  static const double _chipSpacing = 8.0;
+  static const double _rowSpacing = 6.0;
+  static const List<Color> _palette = [
+    Color(0xFF00D9FF),
+    Color(0xFF7B5CFF),
+  ];
+
+  late final List<_TagChipLayout> _chipLayouts;
+
+  _EventTagChipRow({
+    required this.tags,
+    required this.maxWidth,
+    required Vector2 position,
+  }) : super(position: position, size: Vector2(maxWidth, 0)) {
+    _chipLayouts = _buildLayouts();
+    final height = _chipLayouts.isEmpty
+        ? 0.0
+        : _chipLayouts.map((c) => c.rect.bottom).reduce(math.max);
+    size.y = height.toDouble();
+  }
+
+  List<_TagChipLayout> _buildLayouts() {
+    final layouts = <_TagChipLayout>[];
+    double cursorX = 0;
+    double cursorY = 0;
+    var paletteIndex = 0;
+
+    for (final rawTag in tags) {
+      final label = rawTag.toUpperCase();
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: const TextStyle(
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            letterSpacing: 1.4,
+            color: Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: math.max(maxWidth - _chipPaddingX * 2, 0));
+
+      final chipWidth = math.min(
+        painter.width + _chipPaddingX * 2,
+        maxWidth,
+      );
+
+      if (cursorX + chipWidth > maxWidth && cursorX > 0) {
+        cursorX = 0;
+        cursorY += _chipHeight + _rowSpacing;
+      }
+
+      final rect = Rect.fromLTWH(cursorX, cursorY, chipWidth, _chipHeight);
+      const skew = 12.0;
+      final path = Path()
+        ..moveTo(rect.left + skew, rect.top)
+        ..lineTo(rect.right, rect.top)
+        ..lineTo(rect.right - skew, rect.bottom)
+        ..lineTo(rect.left, rect.bottom)
+        ..close();
+
+      final textOffset = Offset(
+        rect.left + _chipPaddingX,
+        rect.top + (_chipHeight - painter.height) / 2,
+      );
+
+      final fillColor = _palette[paletteIndex % _palette.length];
+      paletteIndex++;
+
+      layouts.add(
+        _TagChipLayout(
+          rect: rect,
+          path: path,
+          painter: painter,
+          textOffset: textOffset,
+          fillColor: fillColor,
+        ),
+      );
+
+      cursorX += chipWidth + _chipSpacing;
+    }
+
+    if (layouts.isEmpty) {
+      return layouts;
+    }
+    return layouts;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    for (final chip in _chipLayouts) {
+      canvas.drawPath(
+        chip.path,
+        Paint()..color = chip.fillColor.withOpacity(0.35),
+      );
+      canvas.drawPath(
+        chip.path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = chip.fillColor,
+      );
+      chip.painter.paint(canvas, chip.textOffset);
+    }
+  }
+}
+
+class _ImpactSummaryRow extends PositionComponent {
+  final List<String> stats;
+  late final TextPainter _labelPainter;
+  late final TextPainter _valuePainter;
+
+  _ImpactSummaryRow({
+    required this.stats,
+    required double maxWidth,
+    required Vector2 position,
+  }) : super(position: position, size: Vector2(maxWidth, 26)) {
+    _labelPainter = TextPainter(
+      text: const TextSpan(
+        text: 'AFFECTS:',
+        style: TextStyle(
+          fontFamily: 'Montserrat',
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          color: Color(0xFF00D9FF),
+          letterSpacing: 1.2,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final display = stats.map(_formatStat).join(', ');
+    _valuePainter = TextPainter(
+      text: TextSpan(
+        text: display,
+        style: const TextStyle(
+          fontFamily: 'Montserrat',
+          fontWeight: FontWeight.w500,
+          fontSize: 12,
+          color: Colors.white,
+          letterSpacing: 0.4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: maxWidth - _labelPainter.width - 28);
+  }
+
+  String _formatStat(String raw) {
+    if (raw.isEmpty) {
+      return raw;
+    }
+    return raw[0].toUpperCase() +
+        (raw.length > 1 ? raw.substring(1).toLowerCase() : '');
+  }
+
+  @override
+  void render(Canvas canvas) {
+    const diamondSize = 4.0;
+    final centerY = size.y / 2;
+    final diamondCenter = Offset(diamondSize + 2, centerY);
+
+    final diamondPath = Path()
+      ..moveTo(diamondCenter.dx, diamondCenter.dy - diamondSize)
+      ..lineTo(diamondCenter.dx + diamondSize, diamondCenter.dy)
+      ..lineTo(diamondCenter.dx, diamondCenter.dy + diamondSize)
+      ..lineTo(diamondCenter.dx - diamondSize, diamondCenter.dy)
+      ..close();
+
+    canvas.drawPath(
+      diamondPath,
+      Paint()..color = const Color(0xFF00D9FF),
+    );
+
+    final labelOffset = Offset(
+      diamondCenter.dx + diamondSize + 6,
+      centerY - _labelPainter.height / 2,
+    );
+    _labelPainter.paint(canvas, labelOffset);
+
+    final valueOffset = Offset(
+      labelOffset.dx + _labelPainter.width + 6,
+      centerY - _valuePainter.height / 2,
+    );
+    _valuePainter.paint(canvas, valueOffset);
+  }
+}
+
+class _TagChipLayout {
+  final Rect rect;
+  final Path path;
+  final TextPainter painter;
+  final Offset textOffset;
+  final Color fillColor;
+
+  _TagChipLayout({
+    required this.rect,
+    required this.path,
+    required this.painter,
+    required this.textOffset,
+    required this.fillColor,
+  });
 }
 
 class _AccentDivider extends PositionComponent {

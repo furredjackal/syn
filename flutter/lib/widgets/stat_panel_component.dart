@@ -1,7 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import '../syn_game.dart';
+import '../ui/syn_theme.dart';
 
 /// StatPanel: Compact floating left panel with circular stat rings.
 ///
@@ -14,86 +16,94 @@ import '../syn_game.dart';
 /// - No full-height stretching, no rigid frames
 class StatPanelComponent extends PositionComponent
     with HasGameReference<SynGame> {
-  final Map<String, _StatRing> _statRings = {};
-  late _PanelFrame _frame;
+  final List<_StatRing> _rings = [];
+  final Map<String, _StatRing> _ringMap = {};
 
   @override
   Future<void> onLoad() async {
-    // Panel frame (angled Persona border)
-    _frame = _PanelFrame(size: size);
-    add(_frame);
+    _buildPanelBackground();
+    _buildRings();
+  }
 
-    final gameState = game.gameState;
+  void _buildPanelBackground() {
+    add(_PanelFrame(size: size));
+  }
+
+  void _buildRings() {
+    final state = game.gameState;
     final stats = [
       _StatDescriptor(
         key: 'health',
         stat: 'Health',
         label: 'HP',
-        value: gameState.health,
-        color: const Color(0xFFFF4444),
+        value: state.health,
+        color: SynColors.accentRed,
+      ),
+      _StatDescriptor(
+        key: 'mood',
+        stat: 'Mood',
+        label: 'MOOD',
+        value: state.mood,
+        color: moodToColor(state.mood),
       ),
       _StatDescriptor(
         key: 'wealth',
         stat: 'Wealth',
         label: '\$',
-        value: gameState.wealth,
-        color: const Color(0xFF44FF44),
+        value: state.wealth,
+        color: SynColors.accentGreen,
       ),
       _StatDescriptor(
         key: 'charisma',
         stat: 'Charisma',
-        label: 'CHR',
-        value: gameState.charisma,
-        color: const Color(0xFF00D9FF),
+        label: 'CHA',
+        value: state.charisma,
+        color: SynColors.accentCyan,
       ),
       _StatDescriptor(
         key: 'intelligence',
         stat: 'Intelligence',
         label: 'INT',
-        value: gameState.intelligence,
-        color: const Color(0xFFFFAA00),
+        value: state.intelligence,
+        color: SynColors.accentGold,
       ),
       _StatDescriptor(
         key: 'wisdom',
         stat: 'Wisdom',
         label: 'WIS',
-        value: gameState.wisdom,
-        color: const Color(0xFFDD44FF),
+        value: state.wisdom,
+        color: SynColors.accentMagenta,
       ),
       _StatDescriptor(
         key: 'strength',
         stat: 'Strength',
         label: 'STR',
-        value: gameState.strength,
-        color: const Color(0xFFFF8844),
+        value: state.strength,
+        color: SynColors.accentOrange,
+      ),
+      _StatDescriptor(
+        key: 'stability',
+        stat: 'Stability',
+        label: 'STB',
+        value: state.stability,
+        color: SynColors.accentIndigo,
       ),
     ];
 
-    // Grid layout: 3 columns × 2 rows, centered within the angled frame
-    const columns = 3;
-    const rows = 2;
-    const ringDiameter = 70.0;
-    const horizontalInset = 26.0;
-    const verticalInset = 44.0;
-    final ringRadius = ringDiameter / 2;
-    final widthAvailable =
-        math.max(size.x - 2 * (horizontalInset + ringRadius), 0);
-    final heightAvailable =
-        math.max(size.y - 2 * (verticalInset + ringRadius), 0);
-    final columnSpacing = columns > 1 ? widthAvailable / (columns - 1) : 0;
-    final rowSpacing = rows > 1 ? heightAvailable / (rows - 1) : 0;
+    final columns = 2;
+    final rows = 4;
+    final horizontalPadding = size.x * 0.1;
+    final verticalPadding = size.y * 0.12;
+    final cellWidth = (size.x - horizontalPadding * 2) / columns;
+    final cellHeight = (size.y - verticalPadding * 2) / rows;
 
-    for (var index = 0; index < stats.length; index++) {
-      final descriptor = stats[index];
-      final row = index ~/ columns;
-      final col = index % columns;
-      if (row >= rows) {
-        break;
-      }
-
-      final position = Vector2(
-        horizontalInset + ringRadius + columnSpacing * col,
-        verticalInset + ringRadius + rowSpacing * row,
+    for (var i = 0; i < stats.length; i++) {
+      final descriptor = stats[i];
+      final row = i ~/ columns;
+      final col = i % columns;
+      final center = Vector2(
+        horizontalPadding + cellWidth * col + cellWidth / 2,
+        verticalPadding + cellHeight * row + cellHeight / 2,
       );
 
       final ring = _StatRing(
@@ -102,41 +112,26 @@ class StatPanelComponent extends PositionComponent
         value: descriptor.value,
         maxValue: 100,
         color: descriptor.color,
-        position: position,
+        position: center,
       );
-      _statRings[descriptor.key] = ring;
       add(ring);
+      _rings.add(ring);
+      _ringMap[descriptor.key] = ring;
     }
-
-    // Title label (subtle)
-    final title = TextComponent(
-      text: 'STATS',
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF00D9FF),
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1,
-        ),
-      ),
-      position: Vector2(16, 8),
-      anchor: Anchor.topLeft,
-    );
-    add(title);
   }
 
   @override
   void update(double dt) {
     super.update(dt);
     final gameState = game.gameState;
-
-    // Update stat values
-    _statRings['health']?.updateValue(gameState.health);
-    _statRings['wealth']?.updateValue(gameState.wealth);
-    _statRings['charisma']?.updateValue(gameState.charisma);
-    _statRings['intelligence']?.updateValue(gameState.intelligence);
-    _statRings['wisdom']?.updateValue(gameState.wisdom);
-    _statRings['strength']?.updateValue(gameState.strength);
+    _ringMap['health']?.updateValue(gameState.health);
+    _ringMap['mood']?.updateValue(gameState.mood);
+    _ringMap['wealth']?.updateValue(gameState.wealth);
+    _ringMap['charisma']?.updateValue(gameState.charisma);
+    _ringMap['intelligence']?.updateValue(gameState.intelligence);
+    _ringMap['wisdom']?.updateValue(gameState.wisdom);
+    _ringMap['strength']?.updateValue(gameState.strength);
+    _ringMap['stability']?.updateValue(gameState.stability);
   }
 }
 
@@ -196,7 +191,7 @@ class _StatRing extends PositionComponent {
       center,
       ringRadius,
       Paint()
-        ..color = Colors.black.withOpacity(0.4)
+        ..color = SynColors.bgDark.withOpacity(0.4)
         ..style = PaintingStyle.stroke
         ..strokeWidth = ringWidth,
     );
@@ -221,12 +216,7 @@ class _StatRing extends PositionComponent {
     final labelPainter = TextPainter(
       text: TextSpan(
         text: label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          height: 1.0,
-        ),
+        style: SynTextStyles.chip.copyWith(color: color),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -239,11 +229,7 @@ class _StatRing extends PositionComponent {
     final valuePainter = TextPainter(
       text: TextSpan(
         text: value.toString(),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          height: 1.0,
-        ),
+        style: SynTextStyles.body.copyWith(fontSize: 10),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -273,7 +259,7 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       bgPath,
       Paint()
-        ..color = const Color(0xFF000000).withOpacity(0.65)
+        ..color = SynColors.bgPanel.withOpacity(0.85)
         ..style = PaintingStyle.fill,
     );
 
@@ -285,8 +271,8 @@ class _PanelFrame extends PositionComponent {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF1a1a1a).withOpacity(0.3),
-            const Color(0xFF0a0a0a).withOpacity(0.2),
+            SynColors.bgDark.withOpacity(0.4),
+            SynColors.bgPanel.withOpacity(0.25),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.x, size.y)),
     );
@@ -295,9 +281,9 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       bgPath,
       Paint()
-        ..color = const Color(0xFF00D9FF)
+        ..color = SynColors.accentViolet
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
+        ..strokeWidth = SynLayout.borderWidthHeavy,
     );
 
     // Inner accent line (depth)
@@ -312,9 +298,9 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       innerPath,
       Paint()
-        ..color = const Color(0xFF00D9FF).withOpacity(0.3)
+        ..color = SynColors.accentViolet.withOpacity(0.4)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..strokeWidth = SynLayout.borderWidthLight,
     );
   }
 }

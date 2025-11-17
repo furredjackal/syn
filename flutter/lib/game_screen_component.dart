@@ -58,16 +58,36 @@ class GameScreenComponent extends PositionComponent
     _componentLayer = PositionComponent()..size = size;
     add(_componentLayer);
 
-    // Position components according to floating canvas model
-    // Top bar: thin strip at top
+    const margin = _margin;
     topBar = TopBarComponent()
-      ..position = Vector2(40, 25)
-      ..size = Vector2(size.x - 80, 60);
+      ..position = Vector2.zero()
+      ..size = Vector2(size.x, _topBarHeight);
     _componentLayer.add(topBar);
 
-    // Event card: centered focal point (max 60% of screen width)
-    final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
-    final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
+    final leftWidth = _leftWidth;
+    final centerWidth = _centerWidth;
+    final rightWidth = _rightWidth;
+
+    statPanel = StatPanelComponent()
+      ..position = Vector2(margin, _topBarHeight + margin)
+      ..size = Vector2(leftWidth - margin * 1.5, _contentHeight);
+    _componentLayer.add(statPanel);
+
+    relationshipPanel = RelationshipPanelComponent()
+      ..position = Vector2(
+        leftWidth + centerWidth + margin * 0.5,
+        _topBarHeight + margin,
+      )
+      ..size = Vector2(rightWidth - margin * 1.5, _contentHeight);
+    _componentLayer.add(relationshipPanel);
+
+    quickMenuBar = QuickMenuBarComponent()
+      ..position = Vector2(margin, size.y - _quickMenuHeight - margin)
+      ..size = Vector2(size.x - margin * 2, _quickMenuHeight);
+    _componentLayer.add(quickMenuBar);
+
+    final initialCardSize = _eventCardSize();
+    final eventCardPosition = _eventCardPosition();
 
     // Create a placeholder event for initial display
     final initialEvent = GameEvent(
@@ -82,36 +102,11 @@ class GameScreenComponent extends PositionComponent
     final eventCard = EventCardComponent(
       event: initialEvent,
       onChoice: _handleChoice,
-      position: Vector2(
-        (size.x - eventWidth) / 2,
-        (size.y - eventHeight) / 2 - 40,
-      ),
-      size: Vector2(eventWidth, eventHeight),
+      position: eventCardPosition,
+      size: initialCardSize,
     );
     _componentLayer.add(eventCard);
     currentEventCard = eventCard;
-
-    // Stat panel: floats left (compact ~250px width, 250-300px height)
-    const statPanelWidth = 280.0;
-    const statPanelHeight = 280.0;
-    statPanel = StatPanelComponent()
-      ..position = Vector2(55, size.y * 0.30)
-      ..size = Vector2(statPanelWidth, statPanelHeight);
-    _componentLayer.add(statPanel);
-
-    // Relationship panel: floats right (compact ~250px width, 250-300px height)
-    const relPanelWidth = 280.0;
-    const relPanelHeight = 280.0;
-    relationshipPanel = RelationshipPanelComponent()
-      ..position = Vector2(size.x - relPanelWidth - 55, size.y * 0.30)
-      ..size = Vector2(relPanelWidth, relPanelHeight);
-    _componentLayer.add(relationshipPanel);
-
-    // Quick menu bar: thin strip at bottom
-    quickMenuBar = QuickMenuBarComponent()
-      ..position = Vector2(40, size.y - 120)
-      ..size = Vector2(size.x - 80, 100);
-    _componentLayer.add(quickMenuBar);
 
     // Load and display initial event
     _loadNextEvent();
@@ -151,18 +146,15 @@ class GameScreenComponent extends PositionComponent
 
     final event = game.gameState.currentEvent;
     if (event != null) {
-      final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
-      final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
+      final cardSize = _eventCardSize();
       currentEventCard = EventCardComponent(
         event: event,
         onChoice: _handleChoice,
-        position: Vector2(
-          (size.x - eventWidth) / 2,
-          (size.y - eventHeight) / 2 - 40,
-        ),
-        size: Vector2(eventWidth, eventHeight),
+        position: _eventCardPosition(),
+        size: cardSize,
       );
       _componentLayer.add(currentEventCard!);
+      _layoutFloatingComponents();
     }
   }
 
@@ -218,36 +210,7 @@ class GameScreenComponent extends PositionComponent
   }
 
   void _updateFloatingLayout() {
-    // Recalculate positions for floating components (called on resize)
-    const statPanelWidth = 280.0;
-    const statPanelHeight = 280.0;
-    const relPanelWidth = 280.0;
-    const relPanelHeight = 280.0;
-
-    topBar
-      ..position = Vector2(40, 25)
-      ..size = Vector2(size.x - 80, 60);
-
-    final eventWidth = (size.x * 0.6).clamp(400.0, size.x - 200);
-    final eventHeight = (size.y * 0.65).clamp(200.0, size.y - 200);
-    currentEventCard
-      ?..position = Vector2(
-        (size.x - eventWidth) / 2,
-        (size.y - eventHeight) / 2 - 40,
-      )
-      ..size = Vector2(eventWidth, eventHeight);
-
-    statPanel
-      ..position = Vector2(55, size.y * 0.30)
-      ..size = Vector2(statPanelWidth, statPanelHeight);
-
-    relationshipPanel
-      ..position = Vector2(size.x - relPanelWidth - 55, size.y * 0.30)
-      ..size = Vector2(relPanelWidth, relPanelHeight);
-
-    quickMenuBar
-      ..position = Vector2(40, size.y - 120)
-      ..size = Vector2(size.x - 80, 100);
+    _layoutFloatingComponents();
   }
 
   @override
@@ -257,15 +220,64 @@ class GameScreenComponent extends PositionComponent
     if (!isLoaded) {
       return;
     }
-
     _background.size = newSize;
     _componentLayer.size = newSize;
-
-    _updateFloatingLayout();
-    if (game.gameState.currentEvent != null) {
-      _showEvent();
-    }
+    _layoutFloatingComponents();
   }
+
+  void _layoutFloatingComponents() {
+    if (!isLoaded) {
+      return;
+    }
+
+    const margin = _margin;
+    final leftWidth = _leftWidth;
+    final centerWidth = _centerWidth;
+    final rightWidth = _rightWidth;
+
+    topBar
+      ..position = Vector2.zero()
+      ..size = Vector2(size.x, _topBarHeight);
+
+    final cardSize = _eventCardSize();
+    final cardPosition = _eventCardPosition();
+    currentEventCard
+      ?..size = cardSize
+      ..position = cardPosition;
+
+    statPanel
+      ..size = Vector2(leftWidth - margin * 1.5, _contentHeight)
+      ..position = Vector2(margin, _topBarHeight + margin);
+
+    relationshipPanel
+      ..size = Vector2(rightWidth - margin * 1.5, _contentHeight)
+      ..position = Vector2(
+        leftWidth + centerWidth + margin * 0.5,
+        _topBarHeight + margin,
+      );
+
+    quickMenuBar
+      ..size = Vector2(size.x - margin * 2, _quickMenuHeight)
+      ..position = Vector2(
+        margin,
+        size.y - _quickMenuHeight - margin,
+      );
+  }
+
+  static const double _margin = 24.0;
+
+  double get _topBarHeight => size.y * 0.12;
+  double get _quickMenuHeight => size.y * 0.10;
+  double get _leftWidth => size.x * 0.22;
+  double get _centerWidth => size.x * 0.56;
+  double get _rightWidth => size.x * 0.22;
+  double get _contentHeight =>
+      size.y - _topBarHeight - _quickMenuHeight - _margin * 2;
+
+  Vector2 _eventCardSize() => Vector2(_centerWidth - _margin * 2, _contentHeight);
+
+  Vector2 _eventCardPosition() =>
+      Vector2(_leftWidth + _margin, _topBarHeight + _margin);
 
   @override
   void update(double dt) {

@@ -1,23 +1,12 @@
 import 'package:flutter/material.dart';
+import '../syn_game.dart';
 
 class ConfirmationDialogOverlay extends StatefulWidget {
-  final String title;
-  final String message;
-  final String confirmLabel;
-  final String cancelLabel;
-  final bool isDestructive;
-  final VoidCallback onConfirm;
-  final VoidCallback onCancel;
+  final SynGame game;
 
   const ConfirmationDialogOverlay({
     Key? key,
-    required this.title,
-    required this.message,
-    this.confirmLabel = 'Confirm',
-    this.cancelLabel = 'Cancel',
-    this.isDestructive = false,
-    required this.onConfirm,
-    required this.onCancel,
+    required this.game,
   }) : super(key: key);
 
   @override
@@ -51,6 +40,14 @@ class _ConfirmationDialogOverlayState extends State<ConfirmationDialogOverlay> w
 
   @override
   Widget build(BuildContext context) {
+    final request = widget.game.pendingConfirmation;
+    if (request == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.game.cancelCurrentDialog();
+      });
+      return const SizedBox.shrink();
+    }
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
@@ -70,14 +67,14 @@ class _ConfirmationDialogOverlayState extends State<ConfirmationDialogOverlay> w
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    widget.title,
+                    request.title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: widget.isDestructive ? Colors.red : Colors.cyan,
+                          color: Colors.cyan,
                         ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.message,
+                    request.message,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.grey[300],
                         ),
@@ -88,28 +85,22 @@ class _ConfirmationDialogOverlayState extends State<ConfirmationDialogOverlay> w
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
-                          widget.onCancel();
-                          Navigator.of(context).pop();
-                        },
+                        onPressed: widget.game.cancelCurrentDialog,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey.shade800,
                           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                         ),
-                        child: Text(widget.cancelLabel),
+                        child: Text(request.cancelLabel),
                       ),
                       const SizedBox(width: 16),
                       ElevatedButton(
-                        onPressed: () {
-                          widget.onConfirm();
-                          Navigator.of(context).pop();
-                        },
+                        onPressed: widget.game.confirmCurrentDialog,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: widget.isDestructive ? Colors.red : Colors.cyan,
+                          backgroundColor: Colors.cyan,
                           foregroundColor: Colors.black,
                           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                         ),
-                        child: Text(widget.confirmLabel),
+                        child: Text(request.confirmLabel),
                       ),
                     ],
                   ),

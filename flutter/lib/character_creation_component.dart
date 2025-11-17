@@ -163,7 +163,7 @@ class CharacterCreationComponent extends PositionComponent
     }
   }
 
-  void _handleBeginLife() {
+  Future<void> _handleBeginLife() async {
     if (_nameInputText.isEmpty) {
       // Show error feedback - could add an error message component here
       return;
@@ -173,7 +173,7 @@ class CharacterCreationComponent extends PositionComponent
     final difficulty = difficultyLevels[_selectedDifficulty];
 
     // Pass character creation data to game state
-    game.startGameplayWithCharacter(
+    await game.startGameplayWithCharacter(
       name: _playerName,
       archetype: archetypes[_selected],
       sfwMode: _sfwMode,

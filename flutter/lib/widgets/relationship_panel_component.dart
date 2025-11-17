@@ -1,100 +1,109 @@
+import 'dart:math' as math;
+
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-import '../syn_game.dart';
 import '../models/game_state.dart';
+import '../syn_game.dart';
+import '../ui/syn_theme.dart';
 
-/// RelationshipPanel: Compact floating right panel showing active relationships.
-///
-/// Design:
-/// - Angled Persona-style border (right edge)
-/// - Compact footprint (280x280px, mirror of StatPanel)
-/// - Shows up to 3 active relationships (most important)
-/// - Each relationship has: name, state indicator, affection/trust gauges
-/// - Color-coded by relationship state
-/// - Minimal labels, focused on visual indicators
 class RelationshipPanelComponent extends PositionComponent
     with HasGameReference<SynGame> {
-  late _PanelFrame _frame;
-  final List<_RelationshipRow> _rows = [];
+  final List<_RelationshipCardComponent> _cards = [];
 
   @override
   Future<void> onLoad() async {
-    // Panel frame (angled Persona border)
-    _frame = _PanelFrame(size: size);
-    add(_frame);
+    add(_PanelFrame(size: size));
+    _buildCards();
+  }
 
-    // Title label
-    final title = TextComponent(
-      text: 'BONDS',
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFF00D9FF),
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1,
+  void _buildCards() {
+    final relationships = game.gameState.relationships;
+    final items = relationships.isEmpty
+        ? _placeholderRelationships()
+        : relationships.take(_maxCards).toList();
+
+    final availableHeight = size.y - _panelPadding * 2;
+    final cardHeight = availableHeight / _maxCards - _cardSpacing;
+
+    for (var i = 0; i < math.min(_maxCards, items.length); i++) {
+      final relationship = items[i];
+      final card = _RelationshipCardComponent(
+        relationship: relationship,
+        position: Vector2(
+          _panelPadding,
+          _panelPadding + i * (cardHeight + _cardSpacing),
         ),
-      ),
-      position: Vector2(16, 8),
-      anchor: Anchor.topLeft,
-    );
-    add(title);
-
-    // Get up to 3 most important relationships
-    final gameState = game.gameState;
-    final relationships = gameState.relationships;
+        size: Vector2(size.x - _panelPadding * 2, cardHeight),
+      );
+      add(card);
+      _cards.add(card);
+    }
 
     if (relationships.isEmpty) {
-      // Empty state
-      final emptyText = TextComponent(
-        text: 'No bonds yet',
-        textRenderer: TextPaint(
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
-            fontSize: 11,
-            height: 1.4,
+      add(
+        TextComponent(
+          text: 'NO BONDS YET',
+          anchor: Anchor.center,
+          position: Vector2(size.x / 2, size.y / 2),
+          textRenderer: TextPaint(
+            style: const TextStyle(
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+              color: Color(0x66FFFFFF),
+              fontSize: 14,
+            ),
           ),
         ),
-        position: Vector2(16, 45),
-        anchor: Anchor.topLeft,
       );
-      add(emptyText);
-    } else {
-      // Show top 3 relationships (sorted by affection + trust)
-      final sorted = List<RelationshipData>.from(relationships);
-      sorted.sort((a, b) {
-        final scoreA = a.affection + a.trust;
-        final scoreB = b.affection + b.trust;
-        return scoreB.compareTo(scoreA);
-      });
-
-      double yOffset = 40;
-      for (int i = 0; i < math.min(3, sorted.length); i++) {
-        final rel = sorted[i];
-        final row = _RelationshipRow(
-          relationship: rel,
-          position: Vector2(16, yOffset),
-          size: Vector2(size.x - 32, 65),
-        );
-        add(row);
-        _rows.add(row);
-        yOffset += 72;
-      }
     }
   }
 
-  @override
-  void update(double dt) {
-    super.update(dt);
-    // Rows auto-update their relationship data
+  List<RelationshipData> _placeholderRelationships() {
+    return [
+      RelationshipData(
+        npcId: 'placeholder_1',
+        npcName: 'MOM',
+        affection: 8.0,
+        trust: 6.0,
+        attraction: -2.0,
+        familiarity: 9.0,
+        resentment: 1.0,
+        state: 'Family',
+      ),
+      RelationshipData(
+        npcId: 'placeholder_2',
+        npcName: 'BEST FRIEND',
+        affection: 7.0,
+        trust: 8.0,
+        attraction: 0.0,
+        familiarity: 8.0,
+        resentment: -1.0,
+        state: 'Friend',
+      ),
+      RelationshipData(
+        npcId: 'placeholder_3',
+        npcName: 'RIVAL',
+        affection: -3.0,
+        trust: -2.0,
+        attraction: 4.0,
+        familiarity: 3.0,
+        resentment: 5.0,
+        state: 'Rival',
+      ),
+    ];
   }
+
+  static const double _panelPadding = 18;
+  static const double _cardSpacing = 12;
+  static const int _maxCards = 3;
 }
 
 /// Single relationship row with name, state, and gauges
-class _RelationshipRow extends PositionComponent {
+class _RelationshipCardComponent extends PositionComponent {
   final RelationshipData relationship;
 
-  _RelationshipRow({
+  _RelationshipCardComponent({
     required this.relationship,
     required Vector2 position,
     required Vector2 size,
@@ -102,38 +111,32 @@ class _RelationshipRow extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    // Background
+    final bgRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.x, size.y),
+      const Radius.circular(10),
+    );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        const Radius.circular(4),
-      ),
+      bgRect,
       Paint()
-        ..color = _getStateColor(relationship.state).withOpacity(0.15)
+        ..color = SynColors.bgPanel.withOpacity(0.9)
         ..style = PaintingStyle.fill,
     );
-
-    // Border
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.x, size.y),
-        const Radius.circular(4),
-      ),
+      bgRect,
       Paint()
-        ..color = _getStateColor(relationship.state).withOpacity(0.5)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5,
+        ..strokeWidth = SynLayout.borderWidthLight
+        ..color = _getStateColor(relationship.state).withOpacity(0.8),
     );
 
     // NPC Name (bold, top-left)
     final namePainter = TextPainter(
       text: TextSpan(
         text: relationship.npcName.toUpperCase(),
-        style: TextStyle(
-          color: _getStateColor(relationship.state),
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
+        style: SynTextStyles.body.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+          color: SynColors.textPrimary,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -149,48 +152,32 @@ class _RelationshipRow extends PositionComponent {
       relationship.state,
     );
 
-    // Affection gauge (left side)
-    const gaugeY = 28.0;
     const gaugeHeight = 6.0;
-    const gaugeWidth = 55.0;
+    final gaugeWidth = size.x - 32;
+    const startY = 30.0;
+    const rowSpacing = 18.0;
+    final gauges = [
+      ('AFF', relationship.affection, SynColors.accentRed, -10.0, 10.0),
+      ('TRU', relationship.trust, SynColors.accentGreen, -10.0, 10.0),
+      ('ATR', relationship.attraction, SynColors.accentViolet, -10.0, 10.0),
+      ('FAM', relationship.familiarity, SynColors.primaryCyan, 0.0, 10.0),
+      ('RES', relationship.resentment, SynColors.accentOrange, -10.0, 10.0),
+    ];
 
-    _drawGauge(
-      canvas,
-      Offset(8, gaugeY),
-      'AFF',
-      relationship.affection,
-      gaugeWidth,
-      gaugeHeight,
-      const Color(0xFFFF4488), // Pink/red for affection
-    );
-
-    // Trust gauge (right side)
-    _drawGauge(
-      canvas,
-      Offset(size.x - gaugeWidth - 8, gaugeY),
-      'TRU',
-      relationship.trust,
-      gaugeWidth,
-      gaugeHeight,
-      const Color(0xFF44FF88), // Green for trust
-    );
-
-    // Additional metrics (smaller, bottom)
-    final metricsY = gaugeY + 16;
-    final metricsText = '${relationship.familiarity.toStringAsFixed(1)}F '
-        '${relationship.resentment.toStringAsFixed(1)}R';
-    final metricsPainter = TextPainter(
-      text: TextSpan(
-        text: metricsText,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.6),
-          fontSize: 9,
-          height: 1.0,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    metricsPainter.paint(canvas, Offset(8, metricsY));
+    for (var i = 0; i < gauges.length; i++) {
+      final spec = gauges[i];
+      _drawGauge(
+        canvas,
+        Offset(8, startY + i * rowSpacing),
+        spec.$1,
+        spec.$2,
+        gaugeWidth,
+        gaugeHeight,
+        spec.$3,
+        minValue: spec.$4,
+        maxValue: spec.$5,
+      );
+    }
   }
 
   void _drawGauge(
@@ -200,17 +187,15 @@ class _RelationshipRow extends PositionComponent {
     double value,
     double width,
     double height,
-    Color color,
-  ) {
+    Color color, {
+    double minValue = -10,
+    double maxValue = 10,
+  }) {
     // Label
     final labelPainter = TextPainter(
       text: TextSpan(
         text: label,
-        style: TextStyle(
-          color: color,
-          fontSize: 8,
-          fontWeight: FontWeight.bold,
-        ),
+        style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -224,12 +209,12 @@ class _RelationshipRow extends PositionComponent {
         const Radius.circular(2),
       ),
       Paint()
-        ..color = Colors.black.withOpacity(0.3)
+        ..color = SynColors.bgDark.withOpacity(0.4)
         ..style = PaintingStyle.fill,
     );
 
     // Gauge fill (value -10 to +10 mapped to 0 to 100%)
-    final fillPercent = ((value + 10) / 20).clamp(0.0, 1.0);
+    final fillPercent = ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
     final fillWidth = width * fillPercent;
 
     if (fillWidth > 0) {
@@ -243,21 +228,17 @@ class _RelationshipRow extends PositionComponent {
           ),
           const Radius.circular(2),
         ),
-        Paint()
-          ..color = color.withOpacity(0.8)
-          ..style = PaintingStyle.fill,
-      );
+      Paint()
+        ..color = color.withOpacity(0.85)
+        ..style = PaintingStyle.fill,
+    );
     }
 
     // Value text
     final valuePainter = TextPainter(
       text: TextSpan(
         text: value.toStringAsFixed(0),
-        style: TextStyle(
-          color: color,
-          fontSize: 7,
-          height: 1.0,
-        ),
+        style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -298,15 +279,10 @@ class _RelationshipRow extends PositionComponent {
 
     // State text
     final statePainter = TextPainter(
-      text: TextSpan(
-        text: _getStateLabel(state),
-        style: TextStyle(
-          color: color,
-          fontSize: 8,
-          fontWeight: FontWeight.bold,
-          height: 1.0,
+        text: TextSpan(
+          text: _getStateLabel(state),
+          style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
         ),
-      ),
       textDirection: TextDirection.ltr,
     )..layout();
 
@@ -317,18 +293,18 @@ class _RelationshipRow extends PositionComponent {
 
   Color _getStateColor(String state) {
     return switch (state) {
-      'Stranger' => const Color(0xFF888888),
-      'Acquaintance' => const Color(0xFFAAAAFF),
-      'Friend' => const Color(0xFF44FF88),
-      'CloseFriend' => const Color(0xFF00FF88),
-      'BestFriend' => const Color(0xFF00FFFF),
-      'RomanticInterest' => const Color(0xFFFF4488),
-      'Partner' => const Color(0xFFFF00AA),
-      'Spouse' => const Color(0xFFFFFFFF),
-      'Rival' => const Color(0xFFFF6644),
-      'Estranged' => const Color(0xFF884444),
-      'BrokenHeart' => const Color(0xFFCC4488),
-      _ => const Color(0xFF00D9FF),
+      'Stranger' => SynColors.textMuted,
+      'Acquaintance' => SynColors.accentIndigo,
+      'Friend' => SynColors.accentGreen,
+      'CloseFriend' => SynColors.primaryCyan,
+      'BestFriend' => SynColors.accentCyan,
+      'RomanticInterest' => SynColors.accentMagenta,
+      'Partner' => SynColors.accentOrange,
+      'Spouse' => SynColors.textPrimary,
+      'Rival' => SynColors.accentRed,
+      'Estranged' => SynColors.accentOrange.withOpacity(0.7),
+      'BrokenHeart' => SynColors.accentMagenta.withOpacity(0.7),
+      _ => SynColors.primaryCyan,
     };
   }
 
@@ -369,7 +345,7 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       bgPath,
       Paint()
-        ..color = const Color(0xFF000000).withOpacity(0.65)
+        ..color = SynColors.bgPanel.withOpacity(0.85)
         ..style = PaintingStyle.fill,
     );
 
@@ -381,8 +357,8 @@ class _PanelFrame extends PositionComponent {
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [
-            const Color(0xFF1a1a1a).withOpacity(0.3),
-            const Color(0xFF0a0a0a).withOpacity(0.2),
+            SynColors.bgDark.withOpacity(0.4),
+            SynColors.bgPanel.withOpacity(0.25),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.x, size.y)),
     );
@@ -391,9 +367,9 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       bgPath,
       Paint()
-        ..color = const Color(0xFF00D9FF)
+        ..color = SynColors.accentViolet
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5,
+        ..strokeWidth = SynLayout.borderWidthHeavy,
     );
 
     // Inner accent line (depth)
@@ -408,9 +384,9 @@ class _PanelFrame extends PositionComponent {
     canvas.drawPath(
       innerPath,
       Paint()
-        ..color = const Color(0xFF00D9FF).withOpacity(0.3)
+        ..color = SynColors.accentViolet.withOpacity(0.4)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..strokeWidth = SynLayout.borderWidthLight,
     );
   }
 }

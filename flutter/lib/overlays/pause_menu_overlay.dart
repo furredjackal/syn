@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
+import '../syn_game.dart';
+import '../ui/syn_theme.dart';
 
 class PauseMenuOverlay extends StatefulWidget {
-  final VoidCallback onResume;
-  final VoidCallback onSave;
-  final VoidCallback onLoad;
-  final VoidCallback onSettings;
-  final VoidCallback onQuit;
+  final SynGame game;
 
   const PauseMenuOverlay({
     Key? key,
-    required this.onResume,
-    required this.onSave,
-    required this.onLoad,
-    required this.onSettings,
-    required this.onQuit,
+    required this.game,
   }) : super(key: key);
 
   @override
@@ -45,37 +39,63 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    void resumeGame() {
+      widget.game.resumeEngine();
+      widget.game.overlays.remove('PauseMenuOverlay');
+    }
+
+    void openSettings() {
+      // TODO: swap to SettingsOverlay when implemented.
+      resumeGame();
+      widget.game.showSettings();
+    }
+
+    void quitToMenu() {
+      widget.game.promptQuitToMenu();
+    }
+
     return Stack(
       children: [
         FadeTransition(
           opacity: _fadeAnimation,
           child: GestureDetector(
-            onTap: widget.onResume,
-            child: Container(color: Colors.black.withOpacity(0.7)),
+            onTap: resumeGame,
+            child: Container(color: SynColors.bgDark.withOpacity(0.8)),
           ),
         ),
         SlideTransition(
           position: _slideAnimation,
           child: Center(
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.cyan.withOpacity(0.5), width: 1),
-                borderRadius: BorderRadius.circular(4),
-                color: const Color(0xFF0A0E27),
-              ),
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('GAME PAUSED', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.cyan)),
-                  const SizedBox(height: 32),
-                  _buildMenuButton(context, 'RESUME', Icons.play_arrow, widget.onResume),
-                  _buildMenuButton(context, 'SAVE GAME', Icons.save, widget.onSave),
-                  _buildMenuButton(context, 'LOAD GAME', Icons.upload, widget.onLoad),
-                  _buildMenuButton(context, 'SETTINGS', Icons.settings, widget.onSettings),
-                  const SizedBox(height: 16),
-                  _buildMenuButton(context, 'QUIT TO MENU', Icons.exit_to_app, widget.onQuit, isDestructive: true),
-                ],
+            child: ClipPath(
+              clipper: _PanelClipper(),
+              child: Container(
+                width: 460,
+                padding: const EdgeInsets.all(SynLayout.paddingLarge),
+                decoration: BoxDecoration(
+                  color: SynColors.bgPanel,
+                  border: Border.all(
+                    color: SynColors.primaryCyan,
+                    width: SynLayout.borderWidthHeavy,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PAUSE',
+                      style: SynTextStyles.h1Event,
+                    ),
+                    const SizedBox(height: SynLayout.paddingLarge),
+                    _PauseMenuButton(label: 'RESUME', onPressed: resumeGame),
+                    _PauseMenuButton(label: 'SETTINGS', onPressed: openSettings),
+                    _PauseMenuButton(
+                      label: 'QUIT TO MAIN MENU',
+                      onPressed: quitToMenu,
+                      isDestructive: true,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -83,28 +103,94 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
       ],
     );
   }
+}
 
-  Widget _buildMenuButton(
-    BuildContext context,
-    String label,
-    IconData icon,
-    VoidCallback onPressed, {
-    bool isDestructive = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: SizedBox(
-        width: 200,
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon),
-          label: Text(label),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: isDestructive ? Colors.red.shade700 : Colors.cyan,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+class _PanelClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(28, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width - 28, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _PauseMenuButton extends StatefulWidget {
+  const _PauseMenuButton({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool isDestructive;
+
+  @override
+  State<_PauseMenuButton> createState() => _PauseMenuButtonState();
+}
+
+class _PauseMenuButtonState extends State<_PauseMenuButton> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = widget.isDestructive
+        ? SynColors.accentRed
+        : SynColors.primaryCyan;
+    final bgColor = _hovering
+        ? borderColor.withOpacity(0.2)
+        : SynColors.bgPanel.withOpacity(0.6);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: ClipPath(
+          clipper: _ButtonClipper(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.symmetric(vertical: SynLayout.paddingSmall),
+            padding: const EdgeInsets.symmetric(
+              vertical: SynLayout.paddingSmall,
+              horizontal: SynLayout.paddingLarge,
+            ),
+            decoration: BoxDecoration(
+              color: bgColor,
+              border: Border.all(color: borderColor, width: SynLayout.borderWidthNormal),
+            ),
+            child: Center(
+              child: Text(
+                widget.label,
+                style: SynTextStyles.body.copyWith(
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ButtonClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(12, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width - 12, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

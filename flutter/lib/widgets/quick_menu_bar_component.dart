@@ -3,13 +3,14 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import '../syn_game.dart';
+import '../ui/syn_theme.dart';
 
 class QuickMenuBarComponent extends PositionComponent
     with HasGameReference<SynGame> {
   @override
   Future<void> onLoad() async {
     final background = RectangleComponent(
-      paint: Paint()..color = const Color(0x4D000000),
+      paint: Paint()..color = SynColors.bgPanel.withOpacity(0.8),
       size: size,
     );
     add(background);
@@ -17,11 +18,11 @@ class QuickMenuBarComponent extends PositionComponent
     final items = [
       _QuickMenuConfig(
         label: 'MAIN MENU',
-        onPressed: () => game.returnToTitle(),
+        onPressed: () => game.promptQuitToMenu(),
       ),
       _QuickMenuConfig(
         label: 'PAUSE',
-        onPressed: () => game.showPauseOverlay(),
+        onPressed: () => game.togglePauseOverlay(),
       ),
       _QuickMenuConfig(
         label: 'JOURNAL',
@@ -104,10 +105,9 @@ class _QuickMenuButton extends PositionComponent with TapCallbacks {
       anchor: Anchor.center,
       position: size / 2,
       textRenderer: TextPaint(
-        style: const TextStyle(
-          color: Color(0xFFFFFFFF),
+        style: SynTextStyles.body.copyWith(
           fontSize: 12,
-          letterSpacing: 1.2,
+          letterSpacing: 1.4,
         ),
       ),
     );
@@ -116,14 +116,21 @@ class _QuickMenuButton extends PositionComponent with TapCallbacks {
   }
 
   void _updateVisualState() {
-    final backgroundOpacity = _isPressed ? 0.2 : 0.05;
-    final borderOpacity = _isPressed ? 0.8 : 0.3;
-    _background.paint =
-        Paint()..color = Color.fromRGBO(255, 255, 255, backgroundOpacity);
+    final backgroundOpacity = _isPressed ? 0.4 : 0.25;
+    final borderOpacity = _isPressed ? 1.0 : 0.5;
+    _background.paint = Paint()
+      ..color = SynColors.bgPanel.withOpacity(backgroundOpacity);
     _border.paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = Color.fromRGBO(255, 255, 255, borderOpacity);
+      ..strokeWidth = SynLayout.borderWidthNormal
+      ..color = SynColors.primaryCyan.withOpacity(borderOpacity);
+    _text.textRenderer = TextPaint(
+      style: SynTextStyles.body.copyWith(
+        fontSize: 12,
+        letterSpacing: 1.4,
+        color: SynColors.textPrimary,
+      ),
+    );
   }
 
   @override
