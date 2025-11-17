@@ -20,8 +20,6 @@ class GameEvent {
   final List<GameChoice> choices;
   final String lifeStage;
   final int age;
-  final List<String> tags;
-  final Map<String, int> deltas;
 
   GameEvent({
     required this.id,
@@ -31,8 +29,6 @@ class GameEvent {
     required this.choices,
     required this.lifeStage,
     required this.age,
-    this.tags = const [],
-    this.deltas = const {},
   });
 }
 

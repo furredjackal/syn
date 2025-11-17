@@ -57,10 +57,8 @@ class EventCardComponent extends PositionComponent
     const double horizontalPadding = 36.0;
     const double spacingAfterHeader = 24.0;
     const double bannerBottomGap = 12.0;
-    const double tagRowBottomGap = 16.0;
     const double descriptionBottomGap = 14.0;
     const double dividerBottomGap = 26.0;
-    const double impactSummaryBottomGap = 18.0;
     const double choiceGap = 12.0;
 
     // Track running vertical position for content below the header badge
@@ -76,17 +74,6 @@ class EventCardComponent extends PositionComponent
     await add(titleBanner);
 
     layoutY += titleBanner.size.y + bannerBottomGap;
-
-    final tags = event.tags;
-    if (tags.isNotEmpty) {
-      final tagRow = _EventTagChipRow(
-        tags: tags,
-        maxWidth: bannerMaxWidth,
-        position: Vector2(horizontalPadding, layoutY),
-      );
-      add(tagRow);
-      layoutY += tagRow.size.y + tagRowBottomGap;
-    }
 
     // Description text anchors directly under the banner
     final descriptionMaxWidth =
@@ -118,17 +105,6 @@ class EventCardComponent extends PositionComponent
     add(accentDivider);
 
     layoutY += accentDivider.size.y + dividerBottomGap;
-
-    final impactStats = event.deltas.keys.toList();
-    if (impactStats.isNotEmpty) {
-      final impactRow = _ImpactSummaryRow(
-        affectedStats: impactStats,
-        maxWidth: bannerMaxWidth,
-        position: Vector2(horizontalPadding, layoutY),
-      );
-      add(impactRow);
-      layoutY += impactRow.size.y + impactSummaryBottomGap;
-    }
 
     // Choices run full width with even gaps
     double yOffset = layoutY;
@@ -484,188 +460,6 @@ class _EventTitleBanner extends PositionComponent {
     final textOffset = Offset(20, h / 2 - titlePainter.height / 2);
     titlePainter.paint(canvas, textOffset);
   }
-}
-
-class _EventTagChipRow extends PositionComponent {
-  final List<String> tags;
-  final double maxWidth;
-  static const double _chipHeight = 26.0;
-  static const double _horizontalPadding = 12.0;
-  static const double _horizontalSpacing = 8.0;
-  static const double _verticalSpacing = 6.0;
-  static const List<Color> _chipPalette = [
-    Color(0xFF145366),
-    Color(0xFF2E1A4A),
-  ];
-
-  late final List<_TagChipLayout> _chipLayouts;
-
-  _EventTagChipRow({
-    required this.tags,
-    required this.maxWidth,
-    required Vector2 position,
-  }) : super(position: position, size: Vector2(maxWidth, 0)) {
-    _chipLayouts = _buildLayouts();
-    final height =
-        _chipLayouts.isEmpty ? 0 : _chipLayouts.map((c) => c.rect.bottom).reduce(math.max);
-    size.y = height;
-  }
-
-  List<_TagChipLayout> _buildLayouts() {
-    final layouts = <_TagChipLayout>[];
-    double cursorX = 0;
-    double cursorY = 0;
-    int paletteIndex = 0;
-
-    for (final rawTag in tags) {
-      final label = rawTag.toUpperCase();
-      final painter = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: const TextStyle(
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.4,
-            color: Colors.white,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: math.max(maxWidth - _horizontalPadding * 2, 0));
-
-      final chipWidth = math.min(
-        painter.width + _horizontalPadding * 2,
-        maxWidth,
-      );
-
-      if (cursorX + chipWidth > maxWidth && cursorX > 0) {
-        cursorX = 0;
-        cursorY += _chipHeight + _verticalSpacing;
-      }
-
-      final rect = Rect.fromLTWH(cursorX, cursorY, chipWidth, _chipHeight);
-      const skew = 10.0;
-      final path = Path()
-        ..moveTo(rect.left + skew, rect.top)
-        ..lineTo(rect.right, rect.top)
-        ..lineTo(rect.right - skew, rect.bottom)
-        ..lineTo(rect.left, rect.bottom)
-        ..close();
-
-      final textOffset = Offset(
-        rect.left + _horizontalPadding,
-        rect.top + (_chipHeight - painter.height) / 2,
-      );
-
-      final fillColor = _chipPalette[paletteIndex % _chipPalette.length];
-      paletteIndex++;
-
-      layouts.add(
-        _TagChipLayout(
-          rect: rect,
-          path: path,
-          painter: painter,
-          textOffset: textOffset,
-          fillColor: fillColor,
-        ),
-      );
-
-      cursorX += chipWidth + _horizontalSpacing;
-    }
-
-    return layouts;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    for (final chip in _chipLayouts) {
-      canvas.drawPath(
-        chip.path,
-        Paint()..color = chip.fillColor,
-      );
-      canvas.drawPath(
-        chip.path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = Colors.white.withOpacity(0.25),
-      );
-      chip.painter.paint(canvas, chip.textOffset);
-    }
-  }
-}
-
-class _ImpactSummaryRow extends PositionComponent {
-  final List<String> affectedStats;
-
-  _ImpactSummaryRow({
-    required this.affectedStats,
-    required double maxWidth,
-    required Vector2 position,
-  }) : super(position: position, size: Vector2(maxWidth, 26));
-
-  @override
-  void render(Canvas canvas) {
-    if (affectedStats.isEmpty) {
-      return;
-    }
-
-    final displayStats = affectedStats
-        .map((s) => s.isEmpty
-            ? s
-            : s[0].toUpperCase() +
-                (s.length > 1 ? s.substring(1).toLowerCase() : ''))
-        .join(', ');
-    final summaryPainter = TextPainter(
-      text: TextSpan(
-        text: 'AFFECTS: $displayStats',
-        style: TextStyle(
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w600,
-          fontSize: 14,
-          letterSpacing: 0.8,
-          color: Colors.white.withOpacity(0.9),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: size.x - 24);
-
-    const diamondSize = 4.0;
-    final centerY = size.y / 2;
-    final diamondCenter = Offset(8, centerY);
-    final diamondPath = Path()
-      ..moveTo(diamondCenter.dx, diamondCenter.dy - diamondSize)
-      ..lineTo(diamondCenter.dx + diamondSize, diamondCenter.dy)
-      ..lineTo(diamondCenter.dx, diamondCenter.dy + diamondSize)
-      ..lineTo(diamondCenter.dx - diamondSize, diamondCenter.dy)
-      ..close();
-
-    canvas.drawPath(
-      diamondPath,
-      Paint()..color = const Color(0xFF00D9FF),
-    );
-
-    summaryPainter.paint(
-      canvas,
-      Offset(16, centerY - summaryPainter.height / 2),
-    );
-  }
-}
-
-class _TagChipLayout {
-  final Rect rect;
-  final Path path;
-  final TextPainter painter;
-  final Offset textOffset;
-  final Color fillColor;
-
-  _TagChipLayout({
-    required this.rect,
-    required this.path,
-    required this.painter,
-    required this.textOffset,
-    required this.fillColor,
-  });
 }
 
 class _AccentDivider extends PositionComponent {
