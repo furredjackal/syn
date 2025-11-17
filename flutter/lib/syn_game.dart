@@ -14,6 +14,7 @@ import 'splash_screen_component.dart';
 import 'character_creation_component.dart';
 import 'ui_effect_layer.dart';
 import 'widgets/particle_system_component.dart' as custom;
+import 'settings_screen_component.dart';
 
 class SynGame extends FlameGame
     with HasKeyboardHandlerComponents, MouseMovementDetector {
@@ -27,6 +28,7 @@ class SynGame extends FlameGame
       custom.ParticleSystemComponent();
   late final GameState gameState;
   Vector2? _mousePosition;
+  bool _resumeGameAfterSettings = false;
 
   Vector2? get mousePosition => _mousePosition;
 
@@ -52,6 +54,7 @@ class SynGame extends FlameGame
         'menu': Route(() => MainMenuComponent()),
         'character_creation': Route(() => CharacterCreationComponent()),
         'gameplay': Route(() => GameScreenComponent()),
+        'settings': Route(() => SettingsScreenComponent()),
       },
     );
     add(_router);
@@ -100,6 +103,27 @@ class SynGame extends FlameGame
   void returnToTitle() {
     _setGameSystemsVisible(false);
     _router.pushReplacementNamed('menu');
+  }
+
+  void showSettings() {
+    final current = _router.currentRoute.name;
+    _resumeGameAfterSettings = current == 'gameplay';
+    if (_resumeGameAfterSettings) {
+      _setGameSystemsVisible(false);
+    }
+    _router.pushNamed('settings');
+  }
+
+  void closeSettings() {
+    if (_router.currentRoute.name == 'settings') {
+      if (_router.canPop()) {
+        _router.pop();
+      }
+      if (_resumeGameAfterSettings) {
+        _setGameSystemsVisible(true);
+      }
+      _resumeGameAfterSettings = false;
+    }
   }
 
   void _setGameSystemsVisible(bool visible) {

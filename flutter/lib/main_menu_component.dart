@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:flame/components.dart';
@@ -6,6 +5,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'syn_game.dart';
+import 'widgets/persona_background.dart';
 
 class MainMenuComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
@@ -17,12 +17,12 @@ class MainMenuComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     size = game.size;
-    add(_PersonaBackground()..size = size);
+    add(PersonaBackground()..size = size);
 
     final labels = [
       _MenuAction('STORY', game.showCharacterCreation),
       _MenuAction('TUTORIAL', () => game.showComingSoon('Tutorial coming soon')),
-      _MenuAction('CONFIG', () => game.showComingSoon('Config menu coming soon')),
+      _MenuAction('SETTINGS', game.showSettings),
       _MenuAction('DATA LOAD', () => game.showComingSoon('Loadouts coming soon')),
       _MenuAction('DATA SAVE', () => game.showComingSoon('Saves coming soon')),
       _MenuAction('RETURN TO TITLE', game.showSplash),
@@ -84,93 +84,6 @@ class MainMenuComponent extends PositionComponent
       return true;
     }
     return false;
-  }
-}
-
-class _PersonaBackground extends PositionComponent {
-  @override
-  void render(Canvas canvas) {
-    final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    final gradient = Paint()
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFFB80024),
-          Color(0xFF5A000F),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(rect);
-    canvas.drawRect(rect, gradient);
-
-    final darkPaint = Paint()..color = const Color(0x22000000);
-    for (int i = 0; i < 12; i++) {
-      final y = size.y / 12 * i;
-      canvas.drawRect(Rect.fromLTWH(0, y, size.x, size.y / 24), darkPaint);
-    }
-
-    final overlayPath = Path()
-      ..moveTo(size.x * 0.62, 0)
-      ..lineTo(size.x, size.y * 0.05)
-      ..lineTo(size.x * 0.9, size.y)
-      ..lineTo(size.x * 0.5, size.y)
-      ..close();
-    canvas.drawPath(
-      overlayPath,
-      Paint()..color = const Color(0xFF111111),
-    );
-    canvas.drawPath(
-      overlayPath,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6
-        ..color = const Color(0xFFFFFFFF),
-    );
-
-    final triangles = Paint()..color = const Color(0xFFFFFFFF);
-    final random = Random(7);
-    for (int i = 0; i < 10; i++) {
-      final x = size.x * 0.65 + random.nextDouble() * size.x * 0.3;
-      final y = random.nextDouble() * size.y;
-      final triangle = Path()
-        ..moveTo(x, y)
-        ..lineTo(x + 20, y + 8)
-        ..lineTo(x, y + 16)
-        ..close();
-      canvas.drawPath(triangle, triangles);
-    }
-
-    final titlePainter = TextPainter(
-      text: const TextSpan(
-        text: 'MENU & SYSTEM',
-        style: TextStyle(
-          fontSize: 40,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-          color: Color(0xFFFFFFFF),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    titlePainter.paint(
-      canvas,
-      Offset(size.x * 0.65, size.y * 0.1),
-    );
-
-    final subtitle = TextPainter(
-      text: const TextSpan(
-        text: 'COMMAND SELECT',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF000000),
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    subtitle.paint(
-      canvas,
-      Offset(size.x * 0.65 + 8, size.y * 0.1 + 46),
-    );
   }
 }
 

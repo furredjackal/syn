@@ -34,7 +34,7 @@ class QuickMenuBarComponent extends PositionComponent
       ),
       _QuickMenuConfig(
         label: 'SETTINGS',
-        onPressed: () => game.showComingSoon('Settings coming soon'),
+        onPressed: () => game.showSettings(),
       ),
     ];
 
