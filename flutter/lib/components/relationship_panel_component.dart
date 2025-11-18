@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../syn_game.dart';
 import '../ui/syn_theme.dart';
+import 'character_info_component.dart';
 
 class RelationshipPanelComponent extends PositionComponent
     with HasGameReference<SynGame> {
-  final List<_RelationshipCardComponent> _cards = [];
+  final List<CharacterInfoComponent> _cards = [];
 
   @override
   Future<void> onLoad() async {
@@ -27,7 +28,7 @@ class RelationshipPanelComponent extends PositionComponent
 
     for (var i = 0; i < math.min(_maxCards, items.length); i++) {
       final relationship = items[i];
-      final card = _RelationshipCardComponent(
+      final card = CharacterInfoComponent(
         relationship: relationship,
         position: Vector2(
           _panelPadding,
@@ -97,233 +98,6 @@ class RelationshipPanelComponent extends PositionComponent
   static const double _panelPadding = 18;
   static const double _cardSpacing = 12;
   static const int _maxCards = 3;
-}
-
-/// Single relationship row with name, state, and gauges
-class _RelationshipCardComponent extends PositionComponent {
-  final RelationshipData relationship;
-
-  _RelationshipCardComponent({
-    required this.relationship,
-    required Vector2 position,
-    required Vector2 size,
-  }) : super(position: position, size: size);
-
-  @override
-  void render(Canvas canvas) {
-    final bgRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.x, size.y),
-      const Radius.circular(10),
-    );
-    canvas.drawRRect(
-      bgRect,
-      Paint()
-        ..color = SynColors.bgPanel.withOpacity(0.9)
-        ..style = PaintingStyle.fill,
-    );
-    canvas.drawRRect(
-      bgRect,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = SynLayout.borderWidthLight
-        ..color = _getStateColor(relationship.state).withOpacity(0.8),
-    );
-
-    // NPC Name (bold, top-left)
-    final namePainter = TextPainter(
-      text: TextSpan(
-        text: relationship.npcName.toUpperCase(),
-        style: SynTextStyles.body.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: SynColors.textPrimary,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    namePainter.paint(canvas, const Offset(8, 6));
-
-    // Relationship State Badge (right side, top)
-    final stateBadgeX = size.x - 68.0;
-    final stateBadgeY = 6.0;
-    _drawStateBadge(
-      canvas,
-      Offset(stateBadgeX, stateBadgeY),
-      relationship.state,
-    );
-
-    const gaugeHeight = 6.0;
-    final gaugeWidth = size.x - 32;
-    const startY = 30.0;
-    const rowSpacing = 18.0;
-    final gauges = [
-      ('AFF', relationship.affection, SynColors.accentRed, -10.0, 10.0),
-      ('TRU', relationship.trust, SynColors.accentGreen, -10.0, 10.0),
-      ('ATR', relationship.attraction, SynColors.accentViolet, -10.0, 10.0),
-      ('FAM', relationship.familiarity, SynColors.primaryCyan, 0.0, 10.0),
-      ('RES', relationship.resentment, SynColors.accentOrange, -10.0, 10.0),
-    ];
-
-    for (var i = 0; i < gauges.length; i++) {
-      final spec = gauges[i];
-      _drawGauge(
-        canvas,
-        Offset(8, startY + i * rowSpacing),
-        spec.$1,
-        spec.$2,
-        gaugeWidth,
-        gaugeHeight,
-        spec.$3,
-        minValue: spec.$4,
-        maxValue: spec.$5,
-      );
-    }
-  }
-
-  void _drawGauge(
-    Canvas canvas,
-    Offset position,
-    String label,
-    double value,
-    double width,
-    double height,
-    Color color, {
-    double minValue = -10,
-    double maxValue = 10,
-  }) {
-    // Label
-    final labelPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    labelPainter.paint(canvas, position);
-
-    // Gauge background
-    const gaugeY = 12.0;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(position.dx, position.dy + gaugeY, width, height),
-        const Radius.circular(2),
-      ),
-      Paint()
-        ..color = SynColors.bgDark.withOpacity(0.4)
-        ..style = PaintingStyle.fill,
-    );
-
-    // Gauge fill (value -10 to +10 mapped to 0 to 100%)
-    final fillPercent = ((value - minValue) / (maxValue - minValue)).clamp(0.0, 1.0);
-    final fillWidth = width * fillPercent;
-
-    if (fillWidth > 0) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            position.dx,
-            position.dy + gaugeY,
-            fillWidth,
-            height,
-          ),
-          const Radius.circular(2),
-        ),
-      Paint()
-        ..color = color.withOpacity(0.85)
-        ..style = PaintingStyle.fill,
-    );
-    }
-
-    // Value text
-    final valuePainter = TextPainter(
-      text: TextSpan(
-        text: value.toStringAsFixed(0),
-        style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final valueX = position.dx + (width / 2) - (valuePainter.width / 2);
-    final valueY = position.dy + gaugeY + 0.5;
-    valuePainter.paint(canvas, Offset(valueX, valueY));
-  }
-
-  void _drawStateBadge(Canvas canvas, Offset position, String state) {
-    const badgeWidth = 60.0;
-    const badgeHeight = 16.0;
-
-    final color = _getStateColor(state);
-
-    // Badge background
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(position.dx, position.dy, badgeWidth, badgeHeight),
-        const Radius.circular(2),
-      ),
-      Paint()
-        ..color = color.withOpacity(0.2)
-        ..style = PaintingStyle.fill,
-    );
-
-    // Badge border
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(position.dx, position.dy, badgeWidth, badgeHeight),
-        const Radius.circular(2),
-      ),
-      Paint()
-        ..color = color.withOpacity(0.6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
-
-    // State text
-    final statePainter = TextPainter(
-        text: TextSpan(
-          text: _getStateLabel(state),
-          style: SynTextStyles.chip.copyWith(color: color, fontSize: 9),
-        ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final textX = position.dx + (badgeWidth / 2) - (statePainter.width / 2);
-    final textY = position.dy + (badgeHeight / 2) - (statePainter.height / 2);
-    statePainter.paint(canvas, Offset(textX, textY));
-  }
-
-  Color _getStateColor(String state) {
-    return switch (state) {
-      'Stranger' => SynColors.textMuted,
-      'Acquaintance' => SynColors.accentIndigo,
-      'Friend' => SynColors.accentGreen,
-      'CloseFriend' => SynColors.primaryCyan,
-      'BestFriend' => SynColors.accentCyan,
-      'RomanticInterest' => SynColors.accentMagenta,
-      'Partner' => SynColors.accentOrange,
-      'Spouse' => SynColors.textPrimary,
-      'Rival' => SynColors.accentRed,
-      'Estranged' => SynColors.accentOrange.withOpacity(0.7),
-      'BrokenHeart' => SynColors.accentMagenta.withOpacity(0.7),
-      _ => SynColors.primaryCyan,
-    };
-  }
-
-  String _getStateLabel(String state) {
-    return switch (state) {
-      'Stranger' => 'STR',
-      'Acquaintance' => 'ACQ',
-      'Friend' => 'FRI',
-      'CloseFriend' => 'CF+',
-      'BestFriend' => 'BF+',
-      'RomanticInterest' => 'ROM',
-      'Partner' => 'PRT',
-      'Spouse' => 'SPO',
-      'Rival' => 'RIV',
-      'Estranged' => 'EST',
-      'BrokenHeart' => 'BH',
-      _ => '?',
-    };
-  }
 }
 
 /// Panel frame with angled border (right side)
