@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:math' as math;
 
 void main() {
   group('StatRing Widget Tests', () {

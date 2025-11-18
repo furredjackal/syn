@@ -7,7 +7,6 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
-import 'package:flutter/services.dart';
 import 'models/game_state.dart';
 import 'game_screen_component.dart';
 import 'main_menu_component.dart';
