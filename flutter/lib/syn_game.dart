@@ -18,15 +18,16 @@ import 'components/settings_screen_component.dart';
 
 class SynGame extends FlameGame
     with HasKeyboardHandlerComponents, MouseMovementDetector {
-  SynGame() {
-    gameState = GameState();
-  }
+  SynGame({GameState? initialGameState})
+      : gameState = initialGameState ?? GameState();
 
   late final RouterComponent _router;
   final UIEffectLayer _uiEffectLayer = UIEffectLayer();
   final custom.ParticleSystemComponent _particleSystem =
       custom.ParticleSystemComponent();
-  late final GameState gameState;
+  late final GameScreenComponent _gameScreen;
+  bool _gameScreenInitialized = false;
+  final GameState gameState;
   Vector2? _mousePosition;
   bool _resumeGameAfterSettings = false;
 
@@ -36,6 +37,11 @@ class SynGame extends FlameGame
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewport = FixedResolutionViewport(resolution: Vector2(1280, 720));
+
+    _gameScreen = GameScreenComponent()
+      ..size = size
+      ..position = Vector2.zero();
+    _gameScreenInitialized = true;
 
     _uiEffectLayer
       ..size = size
@@ -52,7 +58,7 @@ class SynGame extends FlameGame
         'splash': Route(() => SplashScreenComponent()),
         'menu': Route(() => MainMenuComponent()),
         'character_creation': Route(() => CharacterCreationComponent()),
-        'gameplay': Route(() => GameScreenComponent()),
+        'gameplay': Route(() => _gameScreen),
         'settings': Route(() => SettingsScreenComponent()),
       },
     );
@@ -64,6 +70,11 @@ class SynGame extends FlameGame
     super.onGameResize(size);
     _uiEffectLayer.size = size;
     _particleSystem.size = size;
+    if (_gameScreenInitialized) {
+      _gameScreen
+        ..size = size
+        ..position = Vector2.zero();
+    }
   }
 
   @override
