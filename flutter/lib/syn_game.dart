@@ -8,13 +8,13 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
 import 'models/game_state.dart';
-import 'game_screen_component.dart';
-import 'main_menu_component.dart';
-import 'splash_screen_component.dart';
-import 'character_creation_component.dart';
-import 'ui_effect_layer.dart';
-import 'widgets/particle_system_component.dart' as custom;
-import 'settings_screen_component.dart';
+import 'components/game_screen_component.dart';
+import 'components/main_menu_component.dart';
+import 'components/splash_screen_component.dart';
+import 'components/character_creation_component.dart';
+import 'components/ui_effect_layer.dart';
+import 'components/particle_system_component.dart' as custom;
+import 'components/settings_screen_component.dart';
 
 class SynGame extends FlameGame
     with HasKeyboardHandlerComponents, MouseMovementDetector {

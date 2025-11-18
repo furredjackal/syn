@@ -8,7 +8,7 @@ import '../ui/syn_theme.dart';
 /// StatPanel: Compact floating left panel with circular stat rings.
 ///
 /// Design:
-/// - Angled Persona-style border (left edge)
+/// - Angled border (left edge)
 /// - Compact footprint (280x280px)
 /// - Circular stat rings (3x2 grid: Health, Wealth, Charisma, Intelligence, Wisdom, Strength)
 /// - Each ring shows stat value as filled percentage
@@ -240,7 +240,7 @@ class _StatRing extends PositionComponent {
   }
 }
 
-/// Panel frame with angled Persona border (left side)
+/// Panel frame with angled border (left side)
 class _PanelFrame extends PositionComponent {
   _PanelFrame({required Vector2 size}) : super(size: size);
 

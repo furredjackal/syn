@@ -64,7 +64,7 @@ void main() {
       expect(true, true);
     });
 
-    testWidgets('All Persona aesthetic elements applied',
+    testWidgets('All aesthetic elements applied',
         (WidgetTester tester) async {
       // Angled borders, cyan #00D9FF, 65% opacity dark, gradients, jagged title
       expect(true, true);

@@ -1,6 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'syn_game.dart';
+import '../syn_game.dart';
 
 /// Global UI effect layer that applies mood-based visual filters to the entire game.
 /// Renders vignette, saturation, brightness, and blur adjustments based on current mood.

@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-class PersonaBackground extends PositionComponent {
+class Background extends PositionComponent {
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);

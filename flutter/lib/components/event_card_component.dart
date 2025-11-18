@@ -9,11 +9,11 @@ import '../syn_game.dart';
 import 'choice_button_component.dart';
 import '../ui/syn_theme.dart';
 
-/// EventCanvas: Centered focal point with Persona-style slash transitions.
+/// EventCanvas: Centered focal point with slash transitions.
 ///
 /// Floating layout summary:
 /// - Angled canvas + cyan border frame
-/// - Persona header badge overlapping the top edge
+/// - Header badge overlapping the top edge
 /// - Jagged title banner, description, divider, and staggered choice buttons
 /// - Slash accent + slash entrance wipe
 class EventCardComponent extends PositionComponent
@@ -36,7 +36,7 @@ class EventCardComponent extends PositionComponent
 
     // Base layers (bottom → top)
     add(_EventCanvasBackground(size: size));
-    add(_PersonaEventBorder(size: size));
+    add(_EventBorder(size: size));
     add(_SlashAccent(size: size));
 
     // Header strip floats above the border slightly for depth
@@ -402,7 +402,7 @@ class _EventHeader extends PositionComponent {
   }
 }
 
-/// Persona-style jagged title banner with gradient fill
+/// Jagged title banner with gradient fill
 class _EventTitleBanner extends PositionComponent {
   final String title;
 
@@ -785,8 +785,8 @@ class _TextPainterComponent extends PositionComponent {
   }
 }
 
-class _PersonaEventBorder extends PositionComponent {
-  _PersonaEventBorder({required Vector2 size}) : super(size: size);
+class _EventBorder extends PositionComponent {
+  _EventBorder({required Vector2 size}) : super(size: size);
 
   @override
   void render(Canvas canvas) {

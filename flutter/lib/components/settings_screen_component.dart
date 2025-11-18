@@ -3,14 +3,14 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'models/game_state.dart';
-import 'syn_game.dart';
-import 'widgets/persona_background.dart';
+import '../models/game_state.dart';
+import '../syn_game.dart';
+import '../ui/background.dart';
 
 class SettingsScreenComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
   late final GameState _gameState;
-  late final PersonaBackground _background;
+  late final Background _background;
   PositionComponent? _content;
   _InfoPanel? _infoPanel;
   _BackButton? _backButton;
@@ -22,7 +22,7 @@ class SettingsScreenComponent extends PositionComponent
     size = game.size;
     _gameState = game.gameState;
 
-    _background = PersonaBackground()..size = size;
+    _background = Background()..size = size;
     add(_background);
 
     _content = PositionComponent();
@@ -30,7 +30,7 @@ class SettingsScreenComponent extends PositionComponent
     _infoPanel = _InfoPanel(
       width: size.x * 0.28,
       text:
-          'Persona-inspired options board.\n\nUse the mouse or ↑/↓ and Enter to toggle controls.\nPress ESC to return to the previous screen.',
+          'Options board.\n\nUse the mouse or ↑/↓ and Enter to toggle controls.\nPress ESC to return to the previous screen.',
     );
     add(_infoPanel!);
     _backButton = _BackButton(
@@ -53,7 +53,7 @@ class SettingsScreenComponent extends PositionComponent
     add(title);
     final subtitle = TextComponent(
       text:
-          'Control the experience. Persona-style options tuned to our neon noir.',
+          'Control the experience. Options tuned to our neon noir.',
       textRenderer: TextPaint(
         style: const TextStyle(
           color: Color(0xFFB7B7B7),

@@ -1,7 +1,7 @@
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
-import 'syn_game.dart';
+import '../syn_game.dart';
 
 class SplashScreenComponent extends PositionComponent
     with HasGameReference<SynGame> {

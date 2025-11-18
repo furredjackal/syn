@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/game_state.dart';
 import '../syn_game.dart';
 
-/// Persona-style choice button rendered as a skewed Flame component.
+/// Choice button rendered as a skewed Flame component.
 class ChoiceButtonComponent extends PositionComponent
     with HasGameReference<SynGame> {
   final GameChoice choice;

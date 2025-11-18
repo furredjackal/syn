@@ -3,8 +3,8 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'syn_game.dart';
-import 'widgets/persona_background.dart';
+import '../syn_game.dart';
+import '../ui/background.dart';
 
 class MainMenuComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
@@ -16,7 +16,7 @@ class MainMenuComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     size = game.size;
-    add(PersonaBackground()..size = size);
+    add(Background()..size = size);
 
     final labels = [
       _MenuAction('STORY', game.showCharacterCreation),
@@ -103,7 +103,7 @@ class _MenuSidebar extends PositionComponent with HasGameReference<SynGame> {
     final painter = TextPainter(
       text: const TextSpan(
         text:
-            'A Persona-inspired interface focusing on bold typography and layered shapes.\n\n'
+            'An interface focusing on bold typography and layered shapes.\n\n'
             'Navigate with ↑/↓ and confirm with Enter, or click/tap a command.',
         style: TextStyle(
           color: Color(0xFFEEEEEE),

@@ -3,7 +3,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'syn_game.dart';
+import '../syn_game.dart';
 
 class CharacterCreationComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
@@ -135,7 +135,7 @@ class CharacterCreationComponent extends PositionComponent
       ..size = Vector2(cardWidth, 70.0 * scale)
       ..position = Vector2(leftMargin, difficultyTop);
 
-    // Big Persona-style BEGIN LIFE button at the bottom of the stack
+    // Big BEGIN LIFE button at the bottom of the stack
     final buttonTop = difficultyTop + _difficultyToggle.size.y + 24.0 * scale;
     _beginButton
       ..size = Vector2(300.0 * scale, 60.0 * scale)

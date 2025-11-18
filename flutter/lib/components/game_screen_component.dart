@@ -1,19 +1,19 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'models/game_state.dart';
-import 'syn_game.dart';
-import 'widgets/event_card_component.dart';
-import 'widgets/persona_background.dart';
-import 'widgets/quick_menu_bar_component.dart';
-import 'widgets/relationship_panel_component.dart';
-import 'widgets/stat_panel_component.dart';
-import 'widgets/top_bar_component.dart';
+import '../models/game_state.dart';
+import '../syn_game.dart';
+import 'event_card_component.dart';
+import '../ui/background.dart';
+import 'quick_menu_bar_component.dart';
+import 'relationship_panel_component.dart';
+import 'stat_panel_component.dart';
+import 'top_bar_component.dart';
 
 /// Main game screen component using Flame components as floating canvas.
 ///
-/// Floating Persona UI model:
-/// - EventCard: Centered focal point (max 60% width, angled Persona style)
+/// Floating UI model:
+/// - EventCard: Centered focal point (max 60% width, angled style)
 /// - StatPanel: Floats left (compact ~250-300px, minimal footprint)
 /// - RelationshipPanel: Floats right (compact ~250-300px, minimal footprint)
 /// - TopBar: Thin strip at top
@@ -36,7 +36,7 @@ class GameScreenComponent extends PositionComponent
     9: {LogicalKeyboardKey.digit9, LogicalKeyboardKey.numpad9},
   };
 
-  late final PersonaBackground _background;
+  late final Background _background;
   late final PositionComponent _componentLayer;
 
   late TopBarComponent topBar;
@@ -50,8 +50,8 @@ class GameScreenComponent extends PositionComponent
   Future<void> onLoad() async {
     size = game.size;
 
-    // Background (Persona-style canvas)
-    _background = PersonaBackground()..size = size;
+    // Background
+    _background = Background()..size = size;
     add(_background);
 
     // Single component layer (no rigid frame structure)

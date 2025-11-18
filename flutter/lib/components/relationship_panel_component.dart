@@ -326,7 +326,7 @@ class _RelationshipCardComponent extends PositionComponent {
   }
 }
 
-/// Panel frame with angled Persona border (right side)
+/// Panel frame with angled border (right side)
 class _PanelFrame extends PositionComponent {
   _PanelFrame({required Vector2 size}) : super(size: size);
 
