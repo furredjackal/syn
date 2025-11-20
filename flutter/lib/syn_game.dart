@@ -8,39 +8,28 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
 import 'models/game_state.dart';
-import 'components/character_creation_component.dart';
-import 'components/debug_console_component.dart';
-import 'components/detailed_stat_component.dart';
-import 'components/end_of_life_component.dart';
-import 'components/main_gameplay_hub_component.dart';
-import 'components/main_menu_component.dart';
-import 'components/memory_journal_component.dart';
-import 'components/possession_screen_component.dart';
-import 'components/relationship_network_component.dart';
-import 'components/save_load_component.dart';
-import 'components/settings_screen_component.dart';
-import 'components/splash_screen_component.dart';
-import 'components/world_map_component.dart';
-import 'components/ui_effect_layer.dart';
-import 'components/particle_system_component.dart' as custom;
-import 'components/settings_screen_component.dart';
+import 'components/screens/character_creation_component.dart';
+import 'components/screens/debug_console_component.dart';
+import 'components/screens/detailed_stat_component.dart';
+import 'components/screens/end_of_life_component.dart';
+import 'components/screens/main_gameplay_hub_component.dart';
+import 'components/screens/main_menu_component.dart';
+import 'components/screens/memory_journal_component.dart';
+import 'components/screens/possession_screen_component.dart';
+import 'components/screens/relationship_network_component.dart';
+import 'components/screens/save_load_component.dart';
+import 'components/screens/settings_screen_component.dart';
+import 'components/screens/splash_screen_component.dart';
+import 'components/screens/world_map_component.dart';
 
 class SynGame extends FlameGame
-    with
-        HasKeyboardHandlerComponents,
-        MouseMovementDetector,
-        HasTappables,
-        HasDraggables {
+    with HasKeyboardHandlerComponents, MouseMovementDetector {
   SynGame({GameState? initialGameState})
       : gameState = initialGameState ?? GameState();
 
   late final RouterComponent _router;
-  final UIEffectLayer _uiEffectLayer = UIEffectLayer();
-  final custom.ParticleSystemComponent _particleSystem =
-      custom.ParticleSystemComponent();
   final GameState gameState;
   Vector2? _mousePosition;
-  bool _resumeGameAfterSettings = false;
 
   Vector2? get mousePosition => _mousePosition;
 
@@ -48,15 +37,6 @@ class SynGame extends FlameGame
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewport = FixedResolutionViewport(resolution: Vector2(1280, 720));
-
-    _uiEffectLayer
-      ..size = size
-      ..setActive(false);
-    _particleSystem
-      ..size = size
-      ..setActive(false);
-    add(_uiEffectLayer);
-    add(_particleSystem);
 
     _router = RouterComponent(
       initialRoute: 'splash',
@@ -82,8 +62,6 @@ class SynGame extends FlameGame
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
-    _uiEffectLayer.size = size;
-    _particleSystem.size = size;
   }
 
   @override
@@ -110,7 +88,6 @@ class SynGame extends FlameGame
 
   Future<void> _navigateToMenu() async {
     await _performSceneTransition(() async {
-      _setGameSystemsVisible(false);
       _router.pushReplacementNamed('menu');
     });
   }
@@ -121,7 +98,6 @@ class SynGame extends FlameGame
 
   Future<void> _navigateToCharacterCreation() async {
     await _performSceneTransition(() async {
-      _setGameSystemsVisible(false);
       _router.pushReplacementNamed('character_creation');
     });
   }
@@ -130,7 +106,6 @@ class SynGame extends FlameGame
     await _runWithLoadingOverlay(() async {
       await _performSceneTransition(() async {
         _router.pushReplacementNamed('gameplay');
-        _setGameSystemsVisible(true);
       });
     });
   }
@@ -148,7 +123,6 @@ class SynGame extends FlameGame
       gameState.setDifficulty(difficulty);
       await _performSceneTransition(() async {
         _router.pushReplacementNamed('gameplay');
-        _setGameSystemsVisible(true);
       });
     });
   }
@@ -159,10 +133,6 @@ class SynGame extends FlameGame
 
   void showSettings() {
     final current = _router.currentRoute.name;
-    _resumeGameAfterSettings = current == 'gameplay';
-    if (_resumeGameAfterSettings) {
-      _setGameSystemsVisible(false);
-    }
     _router.pushNamed('settings');
   }
 
@@ -171,16 +141,7 @@ class SynGame extends FlameGame
       if (_router.canPop()) {
         _router.pop();
       }
-      if (_resumeGameAfterSettings) {
-        _setGameSystemsVisible(true);
-      }
-      _resumeGameAfterSettings = false;
     }
-  }
-
-  void _setGameSystemsVisible(bool visible) {
-    _uiEffectLayer.setActive(visible);
-    _particleSystem.setActive(visible);
   }
 
   void showComingSoon(String label) {
@@ -203,8 +164,6 @@ class SynGame extends FlameGame
     togglePauseOverlay();
   }
 
-  custom.ParticleSystemComponent get particleSystem => _particleSystem;
-  UIEffectLayer get uiEffectLayer => _uiEffectLayer;
   ConfirmationRequest? get pendingConfirmation => _pendingConfirmation;
 
   // Placeholder handlers for Flutter overlays.

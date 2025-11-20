@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../syn_game.dart';
-import '../ui/syn_theme.dart';
+import '../components/ui/syn_theme.dart';
 
 Widget buildPauseMenuOverlay(BuildContext context, SynGame game) {
   return PauseMenuOverlay(game: game);
