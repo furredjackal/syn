@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+Widget buildLoadingOverlay(BuildContext context) {
+  return const LoadingScreenOverlay();
+}
+
 class LoadingScreenOverlay extends StatefulWidget {
   final double progress;
   final String message;

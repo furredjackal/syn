@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../syn_game.dart';
 import '../ui/syn_theme.dart';
 
+Widget buildPauseMenuOverlay(BuildContext context, SynGame game) {
+  return PauseMenuOverlay(game: game);
+}
+
 class PauseMenuOverlay extends StatefulWidget {
   final SynGame game;
 
@@ -41,7 +45,7 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
   Widget build(BuildContext context) {
     void resumeGame() {
       widget.game.resumeEngine();
-      widget.game.overlays.remove('PauseMenuOverlay');
+      widget.game.overlays.remove('pause_menu');
     }
 
     void openSettings() {

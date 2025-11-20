@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../syn_game.dart';
 
+Widget buildConfirmDialogOverlay(BuildContext context, SynGame game) {
+  return ConfirmationDialogOverlay(game: game);
+}
+
 class ConfirmationDialogOverlay extends StatefulWidget {
   final SynGame game;
 

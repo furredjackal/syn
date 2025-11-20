@@ -29,3 +29,73 @@ flutter:
     - assets/images/
     - assets/sounds/
     - assets/fonts/
+  fonts:
+    - family: AgainstMyself
+      fonts:
+        - asset: assets/fonts/AgainstMyself-OA38.ttf
+    - family: BasketcaseRoman
+      fonts:
+        - asset: assets/fonts/BasketcaseRoman-jEwv.ttf
+    - family: DSnetStamped
+      fonts:
+        - asset: "assets/fonts/DSnet Stamped.ttf"
+    - family: Futurot
+      fonts:
+        - asset: assets/fonts/Futurot.ttf
+    - family: GulagDecay
+      fonts:
+        - asset: assets/fonts/GulagDecay-YVPL.ttf
+    - family: HVDPeace
+      fonts:
+        - asset: assets/fonts/hvd-peace.regular.ttf
+    - family: IF
+      fonts:
+        - asset: assets/fonts/if.regular.ttf
+    - family: JotSpInverted
+      fonts:
+        - asset: assets/fonts/JotSpInvertedRegular-ZBem.ttf
+    - family: JotSprayPaint
+      fonts:
+        - asset: assets/fonts/JotSprayPaintRegular-avOR.ttf
+    - family: LetterSoupMainz
+      fonts:
+        - asset: assets/fonts/LetterSoupMainz.ttf
+    - family: NewFacebok
+      fonts:
+        - asset: assets/fonts/new_facebok.ttf
+    - family: OnTheOtherSide
+      fonts:
+        - asset: "assets/fonts/On the Other Side.ttf"
+    - family: PhatGrungeBold
+      fonts:
+        - asset: assets/fonts/phat-grunge-bold.bold.ttf
+    - family: Phorssa
+      fonts:
+        - asset: assets/fonts/Phorssa.ttf
+    - family: Shoplift
+      fonts:
+        - asset: assets/fonts/shoplift.ttf
+    - family: StoneStory
+      fonts:
+        - asset: assets/fonts/stonestory.regular.ttf
+    - family: SweetRevenge
+      fonts:
+        - asset: "assets/fonts/Sweet (H...sya) Revenge-I M NOT EMO.ttf"
+    - family: TengoATusHijosNegativo
+      fonts:
+        - asset: "assets/fonts/tengo a tus hijos negativo.ttf"
+    - family: TengoATusHijos
+      fonts:
+        - asset: "assets/fonts/tengo a tus hijos.ttf"
+    - family: Tiza
+      fonts:
+        - asset: assets/fonts/tiza.ttf
+    - family: Victorious
+      fonts:
+        - asset: assets/fonts/victorious.regular.ttf
+    - family: WindshieldMassacreCondensed
+      fonts:
+        - asset: assets/fonts/WindshieldMassacreCondensed-OYz4.ttf
+    - family: WindshieldMassacre
+      fonts:
+        - asset: assets/fonts/WindshieldMassacre-EPzn.ttf

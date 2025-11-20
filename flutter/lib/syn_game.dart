@@ -8,16 +8,29 @@ import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
 import 'models/game_state.dart';
-import 'components/game_screen_component.dart';
-import 'components/main_menu_component.dart';
-import 'components/splash_screen_component.dart';
 import 'components/character_creation_component.dart';
+import 'components/debug_console_component.dart';
+import 'components/detailed_stat_component.dart';
+import 'components/end_of_life_component.dart';
+import 'components/main_gameplay_hub_component.dart';
+import 'components/main_menu_component.dart';
+import 'components/memory_journal_component.dart';
+import 'components/possession_screen_component.dart';
+import 'components/relationship_network_component.dart';
+import 'components/save_load_component.dart';
+import 'components/settings_screen_component.dart';
+import 'components/splash_screen_component.dart';
+import 'components/world_map_component.dart';
 import 'components/ui_effect_layer.dart';
 import 'components/particle_system_component.dart' as custom;
 import 'components/settings_screen_component.dart';
 
 class SynGame extends FlameGame
-    with HasKeyboardHandlerComponents, MouseMovementDetector {
+    with
+        HasKeyboardHandlerComponents,
+        MouseMovementDetector,
+        HasTappables,
+        HasDraggables {
   SynGame({GameState? initialGameState})
       : gameState = initialGameState ?? GameState();
 
@@ -25,8 +38,6 @@ class SynGame extends FlameGame
   final UIEffectLayer _uiEffectLayer = UIEffectLayer();
   final custom.ParticleSystemComponent _particleSystem =
       custom.ParticleSystemComponent();
-  late final GameScreenComponent _gameScreen;
-  bool _gameScreenInitialized = false;
   final GameState gameState;
   Vector2? _mousePosition;
   bool _resumeGameAfterSettings = false;
@@ -37,11 +48,6 @@ class SynGame extends FlameGame
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewport = FixedResolutionViewport(resolution: Vector2(1280, 720));
-
-    _gameScreen = GameScreenComponent()
-      ..size = size
-      ..position = Vector2.zero();
-    _gameScreenInitialized = true;
 
     _uiEffectLayer
       ..size = size
@@ -58,7 +64,15 @@ class SynGame extends FlameGame
         'splash': Route(() => SplashScreenComponent()),
         'menu': Route(() => MainMenuComponent()),
         'character_creation': Route(() => CharacterCreationComponent()),
-        'gameplay': Route(() => _gameScreen),
+        'gameplay': Route(() => MainGameplayHubComponent()),
+        'detailed_stat': Route(() => DetailedStatComponent()),
+        'relationship_network': Route(() => RelationshipNetworkComponent()),
+        'memory_journal': Route(() => MemoryJournalComponent()),
+        'possession': Route(() => PossessionScreenComponent()),
+        'world_map': Route(() => WorldMapComponent()),
+        'save_load': Route(() => SaveLoadComponent()),
+        'end_of_life': Route(() => EndOfLifeComponent()),
+        'debug_console': Route(() => DebugConsoleComponent()),
         'settings': Route(() => SettingsScreenComponent()),
       },
     );
@@ -70,11 +84,6 @@ class SynGame extends FlameGame
     super.onGameResize(size);
     _uiEffectLayer.size = size;
     _particleSystem.size = size;
-    if (_gameScreenInitialized) {
-      _gameScreen
-        ..size = size
-        ..position = Vector2.zero();
-    }
   }
 
   @override
@@ -181,12 +190,12 @@ class SynGame extends FlameGame
   }
 
   void togglePauseOverlay() {
-    if (overlays.isActive('PauseMenuOverlay')) {
-      overlays.remove('PauseMenuOverlay');
+    if (overlays.isActive('pause_menu')) {
+      overlays.remove('pause_menu');
       resumeEngine();
     } else {
       pauseEngine();
-      overlays.add('PauseMenuOverlay');
+      overlays.add('pause_menu');
     }
   }
 
@@ -198,39 +207,24 @@ class SynGame extends FlameGame
   UIEffectLayer get uiEffectLayer => _uiEffectLayer;
   ConfirmationRequest? get pendingConfirmation => _pendingConfirmation;
 
+  // Placeholder handlers for Flutter overlays.
+  void handleTextInput(String value) {}
+  void executeDebugCommand(String command) {}
+
   Future<void> _runWithLoadingOverlay(Future<void> Function() action) async {
-    overlays.add('LoadingScreenOverlay');
+    overlays.add('loading');
     pauseEngine();
     try {
       await action();
     } finally {
-      overlays.remove('LoadingScreenOverlay');
+      overlays.remove('loading');
       resumeEngine();
     }
   }
 
   Future<void> _performSceneTransition(Future<void> Function() change) async {
-    final completer = Completer<void>();
-    _pendingTransitionCallback = () {
-      change().whenComplete(() {
-        overlays.remove('TransitionOverlay');
-        if (!completer.isCompleted) {
-          completer.complete();
-        }
-      });
-    };
-    overlays.add('TransitionOverlay');
-    return completer.future;
-  }
-
-  void onTransitionOverlayComplete() {
-    final callback = _pendingTransitionCallback;
-    _pendingTransitionCallback = null;
-    if (callback != null) {
-      callback();
-    } else {
-      overlays.remove('TransitionOverlay');
-    }
+    // Previously used a Flutter overlay; now this runs inline to keep overlays to the core set.
+    await change();
   }
 
   void showConfirmationDialog({
@@ -249,24 +243,24 @@ class SynGame extends FlameGame
       onConfirm: onConfirm,
       onCancel: onCancel,
     );
-    overlays.add('ConfirmationDialogOverlay');
+    overlays.add('confirm_dialog');
   }
 
   void confirmCurrentDialog() {
     final request = _pendingConfirmation;
     if (request == null) {
-      overlays.remove('ConfirmationDialogOverlay');
+      overlays.remove('confirm_dialog');
       return;
     }
     _pendingConfirmation = null;
-    overlays.remove('ConfirmationDialogOverlay');
+    overlays.remove('confirm_dialog');
     request.onConfirm();
   }
 
   void cancelCurrentDialog() {
     final request = _pendingConfirmation;
     _pendingConfirmation = null;
-    overlays.remove('ConfirmationDialogOverlay');
+    overlays.remove('confirm_dialog');
     request?.onCancel?.call();
   }
 
@@ -277,14 +271,13 @@ class SynGame extends FlameGame
       confirmLabel: 'Quit',
       cancelLabel: 'Stay',
       onConfirm: () {
-        overlays.remove('PauseMenuOverlay');
+        overlays.remove('pause_menu');
         resumeEngine();
         unawaited(_navigateToMenu());
       },
     );
   }
 
-  VoidCallback? _pendingTransitionCallback;
   ConfirmationRequest? _pendingConfirmation;
 }
 

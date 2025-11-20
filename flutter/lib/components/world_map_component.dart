@@ -1,3 +1,8 @@
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
 
-class WorldMapComponent extends Component {}
+import '../syn_game.dart';
+
+/// Stub for the world map screen (tappable regions).
+class WorldMapComponent extends Component
+    with HasGameReference<SynGame>, HasTappables {}
