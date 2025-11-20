@@ -132,8 +132,31 @@ class SynGame extends FlameGame
   }
 
   void showSettings() {
-    final current = _router.currentRoute.name;
     _router.pushNamed('settings');
+  }
+
+  Future<void> showMemoryJournal() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('memory_journal');
+    });
+  }
+
+  Future<void> showWorldMap() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('world_map');
+    });
+  }
+
+  Future<void> showPossessions() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('possession');
+    });
+  }
+
+  Future<void> showSaveLoad() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('save_load');
+    });
   }
 
   void closeSettings() {

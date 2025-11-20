@@ -1,34 +1,30 @@
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
-import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
 
 import '../../../syn_game.dart';
 
-/// Base button using a NinePatchComponent for its background.
+/// Base button rendered as a simple rounded rectangle.
 class BaseButtonComponent extends PositionComponent
     with HasGameReference<SynGame>, TapCallbacks {
   BaseButtonComponent({
-    required this.onTap,
+    VoidCallback? onTap,
     super.position,
     super.size,
     super.anchor,
-  });
+  }) : onTap = onTap ?? _noop;
 
   final VoidCallback onTap;
 
-  late final NinePatchComponent _background;
+  late final RectangleComponent _background;
   bool _isPressed = false;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    final image = await game.images.load('ui/buttons/button.png');
-    _background = NinePatchComponent(
-      image: image,
-      destSize: size,
-      // The center 1x1 pixel of the 16x16 image is the stretchable area.
-      centerSlice: const Rect.fromLTWH(7, 7, 2, 2),
+    _background = RectangleComponent(
+      size: size,
+      paint: Paint()..color = const Color(0xFF101420),
     );
     add(_background);
   }
@@ -36,7 +32,7 @@ class BaseButtonComponent extends PositionComponent
   @override
   void onTapDown(TapDownEvent event) {
     _isPressed = true;
-    _background.tint(const Color(0xAAFFFFFF)); // Lighten when pressed
+    _background.paint.color = const Color(0xFF1A2438);
   }
 
   @override
@@ -44,13 +40,15 @@ class BaseButtonComponent extends PositionComponent
     if (_isPressed) {
       onTap();
       _isPressed = false;
-      _background.tint(const Color(0xFFFFFFFF)); // Reset tint
+      _background.paint.color = const Color(0xFF101420);
     }
   }
 
   @override
   void onTapCancel(TapCancelEvent event) {
     _isPressed = false;
-    _background.tint(const Color(0xFFFFFFFF)); // Reset tint
+    _background.paint.color = const Color(0xFF101420);
   }
+
+  static void _noop() {}
 }

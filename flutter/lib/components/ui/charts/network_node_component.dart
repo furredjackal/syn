@@ -17,7 +17,7 @@ class NetworkNodeComponent extends PositionComponent with DragCallbacks {
 
   @override
   void onDragUpdate(DragUpdateEvent event) {
-    position += event.delta;
+    position += event.localDelta;
   }
 
   @override

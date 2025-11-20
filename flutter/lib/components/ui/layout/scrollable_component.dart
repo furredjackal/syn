@@ -7,7 +7,7 @@ class ScrollableComponent extends PositionComponent with DragCallbacks {
 
   @override
   void onDragUpdate(DragUpdateEvent event) {
-    scrollOffset += event.delta;
+    scrollOffset += event.localDelta;
     super.onDragUpdate(event);
   }
 }

@@ -10,7 +10,7 @@ class SliderComponent extends PositionComponent with DragCallbacks {
 
   @override
   void onDragUpdate(DragUpdateEvent event) {
-    final local = event.localPosition;
+    final local = event.localEndPosition;
     if (size.x <= 0) return;
     value = (local.x / size.x).clamp(0.0, 1.0);
     onChanged?.call(value);

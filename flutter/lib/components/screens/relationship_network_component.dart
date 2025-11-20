@@ -1,7 +1,6 @@
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
 import 'package:flame/palette.dart';
 
 import '../../syn_game.dart';
@@ -9,7 +8,7 @@ import '../ui/charts/network_node_component.dart';
 
 /// A draggable graph that displays the relationships between characters.
 class RelationshipNetworkComponent extends Component
-    with HasGameReference<SynGame>, HasDraggables {
+    with HasGameReference<SynGame> {
   late final List<NetworkNodeComponent> _nodes;
   late final Path _connections;
 
