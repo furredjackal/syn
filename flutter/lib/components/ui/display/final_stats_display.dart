@@ -1,5 +1,4 @@
 // File: flutter/lib/components/ui/display/final_stats_display.dart
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';

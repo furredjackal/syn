@@ -1,5 +1,4 @@
 // File: flutter/lib/components/ui/effects/slash_transition_effect.dart
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';

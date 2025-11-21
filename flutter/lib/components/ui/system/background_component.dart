@@ -1,5 +1,4 @@
 // File: flutter/lib/components/ui/system/background_component.dart
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';

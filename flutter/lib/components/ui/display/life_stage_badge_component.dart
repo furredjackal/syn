@@ -1,10 +1,10 @@
 // File: flutter/lib/components/ui/display/life_stage_badge_component.dart
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../../syn_game.dart';
+import '../syn_theme.dart';
 
 class LifeStageBadgeComponent extends PositionComponent
     with HasGameReference<SynGame> {
@@ -19,39 +19,19 @@ class LifeStageBadgeComponent extends PositionComponent
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.x, size.y),
-      const Radius.circular(12),
-    );
-
-    canvas.drawRRect(
-      rect,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF00D9FF), Color(0xFF7C3AED)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(rect.outerRect),
-    );
-
-    final label = TextPainter(
-      text: const TextSpan(
-        text: 'LIFE STAGE',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-        ),
+    final stage = game.gameState.lifeStage.isNotEmpty
+        ? game.gameState.lifeStage.toUpperCase()
+        : 'CHILD';
+    final painter = TextPainter(
+      text: TextSpan(
+        text: 'Lifestage: $stage',
+        style: SynTopBar.lifeStageTextStyle,
       ),
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: size.x - 16);
+    )..layout(maxWidth: size.x - 8);
 
-    label.paint(
-      canvas,
-      Offset(
-        (size.x - label.width) / 2,
-        (size.y - label.height) / 2,
-      ),
-    );
+    final dx = (size.x - painter.width) / 2;
+    final dy = (size.y - painter.height) / 2;
+    painter.paint(canvas, Offset(dx, dy));
   }
 }

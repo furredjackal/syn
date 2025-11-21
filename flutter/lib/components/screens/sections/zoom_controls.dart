@@ -1,5 +1,4 @@
 // File: flutter/lib/components/screens/sections/zoom_controls.dart
-import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
