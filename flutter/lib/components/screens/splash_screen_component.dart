@@ -85,3 +85,5 @@ class _SplashBackground extends PositionComponent {
     }
   }
 }
+
+class SplashScreen extends SplashScreenComponent {}

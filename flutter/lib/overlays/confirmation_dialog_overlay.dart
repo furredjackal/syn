@@ -55,7 +55,7 @@ class _ConfirmationDialogOverlayState extends State<ConfirmationDialogOverlay> w
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
-        color: Colors.black.withOpacity(0.5),
+        color: Colors.black.withValues(alpha: 0.5),
         child: Center(
           child: SlideTransition(
             position: _slideAnimation,

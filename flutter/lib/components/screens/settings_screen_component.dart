@@ -1,11 +1,12 @@
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide BackButton;
 import 'package:flutter/services.dart';
 import '../../models/game_state.dart';
 import '../../syn_game.dart';
 import '../ui/system/background_layer_component.dart';
+import '../ui/buttons/back_button.dart';
 
 class SettingsScreenComponent extends PositionComponent
     with HasGameReference<SynGame>, KeyboardHandler {
@@ -13,7 +14,7 @@ class SettingsScreenComponent extends PositionComponent
   late final BackgroundLayerComponent _background;
   PositionComponent? _content;
   _InfoPanel? _infoPanel;
-  _BackButton? _backButton;
+  BackButton? _backButton;
   double _contentWidth = 0;
   double _scaleY = 1;
 
@@ -33,10 +34,8 @@ class SettingsScreenComponent extends PositionComponent
           'Options board.\n\nUse the mouse or ↑/↓ and Enter to toggle controls.\nPress ESC to return to the previous screen.',
     );
     add(_infoPanel!);
-    _backButton = _BackButton(
-      label: 'BACK TO MENU',
-      onPressed: () => game.closeSettings(),
-    );
+    _backButton = BackButton(onPressed: () => game.closeSettings())
+      ..size = Vector2(220, 60);
     add(_backButton!);
 
     final title = TextComponent(
@@ -589,54 +588,6 @@ class _InfoPanel extends PositionComponent {
   }
 }
 
-class _BackButton extends PositionComponent with TapCallbacks {
-  final String label;
-  final VoidCallback onPressed;
-
-  _BackButton({
-    required this.label,
-    required this.onPressed,
-  }) : super(size: Vector2(220, 60));
-
-  @override
-  void render(Canvas canvas) {
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.x - 20, 0)
-      ..lineTo(size.x, size.y)
-      ..lineTo(20, size.y)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFF00D9FF));
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = const Color(0xFF000000),
-    );
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: const TextStyle(
-          color: Color(0xFF000000),
-          fontSize: 20,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(
-      canvas,
-      Offset(
-        (size.x - painter.width) / 2,
-        (size.y - painter.height) / 2,
-      ),
-    );
-  }
-
-  @override
-  void onTapUp(TapUpEvent event) {
-    onPressed();
-  }
+class SettingsScreen extends SettingsScreenComponent {
+  SettingsScreen();
 }

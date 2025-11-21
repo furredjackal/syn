@@ -155,7 +155,7 @@ class ChoiceButtonComponent extends PositionComponent
         fontWeight: FontWeight.w600,
         fontSize: 20,
         letterSpacing: 0.5,
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
       ),
     );
   }
@@ -234,7 +234,7 @@ class ChoiceButtonComponent extends PositionComponent
       fill = const Color(0xFF0E141F);
     }
     if (_pressAnimationValue > 0.0) {
-      fill = fill.withOpacity(0.9);
+      fill = fill.withValues(alpha: 0.9);
     }
     return fill;
   }
@@ -253,7 +253,7 @@ class ChoiceButtonComponent extends PositionComponent
     canvas.drawPath(
       badgePath,
       Paint()
-        ..color = Colors.black.withOpacity(0.8)
+        ..color = Colors.black.withValues(alpha: 0.8)
         ..style = PaintingStyle.fill,
     );
 
@@ -283,7 +283,7 @@ class ChoiceButtonComponent extends PositionComponent
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 6
-          ..color = const Color(0xFF00D9FF).withOpacity(0.25)
+          ..color = const Color(0xFF00D9FF).withValues(alpha: 0.25)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
       );
     }
@@ -301,7 +301,7 @@ class ChoiceButtonComponent extends PositionComponent
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2
-        ..color = const Color(0xFF7AFFFF).withOpacity(0.35),
+        ..color = const Color(0xFF7AFFFF).withValues(alpha: 0.35),
     );
 
     _renderShortcutBadge(canvas);

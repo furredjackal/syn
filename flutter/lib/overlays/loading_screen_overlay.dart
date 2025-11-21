@@ -41,7 +41,7 @@ class _LoadingScreenOverlayState extends State<LoadingScreenOverlay> with Single
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black.withOpacity(0.85),
+      color: Colors.black.withValues(alpha: 0.85),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

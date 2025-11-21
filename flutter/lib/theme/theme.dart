@@ -138,7 +138,7 @@ class SynTypography {
     return GoogleFonts.roboto(
       fontSize: 18,
       fontWeight: FontWeight.w400,
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white.withValues(alpha: 0.9),
     );
   }
 
@@ -146,7 +146,7 @@ class SynTypography {
     return GoogleFonts.roboto(
       fontSize: 16,
       fontWeight: FontWeight.w400,
-      color: Colors.white.withOpacity(0.85),
+      color: Colors.white.withValues(alpha: 0.85),
     );
   }
 
@@ -154,7 +154,7 @@ class SynTypography {
     return GoogleFonts.roboto(
       fontSize: 14,
       fontWeight: FontWeight.w400,
-      color: Colors.white.withOpacity(0.75),
+      color: Colors.white.withValues(alpha: 0.75),
     );
   }
 
@@ -163,7 +163,7 @@ class SynTypography {
       fontSize: 12,
       fontWeight: FontWeight.w600,
       letterSpacing: 1,
-      color: Colors.white.withOpacity(0.9),
+      color: Colors.white.withValues(alpha: 0.9),
     );
   }
 
@@ -193,7 +193,7 @@ class SynTheme {
     ),
     canvasColor: const Color(0xFF1A1F3A),
     cardColor: const Color(0xFF15192E),
-    dividerColor: const Color(0xFF00D9FF).withOpacity(0.3),
+    dividerColor: const Color(0xFF00D9FF).withValues(alpha: 0.3),
   );
 }
 

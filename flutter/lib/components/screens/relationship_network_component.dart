@@ -54,3 +54,7 @@ class RelationshipNetworkComponent extends Component
     canvas.drawPath(_connections, paint);
   }
 }
+
+class RelationshipNetworkScreen extends RelationshipNetworkComponent {
+  RelationshipNetworkScreen();
+}

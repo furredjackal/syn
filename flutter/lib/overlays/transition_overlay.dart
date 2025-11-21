@@ -59,7 +59,7 @@ class _TransitionOverlayState extends State<TransitionOverlay> with SingleTicker
 
   Widget _buildFadeTransition() {
     return Container(
-      color: Colors.black.withOpacity(1.0 - _controller.value),
+      color: Colors.black.withValues(alpha: 1.0 - _controller.value),
     );
   }
 
@@ -77,13 +77,13 @@ class _TransitionOverlayState extends State<TransitionOverlay> with SingleTicker
         Transform.translate(
           offset: Offset(_controller.value > 0.5 ? 10 : -10, 0),
           child: Container(
-            color: Colors.red.withOpacity((1.0 - _controller.value) * 0.3),
+            color: Colors.red.withValues(alpha: (1.0 - _controller.value) * 0.3),
           ),
         ),
         Transform.translate(
           offset: Offset(_controller.value > 0.5 ? -10 : 10, 0),
           child: Container(
-            color: Colors.cyan.withOpacity((1.0 - _controller.value) * 0.3),
+            color: Colors.cyan.withValues(alpha: (1.0 - _controller.value) * 0.3),
           ),
         ),
       ],
@@ -135,7 +135,7 @@ class PixelatePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(progress);
+    final paint = Paint()..color = Colors.black.withValues(alpha: progress);
     for (double x = 0; x < size.width; x += pixelSize) {
       for (double y = 0; y < size.height; y += pixelSize) {
         canvas.drawRect(

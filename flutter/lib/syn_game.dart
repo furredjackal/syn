@@ -141,6 +141,18 @@ class SynGame extends FlameGame
     });
   }
 
+  Future<void> showDetailedStats() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('detailed_stat');
+    });
+  }
+
+  Future<void> showRelationshipNetwork() async {
+    await _performSceneTransition(() async {
+      _router.pushReplacementNamed('relationship_network');
+    });
+  }
+
   Future<void> showWorldMap() async {
     await _performSceneTransition(() async {
       _router.pushReplacementNamed('world_map');

@@ -1,9 +1,7 @@
-import 'dart:math';
-
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-/// Flame background layer with the existing gradient + geometric accents.
+/// Ambient background: dark base with subtle slashes and a soft grid.
 class BackgroundLayerComponent extends PositionComponent {
   @override
   void onGameResize(Vector2 size) {
@@ -14,52 +12,75 @@ class BackgroundLayerComponent extends PositionComponent {
   @override
   void render(Canvas canvas) {
     final rect = Rect.fromLTWH(0, 0, size.x, size.y);
-    final gradient = Paint()
+    final base = Paint()
       ..shader = const LinearGradient(
-        colors: [
-          Color(0xFFB80024),
-          Color(0xFF5A000F),
-        ],
+        colors: [Color(0xFF05050A), Color(0xFF0A0A0F)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(rect);
-    canvas.drawRect(rect, gradient);
+    canvas.drawRect(rect, base);
 
-    final darkPaint = Paint()..color = const Color(0x22000000);
-    for (int i = 0; i < 12; i++) {
-      final y = size.y / 12 * i;
-      canvas.drawRect(Rect.fromLTWH(0, y, size.x, size.y / 24), darkPaint);
+    _drawGrid(canvas);
+    _drawSlashes(canvas);
+    _drawNoise(canvas);
+  }
+
+  void _drawGrid(Canvas canvas) {
+    final paint = Paint()
+      ..color = const Color(0x2200D9FF)
+      ..strokeWidth = 1.0;
+    const cell = 60.0;
+    for (double x = -size.y * 0.2; x < size.x + size.y * 0.2; x += cell) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x + size.y * 0.2, size.y),
+        paint,
+      );
     }
+    for (double y = 0; y < size.y + cell; y += cell) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.x, y),
+        paint,
+      );
+    }
+  }
 
-    final overlayPath = Path()
-      ..moveTo(size.x * 0.62, 0)
-      ..lineTo(size.x, size.y * 0.05)
-      ..lineTo(size.x * 0.9, size.y)
-      ..lineTo(size.x * 0.5, size.y)
-      ..close();
-    canvas.drawPath(
-      overlayPath,
-      Paint()..color = const Color(0xFF111111),
-    );
-    canvas.drawPath(
-      overlayPath,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 6
-        ..color = const Color(0xFFFFFFFF),
-    );
-
-    final triangles = Paint()..color = const Color(0xFFFFFFFF);
-    final random = Random(7);
-    for (int i = 0; i < 10; i++) {
-      final x = size.x * 0.65 + random.nextDouble() * size.x * 0.3;
-      final y = random.nextDouble() * size.y;
-      final triangle = Path()
-        ..moveTo(x, y)
-        ..lineTo(x + 20, y + 8)
-        ..lineTo(x, y + 16)
+  void _drawSlashes(Canvas canvas) {
+    final slashPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0x2217D2FF),
+          Color(0x3300FFC8),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, size.x, size.y));
+    final bands = [
+      Rect.fromLTWH(size.x * 0.05, size.y * -0.1, size.x * 0.35, size.y * 0.4),
+      Rect.fromLTWH(size.x * 0.6, size.y * 0.2, size.x * 0.32, size.y * 0.38),
+      Rect.fromLTWH(size.x * -0.12, size.y * 0.55, size.x * 0.4, size.y * 0.4),
+    ];
+    for (final band in bands) {
+      final path = Path()
+        ..moveTo(band.left, band.top + band.height * 0.2)
+        ..lineTo(band.right, band.top)
+        ..lineTo(band.right - band.width * 0.18, band.bottom)
+        ..lineTo(band.left - band.width * 0.12, band.bottom)
         ..close();
-      canvas.drawPath(triangle, triangles);
+      canvas.drawPath(path, slashPaint);
+    }
+  }
+
+  void _drawNoise(Canvas canvas) {
+    final dotPaint = Paint()..color = const Color(0x1100FFFF);
+    const spacing = 32.0;
+    for (double y = 0; y < size.y; y += spacing) {
+      for (double x = (y / spacing) % 2 == 0 ? 0 : spacing / 2;
+          x < size.x;
+          x += spacing) {
+        canvas.drawCircle(Offset(x, y), 1.2, dotPaint);
+      }
     }
   }
 }

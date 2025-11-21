@@ -99,7 +99,7 @@ class EventCardComponent extends PositionComponent
         style: SynTextStyles.body.copyWith(
           fontSize: 18,
           height: 1.45,
-          color: SynColors.textPrimary.withOpacity(0.9),
+          color: SynColors.textPrimary.withValues(alpha: 0.9),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -132,6 +132,7 @@ class EventCardComponent extends PositionComponent
     // Choices run full width with even gaps
     double yOffset = layoutY;
     final buttonWidth = math.max(size.x - horizontalPadding * 2, 0);
+    double contentHeight = layoutY;
     for (var i = 0; i < event.choices.length; i++) {
       final choice = event.choices[i];
       final choiceButton = ChoiceButtonComponent(
@@ -151,6 +152,15 @@ class EventCardComponent extends PositionComponent
       choiceButtons.add(choiceButton);
 
       yOffset += choiceButton.size.y + choiceGap;
+    }
+    contentHeight = yOffset;
+
+    // If the content overflows the allotted card height, scale the card down
+    // uniformly so choices remain reachable within the viewport.
+    final availableHeight = size.y - 20;
+    if (contentHeight > availableHeight && availableHeight > 0) {
+      final shrink = (availableHeight / contentHeight).clamp(0.7, 1.0);
+      scale.setValues(shrink, shrink);
     }
   }
 
@@ -454,7 +464,7 @@ class _EventTitleBanner extends PositionComponent {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.6
-        ..color = const Color(0xFF00131C).withOpacity(0.6),
+        ..color = const Color(0xFF00131C).withValues(alpha: 0.6),
     );
 
     final titlePainter = TextPainter(
@@ -585,7 +595,7 @@ class _EventTagChipRow extends PositionComponent {
     for (final chip in _chipLayouts) {
       canvas.drawPath(
         chip.path,
-        Paint()..color = chip.fillColor.withOpacity(0.35),
+        Paint()..color = chip.fillColor.withValues(alpha: 0.35),
       );
       canvas.drawPath(
         chip.path,
@@ -728,7 +738,7 @@ class _AccentDivider extends PositionComponent {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2
-        ..color = Colors.white.withOpacity(0.3),
+        ..color = Colors.white.withValues(alpha: 0.3),
     );
   }
 }
@@ -743,7 +753,7 @@ class _EventCanvasBackground extends PositionComponent {
     canvas.drawPath(
       path,
       Paint()
-        ..color = const Color(0xFF000000).withOpacity(0.75)
+        ..color = const Color(0xFF000000).withValues(alpha: 0.75)
         ..style = PaintingStyle.fill,
     );
 
@@ -755,8 +765,8 @@ class _EventCanvasBackground extends PositionComponent {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF1a1a1a).withOpacity(0.4),
-            const Color(0xFF0a0a0a).withOpacity(0.2),
+            const Color(0xFF1a1a1a).withValues(alpha: 0.4),
+            const Color(0xFF0a0a0a).withValues(alpha: 0.2),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.x, size.y)),
     );

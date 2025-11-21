@@ -527,7 +527,7 @@ class _ContentModeToggle extends PositionComponent with TapCallbacks {
       rect,
       Paint()
         ..color = isSelected
-            ? const Color(0xFF00D9FF).withOpacity(0.2)
+            ? const Color(0xFF00D9FF).withValues(alpha: 0.2)
             : const Color(0x22000000),
     );
     canvas.drawRRect(
@@ -624,7 +624,7 @@ class _DifficultyToggle extends PositionComponent with TapCallbacks {
       rect,
       Paint()
         ..color = isSelected
-            ? const Color(0xFF00D9FF).withOpacity(0.2)
+            ? const Color(0xFF00D9FF).withValues(alpha: 0.2)
             : const Color(0x22000000),
     );
     canvas.drawRRect(
@@ -714,3 +714,5 @@ class _BeginLifeButton extends PositionComponent with TapCallbacks {
     onPressed();
   }
 }
+
+class CharacterCreationScreen extends CharacterCreationComponent {}

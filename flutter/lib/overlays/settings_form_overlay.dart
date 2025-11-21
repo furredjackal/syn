@@ -51,7 +51,7 @@ class _SettingsFormOverlayState extends State<_SettingsFormOverlay> {
                 onChanged: (value) => setState(() => _sfwMode = value),
                 title: const Text('SFW Mode'),
                 subtitle: const Text('Hide explicit content while playing'),
-                activeColor: SynColors.primaryCyan,
+                activeThumbColor: SynColors.primaryCyan,
                 contentPadding: EdgeInsets.zero,
               ),
               ListTile(

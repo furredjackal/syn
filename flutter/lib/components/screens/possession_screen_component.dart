@@ -51,3 +51,7 @@ class PossessionScreenComponent extends Component
     }
   }
 }
+
+class PossessionScreen extends PossessionScreenComponent {
+  PossessionScreen();
+}

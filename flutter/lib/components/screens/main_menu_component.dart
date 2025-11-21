@@ -142,7 +142,7 @@ class _MenuSidebar extends PositionComponent with HasGameReference<SynGame> {
     // Panel background
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(20)),
-      Paint()..color = BG.withOpacity(0.92),
+      Paint()..color = BG.withValues(alpha: 0.92),
     );
 
     // Neon border
@@ -284,3 +284,5 @@ class _MenuAction {
   final String label;
   final VoidCallback callback;
 }
+
+class MainMenuScreen extends MainMenuComponent {}

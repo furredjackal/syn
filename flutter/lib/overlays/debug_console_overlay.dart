@@ -82,7 +82,7 @@ class _DebugConsoleOverlayState extends State<_DebugConsoleOverlay> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF0B0F18),
                     border: Border.all(
-                      color: SynColors.primaryCyan.withOpacity(0.4),
+                      color: SynColors.primaryCyan.withValues(alpha: 0.4),
                     ),
                   ),
                   child: ListView.builder(
