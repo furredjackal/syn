@@ -18,12 +18,18 @@ class NPCCardComponent extends PositionComponent with TapCallbacks {
   final VoidCallback? onTap;
   bool _pressed = false;
 
+  // Internal layout constants for styling and padding.
+  static const double _kPadding = 12.0;
+  static const double _kBarHeight = 8.0;
+  static const double _kRadius = 12.0;
+  static const double _kLabelToBarVerticalOffset = 14.0;
+
   @override
   void render(Canvas canvas) {
     super.render(canvas);
     final rrect = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, 0, size.x, size.y),
-      const Radius.circular(12),
+      const Radius.circular(_kRadius),
     );
     canvas.drawRRect(
       rrect,
@@ -46,18 +52,18 @@ class NPCCardComponent extends PositionComponent with TapCallbacks {
         letterSpacing: 0.8,
       ),
     ).toTextPainter(relationship.npcName.toUpperCase());
-    name.paint(canvas, const Offset(12, 10));
+    name.paint(canvas, const Offset(_kPadding, 10));
 
     _drawBar(
       canvas,
-      origin: const Offset(12, 36),
+      origin: const Offset(_kPadding, 36),
       label: 'BOND',
       value: _normalize(relationship.trust),
       color: const Color(0xFF00D9FF),
     );
     _drawBar(
       canvas,
-      origin: const Offset(12, 56),
+      origin: const Offset(_kPadding, 56),
       label: 'CONFLICT',
       value: _normalize(relationship.resentment),
       color: const Color(0xFFFF4C4C),
@@ -80,20 +86,19 @@ class NPCCardComponent extends PositionComponent with TapCallbacks {
     ).toTextPainter(label);
     text.paint(canvas, origin);
 
-    final barY = origin.dy + 14;
-    const barHeight = 8.0;
-    final barWidth = size.x - 120;
+    final barY = origin.dy + _kLabelToBarVerticalOffset;
+    final barWidth = size.x - (2 * _kPadding);
     final radius = const Radius.circular(4);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(origin.dx, barY, barWidth, barHeight),
+        Rect.fromLTWH(origin.dx, barY, barWidth, _kBarHeight),
         radius,
       ),
       Paint()..color = const Color(0x22111B2C),
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(origin.dx, barY, barWidth * value, barHeight),
+        Rect.fromLTWH(origin.dx, barY, barWidth * value, _kBarHeight),
         radius,
       ),
       Paint()..color = color,
@@ -108,7 +113,7 @@ class NPCCardComponent extends PositionComponent with TapCallbacks {
     ).toTextPainter(relationship.state.toUpperCase());
     stateText.paint(
       canvas,
-      Offset(size.x - stateText.width - 12, origin.dy),
+      Offset(size.x - stateText.width - _kPadding, origin.dy),
     );
   }
 

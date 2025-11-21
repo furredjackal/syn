@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 import '../../models/game_state.dart';
 import '../../syn_game.dart';
@@ -132,7 +133,7 @@ class MainGameplayHubComponent extends PositionComponent
     final w = size.x;
     final h = size.y;
     final topBarHeight = (h * SynTopBar.heightFraction)
-        .clamp(SynTopBar.height * 0.85, SynTopBar.height * 1.15) as double;
+        .clamp(SynTopBar.height * 0.85, SynTopBar.height * 1.15);
     final marginX = w * 0.06;
     final marginBottom = h * 0.06;
 
@@ -448,7 +449,7 @@ class TopBarComponent extends PositionComponent with HasGameReference<SynGame> {
 
     if (_flashAlpha > 0) {
       _flashAlpha =
-          (_flashAlpha - dt * _kFlashFadePerSecond).clamp(0.0, 1.0) as double;
+          (_flashAlpha - dt * _kFlashFadePerSecond).clamp(0.0, 1.0);
     }
   }
 
@@ -706,23 +707,67 @@ class RelationshipPanelComponent extends PositionComponent
   static const _slashColor = Color(0xFFFF4A9B);
   static const _borderWidth = SynLayout.borderWidthHeavy;
 
+  // Layout constants
+  static const double _topMargin = 24.0;
+  static const double _bottomMargin = 24.0;
+  static const double _horizontalPadding = 16.0;
+  static const double _cardHeight = 78.0;
+  static const double _minSpacing = 12.0;
+  static const int _maxCards = 4;
+
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    _updateCardLayout();
+  }
+
+  @override
+  void onGameResize(Vector2 newSize) {
+    super.onGameResize(newSize);
+    _updateCardLayout();
+  }
+
+  void _updateCardLayout() {
+    // Clear previous cards to prevent duplicates on resize
+    removeAll(children.whereType<NPCCardComponent>());
 
     final entries =
         relationships.isNotEmpty ? relationships : _placeholderRelationships();
+    final cardCount = min(entries.length, _maxCards);
+    if (cardCount == 0) {
+      return;
+    }
 
-    var y = 24.0;
-    for (final rel in entries.take(4)) {
+    final availableHeight = size.y - _topMargin - _bottomMargin;
+    final cardWidth = size.x - 2 * _horizontalPadding;
+
+    double y;
+    final double spacing;
+
+    if (cardCount > 1) {
+      final totalCardHeight = cardCount * _cardHeight;
+      spacing = max(
+        _minSpacing,
+        (availableHeight - totalCardHeight) / (cardCount - 1),
+      );
+      y = _topMargin;
+    } else {
+      // Vertically center a single card
+      spacing = 0;
+      y = _topMargin + (availableHeight - _cardHeight) / 2;
+    }
+
+    // Add the cards with the new layout
+    for (var i = 0; i < cardCount; i++) {
+      final rel = entries[i];
       final card = NPCCardComponent(
         relationship: rel,
         onTap: onOpenNetwork,
-        position: Vector2(18, y),
-        size: Vector2(size.x - 36, 82),
+        position: Vector2(_horizontalPadding, y),
+        size: Vector2(cardWidth, _cardHeight),
       );
       add(card);
-      y += 94; // card height (82) + spacing (12)
+      y += _cardHeight + spacing;
     }
   }
 
