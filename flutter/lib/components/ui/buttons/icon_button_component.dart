@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'base_button_component.dart';
 import '../syn_theme.dart';
 
-/// Icon-only button stub with hover support.
+/// Icon-only button that supports both Sprites and Material Icons.
 class IconButtonComponent extends BaseButtonComponent with HoverCallbacks {
   IconButtonComponent({
     super.size,
     this.icon,
+    this.materialIcon, // <--- New: Support for Icons.close, Icons.settings, etc.
+    this.iconColor,
     super.onTap,
     this.onHoverChanged,
     this.onPressChanged,
@@ -32,6 +34,9 @@ class IconButtonComponent extends BaseButtonComponent with HoverCallbacks {
         );
 
   final SpriteComponent? icon;
+  final IconData? materialIcon;
+  final Color? iconColor;
+  
   bool isHovered = false;
   Effect? _hoverEffect;
   final double _hoverScale;
@@ -42,8 +47,26 @@ class IconButtonComponent extends BaseButtonComponent with HoverCallbacks {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+
+    // Priority 1: Sprite Icon
     if (icon != null) {
-      await add(icon!);
+      add(icon!);
+    } 
+    // Priority 2: Material Icon (Rendered as Text)
+    else if (materialIcon != null) {
+      add(TextComponent(
+        text: String.fromCharCode(materialIcon!.codePoint),
+        textRenderer: TextPaint(
+          style: TextStyle(
+            color: iconColor ?? SynColors.primaryCyan,
+            fontFamily: materialIcon!.fontFamily,
+            package: materialIcon!.fontPackage,
+            fontSize: size.y * 0.65, // Auto-scale to 65% of button height
+          ),
+        ),
+        anchor: Anchor.center,
+        position: size / 2,
+      ));
     }
   }
 
@@ -85,9 +108,7 @@ class IconButtonComponent extends BaseButtonComponent with HoverCallbacks {
     _hoverEffect?.removeFromParent();
     _hoverEffect = ScaleEffect.to(
       Vector2.all(target),
-      EffectController(
-        duration: _hoverDuration,
-      ),
+      EffectController(duration: _hoverDuration),
     );
     add(_hoverEffect!);
   }
