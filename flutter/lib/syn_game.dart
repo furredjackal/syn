@@ -12,7 +12,7 @@ import 'components/screens/character_creation_component.dart';
 import 'components/screens/debug_console_component.dart';
 import 'components/screens/detailed_stat_component.dart';
 import 'components/screens/end_of_life_component.dart';
-import 'components/screens/main_gameplay_hub_component.dart';
+import 'components/screens/focus_layout_hub_component.dart';
 import 'components/screens/main_menu_component.dart';
 import 'components/screens/memory_journal_component.dart';
 import 'components/screens/possession_screen_component.dart';
@@ -44,7 +44,7 @@ class SynGame extends FlameGame
         'splash': Route(() => SplashScreenComponent()),
         'menu': Route(() => MainMenuComponent()),
         'character_creation': Route(() => CharacterCreationComponent()),
-        'gameplay': Route(() => MainGameplayHubComponent()),
+        'gameplay': Route(() => FocusLayoutHubComponent()),
         'detailed_stat': Route(() => DetailedStatComponent()),
         'relationship_network': Route(() => RelationshipNetworkComponent()),
         'memory_journal': Route(() => MemoryJournalComponent()),
