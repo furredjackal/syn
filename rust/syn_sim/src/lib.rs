@@ -7,6 +7,8 @@ use syn_core::{
 };
 use std::collections::HashMap;
 
+pub mod relationship_drift;
+
 /// Level of Detail tier for NPC simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LodTier {
@@ -204,6 +206,17 @@ impl Simulator {
 
         // Slowly drift passive stats for non-instantiated NPCs
         self.apply_population_drift(world);
+
+        // Relationship drift (additive, deterministic)
+        let drift = relationship_drift::RelationshipDriftSystem::new(
+            relationship_drift::RelationshipDriftConfig {
+                affection_decay_per_tick: 0.05,
+                trust_decay_per_tick: 0.03,
+                resentment_decay_per_tick: 0.02,
+                familiarity_growth_per_tick: 0.01,
+            },
+        );
+        drift.tick(world);
 
         // Derive RNG for next tick's stochastic events
         let next_seed = self.rng.derive_seed();

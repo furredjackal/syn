@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use syn_core::{NpcId, SimTick, StatDelta};
+pub use syn_core::relationships::RelationshipDelta;
 
 /// A single memory entry recording an event and its impact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +18,8 @@ pub struct MemoryEntry {
     pub emotional_intensity: f32,                // -1.0 (negative) to +1.0 (positive)
     #[serde(default)]
     pub stat_deltas: Vec<StatDelta>,             // e.g., [{"kind": Mood, "delta": -2.0}]
+    #[serde(default)]
+    pub relationship_deltas: Vec<RelationshipDelta>,
     pub tags: Vec<String>,                      // e.g., ["betrayal", "trauma", "relationship"]
 }
 
@@ -35,6 +38,7 @@ impl MemoryEntry {
             sim_tick,
             emotional_intensity: emotional_intensity.clamp(-1.0, 1.0),
             stat_deltas: Vec::new(),
+            relationship_deltas: Vec::new(),
             tags: Vec::new(),
         }
     }
@@ -42,6 +46,11 @@ impl MemoryEntry {
     /// Add stat deltas to this memory.
     pub fn with_stat_deltas(mut self, deltas: Vec<StatDelta>) -> Self {
         self.stat_deltas = deltas;
+        self
+    }
+
+    pub fn with_relationship_deltas(mut self, deltas: Vec<RelationshipDelta>) -> Self {
+        self.relationship_deltas = deltas;
         self
     }
 

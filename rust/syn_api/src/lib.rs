@@ -228,6 +228,26 @@ impl GameEngine {
         }
     }
 
+    /// Get all relationships from the player to others.
+    pub fn player_relationships(&self) -> ApiRelationshipSnapshot {
+        let player = self.world.player_id;
+        let relationships = self
+            .world
+            .relationships
+            .iter()
+            .filter(|((from, _), _)| *from == player)
+            .map(|((_, to), rel)| ApiRelationship {
+                target_id: to.0 as i64,
+                affection: rel.affection,
+                trust: rel.trust,
+                attraction: rel.attraction,
+                familiarity: rel.familiarity,
+                resentment: rel.resentment,
+            })
+            .collect();
+        ApiRelationshipSnapshot { relationships }
+    }
+
     // ==================== Memory ====================
 
     /// Record a memory for an NPC.
@@ -344,6 +364,21 @@ pub struct RelationshipDto {
     pub heat: f32,
 }
 
+#[derive(Debug, Clone)]
+pub struct ApiRelationship {
+    pub target_id: i64,
+    pub affection: f32,
+    pub trust: f32,
+    pub attraction: f32,
+    pub familiarity: f32,
+    pub resentment: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiRelationshipSnapshot {
+    pub relationships: Vec<ApiRelationship>,
+}
+
 /// Memory DTO for serialization to Dart.
 #[derive(Debug, Clone)]
 pub struct MemoryDto {
@@ -397,6 +432,15 @@ pub fn engine_player_mood() -> f32 {
         .as_ref()
         .map(|e| e.world.player_stats.get(StatKind::Mood))
         .unwrap_or(0.0)
+}
+
+#[frb(sync)]
+pub fn engine_player_relationships() -> ApiRelationshipSnapshot {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.player_relationships())
+        .unwrap_or(ApiRelationshipSnapshot { relationships: vec![] })
 }
 
 /// Get current narrative heat value.

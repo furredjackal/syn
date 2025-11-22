@@ -11,12 +11,15 @@ pub mod rng;
 pub mod persistence;
 pub mod errors;
 pub mod stats;
+pub mod relationships;
+pub mod relationship_model;
 
 pub use types::*;
 pub use rng::*;
 pub use persistence::*;
 pub use errors::*;
 pub use stats::*;
+pub use relationships::*;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -2,9 +2,9 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use syn_core::{Persistence, StoryletRecord};
-use syn_director::Storylet;
-pub mod storylet;
-pub use storylet::*;
+
+pub mod schemas;
+pub use schemas::*;
 
 /// Load all storylets stored inside the SQLite database at `db_path`.
 pub fn load_storylets_from_db(db_path: &str) -> Result<Vec<Storylet>> {
@@ -85,7 +85,6 @@ mod tests {
     use super::*;
     use std::{fs, time::SystemTime};
     use syn_core::RelationshipState;
-    use syn_director::StoryletPrerequisites;
 
     fn sample_storylet() -> Storylet {
         Storylet {
@@ -102,6 +101,7 @@ mod tests {
                 memory_tags_required: vec![],
                 memory_tags_forbidden: vec![],
                 memory_recency_ticks: None,
+                relationship_prereqs: vec![],
             },
             heat: 40.0,
             weight: 0.5,

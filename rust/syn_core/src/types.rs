@@ -482,6 +482,16 @@ impl Relationship {
         self.resentment = self.resentment.clamp(-10.0, 10.0);
     }
 
+    pub fn apply_delta(&mut self, axis: crate::RelationshipAxis, delta: f32) {
+        match axis {
+            crate::RelationshipAxis::Affection => self.affection = (self.affection + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Trust => self.trust = (self.trust + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Attraction => self.attraction = (self.attraction + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Familiarity => self.familiarity = (self.familiarity + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Resentment => self.resentment = (self.resentment + delta).clamp(-10.0, 10.0),
+        }
+    }
+
     /// Calculate relationship "heat" (0..1 scale) based on axes.
     /// High heat = high intensity (emotional or conflictual).
     pub fn heat(&self) -> f32 {
@@ -729,6 +739,15 @@ impl WorldState {
     /// Update relationship between two NPCs.
     pub fn set_relationship(&mut self, from: NpcId, to: NpcId, rel: Relationship) {
         self.relationships.insert((from, to), rel);
+    }
+
+    pub fn apply_relationship_deltas(&mut self, deltas: &[crate::RelationshipDelta]) {
+        for d in deltas {
+            let mut current = self.get_relationship(self.player_id, d.target_id);
+            current.apply_delta(d.axis, d.delta);
+            current.state = current.compute_next_state();
+            self.set_relationship(self.player_id, d.target_id, current);
+        }
     }
 
     /// Advance world by one tick.
