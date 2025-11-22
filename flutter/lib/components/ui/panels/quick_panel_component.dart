@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 import '../../../syn_game.dart';
+import '../paint/angled_panel.dart';
 import '../buttons/text_button_component.dart';
 import '../syn_theme.dart';
 
@@ -124,6 +125,18 @@ class QuickMenuBarComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    drawAngledPanel(
+      canvas,
+      size.toRect(),
+      fill: const Color(0xFF070A12),
+      border: const Color(0xFF00E6FF),
+      borderWidth: 3,
+      cutTopLeft: true,
+      cutTopRight: true,
+      cutBottomLeft: true,
+      cutBottomRight: true,
+    );
+
     final buttonCount = _buttonBounds.isEmpty ? 1 : _buttonBounds.length;
     final path = Path()
       ..moveTo(18, 0)

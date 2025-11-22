@@ -2,15 +2,19 @@ import 'dart:math' as math;
 
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
+import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
-import '../syn_theme.dart';
+import '../../../ui/ui_signal_bus.dart';
 import '../buttons/choice_button_component.dart';
+import '../paint/angled_panel.dart';
+import '../syn_theme.dart';
 
 /// EventCanvas: Centered focal point with slash transitions.
 class EventCardComponent extends PositionComponent
-    with HasGameReference<SynGame> {
+    with HasGameReference<SynGame>, UiSignalListener, KeyboardHandler {
   final GameEvent event;
   final Function(int) onChoice;
 
@@ -22,6 +26,10 @@ class EventCardComponent extends PositionComponent
 
   // Content container - PositionComponent allows transform/scale
   final PositionComponent _contentRoot = PositionComponent();
+  final List<_EventChoiceComponent> _choiceButtons = [];
+  final Set<String> _highlightedStats = {};
+  String? _highlightedRelationshipId;
+  int _focusedChoiceIndex = 0;
 
 
   EventCardComponent({
@@ -34,6 +42,7 @@ class EventCardComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    game.uiSignals.register(this);
 
     // Ensure we have a default size if initialized with zero
     if (size.isZero()) size = Vector2(600, 800);
@@ -60,6 +69,12 @@ class EventCardComponent extends PositionComponent
   }
 
   @override
+  void onRemove() {
+    game.uiSignals.unregister(this);
+    super.onRemove();
+  }
+
+  @override
   void onGameResize(Vector2 newSize) {
     super.onGameResize(newSize);
     if (!isLoaded) return;
@@ -74,6 +89,7 @@ class EventCardComponent extends PositionComponent
 
   void _rebuildContent() {
     _contentRoot.removeAll(_contentRoot.children);
+    _choiceButtons.clear();
 
     // Layout constants
     const double horizontalPadding = 42.0; 
@@ -145,43 +161,38 @@ class EventCardComponent extends PositionComponent
     for (var i = 0; i < event.choices.length; i++) {
       final choice = event.choices[i];
       final skewOffset = 8.0;
-
-      final choiceButton = ChoiceButtonComponent(
+      final choiceButton = _EventChoiceComponent(
         choice: choice,
         index: i,
-        onPressed: () => onChoice(i),
+        onSelect: () => onChoice(i),
         position: Vector2(horizontalPadding + skewOffset, layoutY),
         size: Vector2(contentWidth - skewOffset, buttonHeight),
       );
 
-      // Initialize invisible
+      // Entrance Animation
       choiceButton.setOpacity(0);
-
-      // Entrance Animation: Use EffectController startDelay instead of TimerComponent
-      // This avoids the "onFinish undefined" error
-      choiceButton.add(
-        _CustomOpacityEffect(
-          target: choiceButton,
-          duration: 0.4,
-          startDelay: 0.1 + (0.1 * i), // Stagger here
-        ),
-      );
-
-      choiceButton.add(
-        MoveEffect.by(
-          Vector2(0, -10),
-          EffectController(
-            duration: 0.4, 
-            curve: Curves.easeOut,
-            startDelay: 0.1 + (0.1 * i), // Sync stagger
+      choiceButton
+        ..add(
+          _CustomOpacityEffect(
+            target: choiceButton,
+            duration: 0.4,
+            startDelay: 0.1 + (0.1 * i),
           ),
-        ),
-      );
-
-      // Start offset down for slide up effect
+        )
+        ..add(
+          MoveEffect.by(
+            Vector2(0, -10),
+            EffectController(
+              duration: 0.4,
+              curve: Curves.easeOut,
+              startDelay: 0.1 + (0.1 * i),
+            ),
+          ),
+        );
       choiceButton.position.y += 10;
 
       _contentRoot.add(choiceButton);
+      _choiceButtons.add(choiceButton);
       layoutY += buttonHeight + buttonGap;
     }
 
@@ -197,15 +208,222 @@ class EventCardComponent extends PositionComponent
     }
   }
 
+  void _addChoiceHighlight(ChoiceButtonComponent button) {
+    final highlightFill = _ChoiceHighlightOverlay(
+      size: button.size,
+      paint: Paint()
+        ..color = SynColors.primaryCyan.withValues(alpha: 0.08)
+        ..style = PaintingStyle.fill,
+    );
+    final highlightStroke = _ChoiceHighlightOverlay(
+      size: button.size,
+      paint: Paint()
+        ..color = SynColors.primaryCyan.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+    button
+      ..add(highlightFill)
+      ..add(highlightStroke);
+  }
+
+  void _applyChoiceHighlights() {
+    for (var i = 0; i < _choiceButtons.length; i++) {
+      final button = _choiceButtons[i];
+      final affectsHighlightedStat =
+          button.choice.statChanges.keys.any(_highlightedStats.contains);
+      final hasRelationshipHighlight = _highlightedRelationshipId != null;
+      button.showSignalHighlight = affectsHighlightedStat || hasRelationshipHighlight;
+      button.isFocused = i == _focusedChoiceIndex;
+    }
+  }
+
+  @override
+  void onUiSignal(UiSignal signal) {
+    switch (signal.type) {
+      case 'stat:updated':
+        final payload = signal.payload;
+        if (payload is Map && payload['id'] is String) {
+          final id = payload['id'] as String;
+          _highlightedStats.add(id);
+          _applyChoiceHighlights();
+        }
+        break;
+      case 'relationship:hovered':
+        final payload = signal.payload;
+        if (payload is Map && payload['id'] is String) {
+          _highlightedRelationshipId = payload['id'] as String;
+          _applyChoiceHighlights();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _focusChoice(int index) {
+    if (_choiceButtons.isEmpty) return;
+    _focusedChoiceIndex = index.clamp(0, _choiceButtons.length - 1);
+    _applyChoiceHighlights();
+  }
+
+  void _activateFocusedChoice() {
+    if (_choiceButtons.isEmpty) return;
+    _choiceButtons[_focusedChoiceIndex].triggerSelect();
+  }
+
+  @override
+  bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    if (event is! KeyDownEvent || _choiceButtons.isEmpty) return false;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown || key == LogicalKeyboardKey.keyS) {
+      _focusChoice((_focusedChoiceIndex + 1) % _choiceButtons.length);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.keyW) {
+      _focusChoice(
+          (_focusedChoiceIndex - 1 + _choiceButtons.length) % _choiceButtons.length);
+      return true;
+    }
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+      _activateFocusedChoice();
+      return true;
+    }
+    return false;
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
   }
 }
 
+class _ChoiceHighlightOverlay extends PositionComponent {
+  _ChoiceHighlightOverlay({
+    required Vector2 size,
+    required this.paint,
+  }) : super(size: size, anchor: Anchor.topLeft);
+
+  final Paint paint;
+
+  @override
+  void render(Canvas canvas) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(size.toRect(), const Radius.circular(10)),
+      paint,
+    );
+  }
+}
+
+class _EventChoiceComponent extends PositionComponent
+    with HasGameReference<SynGame>, TapCallbacks, HoverCallbacks {
+  _EventChoiceComponent({
+    required this.choice,
+    required this.index,
+    required this.onSelect,
+    super.position,
+    required Vector2 size,
+  }) : super(size: size, anchor: Anchor.topLeft);
+
+  final GameChoice choice;
+  final int index;
+  final VoidCallback onSelect;
+  bool showSignal = false;
+  bool _hovered = false;
+  bool _focused = false;
+  late final ChoiceButtonComponent _button;
+
+  set showSignalHighlight(bool value) {
+    showSignal = value;
+  }
+
+  set isFocused(bool value) {
+    _focused = value;
+  }
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    _button = ChoiceButtonComponent(
+      choice: choice,
+      index: index,
+      onPressed: onSelect,
+      position: Vector2.zero(),
+      size: size,
+    );
+    add(_button);
+  }
+
+  void triggerSelect() {
+    onSelect();
+  }
+
+  void setOpacity(double value) {
+    _button.setOpacity(value);
+  }
+
+  void _scaleTo(Vector2 target, double duration) {
+    removeWhere((c) => c is ScaleEffect);
+    add(
+      ScaleEffect.to(
+        target,
+        EffectController(duration: duration, curve: Curves.easeOut),
+      ),
+    );
+  }
+
+  @override
+  void onHoverEnter() {
+    _hovered = true;
+    _scaleTo(Vector2.all(1.03), 0.15);
+  }
+
+  @override
+  void onHoverExit() {
+    _hovered = false;
+    _scaleTo(Vector2.all(1.0), 0.12);
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    _scaleTo(Vector2.all(0.97), 0.08);
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    _scaleTo(Vector2.all(1.0), 0.1);
+    triggerSelect();
+  }
+
+  @override
+  void onTapCancel(TapCancelEvent event) {
+    _scaleTo(Vector2.all(1.0), 0.1);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    if (showSignal || _focused || _hovered) {
+      drawAngledPanel(
+        canvas,
+        size.toRect(),
+        fill: Colors.transparent,
+        border: showSignal
+            ? SynColors.primaryCyan
+            : _focused
+                ? SynColors.accentCyan
+                : SynColors.primaryCyan.withValues(alpha: 0.5),
+        borderWidth: 2.5,
+        cutTopRight: true,
+        cutBottomLeft: true,
+      );
+    }
+  }
+}
+
 // Custom Effect to bridge Flame's timing with our custom setOpacity
 class _CustomOpacityEffect extends Component {
-  final ChoiceButtonComponent target;
+  final _EventChoiceComponent target;
   final double duration;
   final double startDelay;
   double _timer = 0;
@@ -364,6 +582,15 @@ class _SlashAccent extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
+    drawAngledPanel(
+      canvas,
+      size.toRect(),
+      fill: const Color(0xFF0A0A0A).withValues(alpha: 0.6),
+      border: const Color(0xFF00D9FF),
+      borderWidth: 3,
+      cutTopRight: true,
+      cutBottomLeft: true,
+    );
     canvas.drawPath(_slashPath, _glowPaint);
     canvas.drawPath(_corePath, _corePaint);
   }
@@ -655,4 +882,3 @@ class _SlashTransition extends PositionComponent {
           ..strokeWidth = 50);
   }
 }
-

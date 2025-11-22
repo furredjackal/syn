@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
-import '../syn_theme.dart';
-import '../display/stat_bar_component.dart';
+import '../../../ui/ui_signal_bus.dart';
 import '../buttons/icon_button_component.dart';
+import '../display/stat_bar_component.dart';
+import '../paint/angled_panel.dart';
+import '../syn_theme.dart';
 
 enum PanelMode { compact, detailed }
 
@@ -157,6 +159,17 @@ class StatPanelComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    drawAngledPanel(
+      canvas,
+      size.toRect(),
+      fill: SynColors.bgDark.withValues(alpha: 0.85),
+      border: SynHudChrome.topBarBorderColorPrimary,
+      borderWidth: SynLayout.borderWidthHeavy,
+      cutTopRight: true,
+      cutBottomLeft: true,
+      cutTopLeft: false,
+      cutBottomRight: false,
+    );
     canvas.drawPath(_clipPath, _bgPaint);
     canvas.drawPath(_clipPath, _borderPaint);
   }

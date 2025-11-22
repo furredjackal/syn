@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
+import '../../../ui/ui_signal_bus.dart';
 import '../cards/npc_card_component.dart';
+import '../paint/angled_panel.dart';
 import '../syn_theme.dart';
 
 class RelationshipPanelComponent extends PositionComponent
@@ -132,6 +134,15 @@ class RelationshipPanelComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    drawAngledPanel(
+      canvas,
+      size.toRect(),
+      fill: const Color(0xFF0A081A).withValues(alpha: 0.6),
+      border: _borderColor,
+      borderWidth: _borderWidth,
+      cutTopLeft: true,
+      cutBottomLeft: true,
+    );
     // Angled silhouette, matching StatPanel's general shape but mirrored
     final path = Path()
       ..moveTo(10, 6)

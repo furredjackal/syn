@@ -197,6 +197,27 @@ class SynTheme {
   );
 }
 
+/// UI theme + motion
+class SynMotionSpec {
+  final double dockSnapDuration;
+  final Curve dockSnapCurve;
+
+  const SynMotionSpec({
+    this.dockSnapDuration = 0.35,
+    this.dockSnapCurve = Curves.elasticOut,
+  });
+}
+
+class SynUiTheme {
+  final SynMotionSpec motion;
+
+  const SynUiTheme({
+    this.motion = const SynMotionSpec(),
+  });
+
+  static const SynUiTheme defaultTheme = SynUiTheme();
+}
+
 /// Extension to provide .label getter for backward compatibility
 extension TextThemeExt on TextTheme {
   TextStyle? get label => labelMedium;

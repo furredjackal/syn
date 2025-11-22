@@ -7,6 +7,8 @@ import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart'
     show TextDirection, TextPainter, TextSpan, TextStyle;
+import 'theme/theme.dart';
+import 'ui/ui_signal_bus.dart';
 import 'models/game_state.dart';
 import 'components/screens/character_creation_component.dart';
 import 'components/screens/debug_console_component.dart';
@@ -29,6 +31,8 @@ class SynGame extends FlameGame
 
   late final RouterComponent _router;
   final GameState gameState;
+  final SynUiTheme uiTheme = SynUiTheme.defaultTheme;
+  final UiSignalBus uiSignals = UiSignalBus();
   Vector2? _mousePosition;
 
   Vector2? get mousePosition => _mousePosition;
