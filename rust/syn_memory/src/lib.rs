@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use syn_core::{NpcId, SimTick};
+pub use syn_core::{NpcId, SimTick, StatDelta};
 
 /// A single memory entry recording an event and its impact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +15,7 @@ pub struct MemoryEntry {
     pub npc_id: NpcId,                           // Who holds this memory
     pub sim_tick: SimTick,                       // When it happened
     pub emotional_intensity: f32,                // -1.0 (negative) to +1.0 (positive)
-    pub stat_impacts: HashMap<String, f32>,     // e.g., {"mood": -2.0, "trust": -3.0}
+    pub stat_impacts: Vec<StatDelta>,     // e.g., [{"kind": Mood, "delta": -2.0}]
     pub tags: Vec<String>,                      // e.g., ["betrayal", "trauma", "relationship"]
 }
 
@@ -33,14 +33,14 @@ impl MemoryEntry {
             npc_id,
             sim_tick,
             emotional_intensity: emotional_intensity.clamp(-1.0, 1.0),
-            stat_impacts: HashMap::new(),
+            stat_impacts: Vec::new(),
             tags: Vec::new(),
         }
     }
 
-    /// Add a stat impact to this memory.
-    pub fn with_stat_impact(mut self, stat: &str, delta: f32) -> Self {
-        self.stat_impacts.insert(stat.to_string(), delta);
+    /// Add stat impacts to this memory.
+    pub fn with_stat_deltas(mut self, deltas: Vec<StatDelta>) -> Self {
+        self.stat_impacts = deltas;
         self
     }
 

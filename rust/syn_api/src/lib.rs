@@ -9,8 +9,8 @@ use syn_content::load_storylets_from_db;
 
 // Re-export core types for Dart
 pub use syn_core::{
-    AbstractNpc, AttachmentStyle, Karma, LifeStage, NpcId, Relationship, SimTick, Stats,
-    Traits, WorldSeed, WorldState,
+    AbstractNpc, AttachmentStyle, Karma, KarmaBand, LifeStage, MoodBand, NpcId, Relationship,
+    SimTick, StatKind, Stats, Traits, WorldSeed, WorldState, ALL_STAT_KINDS,
 };
 pub use syn_director::{EventDirector, Storylet, StoryletOutcome, StoryletRole};
 pub use syn_memory::{Journal, MemoryEntry, MemorySystem};
@@ -80,9 +80,17 @@ impl GameEngine {
         format!("{:?}", self.world.player_life_stage)
     }
 
+    pub fn player_mood_band(&self) -> String {
+        format!("{:?}", self.world.player_stats.mood_band())
+    }
+
     /// Get player karma.
     pub fn player_karma(&self) -> f32 {
         self.world.player_karma.0
+    }
+
+    pub fn player_karma_band(&self) -> String {
+        format!("{:?}", self.world.player_karma.band())
     }
 
     /// Get current narrative heat.
@@ -103,14 +111,14 @@ impl GameEngine {
     /// Get player stats (serialized for Dart).
     pub fn player_stats(&self) -> PlayerStatsDto {
         PlayerStatsDto {
-            health: self.world.player_stats.health,
-            intelligence: self.world.player_stats.intelligence,
-            charisma: self.world.player_stats.charisma,
-            wealth: self.world.player_stats.wealth,
-            mood: self.world.player_stats.mood,
-            appearance: self.world.player_stats.appearance,
-            reputation: self.world.player_stats.reputation,
-            wisdom: self.world.player_stats.wisdom,
+            stats: ALL_STAT_KINDS
+                .iter()
+                .map(|kind| ApiStat {
+                    kind: format!("{:?}", kind),
+                    value: self.world.player_stats.get(*kind),
+                })
+                .collect(),
+            mood_band: format!("{:?}", self.world.player_stats.mood_band()),
         }
     }
 
@@ -291,14 +299,14 @@ impl GameEngine {
 /// Player stats DTO for serialization to Dart.
 #[derive(Debug, Clone)]
 pub struct PlayerStatsDto {
-    pub health: f32,
-    pub intelligence: f32,
-    pub charisma: f32,
-    pub wealth: f32,
-    pub mood: f32,
-    pub appearance: f32,
-    pub reputation: f32,
-    pub wisdom: f32,
+    pub stats: Vec<ApiStat>,
+    pub mood_band: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiStat {
+    pub kind: String,
+    pub value: f32,
 }
 
 /// NPC DTO for serialization to Dart.

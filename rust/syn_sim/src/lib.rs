@@ -3,7 +3,7 @@
 //! Handles the core simulation loop, NPC updates, time progression, and LOD tier management.
 
 use syn_core::{
-    AbstractNpc, BehaviorAction, BehaviorNeed, DeterministicRng, NpcId, Stats, WorldState,
+    AbstractNpc, BehaviorAction, BehaviorNeed, DeterministicRng, NpcId, StatKind, Stats, WorldState,
 };
 use std::collections::HashMap;
 
@@ -24,7 +24,6 @@ pub struct SimulatedNpc {
     pub id: NpcId,
     pub abstract_npc: AbstractNpc,
     pub stats: Stats,
-    pub mood: f32,
     pub lod_tier: LodTier,
     pub needs: HashMap<String, f32>, // e.g., {"social": 0.7, "stimulation": 0.4}
     pub behavioral_cooldowns: HashMap<String, u32>, // e.g., {"dialogue": 5 ticks}
@@ -36,7 +35,6 @@ impl SimulatedNpc {
             id: abstract_npc.id,
             abstract_npc,
             stats: Stats::default(),
-            mood: 0.0,
             lod_tier: LodTier::Low,
             needs: HashMap::new(),
             behavioral_cooldowns: HashMap::new(),
@@ -54,17 +52,19 @@ impl SimulatedNpc {
     /// Apply mood decay toward baseline (linear slow drift).
     pub fn apply_mood_decay(&mut self) {
         const MOOD_DECAY_RATE: f32 = 0.05;
-        self.mood *= 1.0 - MOOD_DECAY_RATE;
-        self.mood = self.mood.clamp(-10.0, 10.0);
+        let current = self.stats.get(StatKind::Mood);
+        let delta = -current * MOOD_DECAY_RATE;
+        self.stats.apply_delta(StatKind::Mood, delta);
     }
 
     /// Recalculate needs based on stats, mood, and personality.
     pub fn update_needs(&mut self) {
         let mut needs = HashMap::new();
+        let mood = self.stats.get(StatKind::Mood);
 
         // Social need: influenced by mood and sociability
         let social_base = (self.abstract_npc.traits.sociability - 50.0) / 100.0;
-        let social_mood = if self.mood < -5.0 { 1.0 } else if self.mood > 5.0 { -0.5 } else { 0.0 };
+        let social_mood = if mood < -5.0 { 1.0 } else if mood > 5.0 { -0.5 } else { 0.0 };
         needs.insert("social".to_string(), (social_base + social_mood).clamp(0.0, 1.0));
 
         // Stimulation need: curiosity, impulsivity, boredom
@@ -73,16 +73,16 @@ impl SimulatedNpc {
 
         // Security need: affected by stability and health
         let security_stability = (100.0 - self.abstract_npc.traits.stability) / 100.0;
-        let security_health = if self.stats.health < 30.0 { 0.7 } else { 0.0 };
+        let security_health = if self.stats.get(StatKind::Health) < 30.0 { 0.7 } else { 0.0 };
         needs.insert("security".to_string(), (security_stability + security_health).clamp(0.0, 1.0));
 
         // Recognition need: ambition + mood boost
         let recognition_base = (self.abstract_npc.traits.ambition - 50.0) / 100.0;
-        let recognition_mood = self.mood.max(0.0) / 10.0;
+        let recognition_mood = mood.max(0.0) / 10.0;
         needs.insert("recognition".to_string(), (recognition_base + recognition_mood).clamp(0.0, 1.0));
 
         // Comfort need: mood dips + stability
-        let comfort_base = ((0.0 - self.mood).max(0.0) / 10.0) + ((100.0 - self.abstract_npc.traits.stability) / 200.0);
+        let comfort_base = ((0.0 - mood).max(0.0) / 10.0) + ((100.0 - self.abstract_npc.traits.stability) / 200.0);
         needs.insert("comfort".to_string(), comfort_base.clamp(0.0, 1.0));
 
         self.needs = needs;
@@ -108,7 +108,7 @@ impl SimulatedNpc {
         } else {
             primary
         };
-        let mood_mult = action.mood_multiplier(self.mood);
+        let mood_mult = action.mood_multiplier(self.stats.get(StatKind::Mood));
         let context = action.context_fit(world);
         (base * trait_bias * attachment_bias * need_component * mood_mult * context).clamp(0.0, 100.0)
     }
@@ -133,10 +133,16 @@ impl Simulator {
         let mut simulated = SimulatedNpc::new(abstract_npc);
         
         // Initialize stats based on traits and age
-        simulated.stats.health = 75.0 + (simulated.abstract_npc.traits.stability - 50.0) / 2.0;
-        simulated.stats.intelligence = 50.0;
-        simulated.stats.charisma = (simulated.abstract_npc.traits.charm + simulated.abstract_npc.traits.confidence) / 2.0;
-        simulated.stats.mood = 0.0;
+        simulated.stats.set(
+            StatKind::Health,
+            75.0 + (simulated.abstract_npc.traits.stability - 50.0) / 2.0,
+        );
+        simulated.stats.set(StatKind::Intelligence, 50.0);
+        simulated.stats.set(
+            StatKind::Charisma,
+            (simulated.abstract_npc.traits.charm + simulated.abstract_npc.traits.confidence) / 2.0,
+        );
+        simulated.stats.set(StatKind::Mood, 0.0);
         simulated.stats.clamp();
 
         self.active_npcs.insert(simulated.id, simulated);
@@ -175,7 +181,8 @@ impl Simulator {
             }
             // Medium fidelity: simplified updates
             else if simulated_npc.lod_tier == LodTier::Medium {
-                simulated_npc.mood *= 0.98; // Slower decay
+                let mood = simulated_npc.stats.get(StatKind::Mood) * 0.98; // Slower decay
+                simulated_npc.stats.set(StatKind::Mood, mood);
             }
             // Low fidelity: minimal updates (already handled in abstract layer)
 
@@ -256,10 +263,10 @@ mod tests {
         };
 
         let mut sim_npc = SimulatedNpc::new(abstract_npc);
-        sim_npc.mood = 5.0;
+        sim_npc.stats.set(StatKind::Mood, 5.0);
         sim_npc.apply_mood_decay();
 
-        assert!(sim_npc.mood < 5.0);
+        assert!(sim_npc.stats.get(StatKind::Mood) < 5.0);
     }
 
     #[test]
@@ -303,8 +310,8 @@ mod tests {
             attachment_style: AttachmentStyle::Secure,
         };
         let mut sim_npc = SimulatedNpc::new(abstract_npc);
-        sim_npc.mood = 2.0;
-        sim_npc.stats.health = 80.0;
+        sim_npc.stats.set(StatKind::Mood, 2.0);
+        sim_npc.stats.set(StatKind::Health, 80.0);
         sim_npc.update_needs();
 
         let mut world = WorldState::new(WorldSeed(42), NpcId(99));
@@ -392,5 +399,39 @@ mod tests {
 
         let sim_npc = simulator.get_active_npc(NpcId(2)).unwrap();
         assert_eq!(sim_npc.lod_tier, LodTier::High);
+    }
+
+    #[test]
+    fn test_tick_updates_mood_via_stats() {
+        let mut simulator = Simulator::new(42);
+        let mut world = WorldState::new(WorldSeed(42), NpcId(1));
+
+        let abstract_npc = AbstractNpc {
+            id: NpcId(2),
+            age: 25,
+            job: "Engineer".to_string(),
+            district: "Downtown".to_string(),
+            household_id: 1,
+            traits: Traits::default(),
+            seed: 123,
+            attachment_style: AttachmentStyle::Secure,
+        };
+
+        world.npcs.insert(NpcId(2), abstract_npc.clone());
+        simulator.instantiate_npc(abstract_npc);
+
+        // Force LOD High via strong relationship so mood decay runs.
+        let mut rel = Relationship::default();
+        rel.affection = 5.0;
+        world.set_relationship(NpcId(1), NpcId(2), rel);
+
+        let sim_npc = simulator.get_active_npc_mut(NpcId(2)).unwrap();
+        sim_npc.stats.set(StatKind::Mood, 5.0);
+
+        simulator.tick(&mut world);
+
+        let updated = simulator.get_active_npc(NpcId(2)).unwrap();
+        assert!(updated.stats.get(StatKind::Mood) < 5.0);
+        assert!(updated.stats.get(StatKind::Mood) <= 10.0);
     }
 }

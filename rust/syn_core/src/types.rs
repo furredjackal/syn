@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::{KarmaBand, MoodBand, StatKind, clamp_for};
 
 /// Unique identifier for a world seed (ensures determinism).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -53,23 +54,76 @@ impl Default for Stats {
 impl Stats {
     /// Clamp all stats to valid range [0..100] except mood [-10..10].
     pub fn clamp(&mut self) {
-        self.health = self.health.clamp(0.0, 100.0);
-        self.intelligence = self.intelligence.clamp(0.0, 100.0);
-        self.charisma = self.charisma.clamp(0.0, 100.0);
-        self.wealth = self.wealth.clamp(0.0, 100.0);
-        self.mood = self.mood.clamp(-10.0, 10.0);
-        self.appearance = self.appearance.clamp(0.0, 100.0);
-        self.reputation = self.reputation.clamp(-100.0, 100.0);
-        self.wisdom = self.wisdom.clamp(0.0, 100.0);
+        self.health = clamp_for(StatKind::Health, self.health);
+        self.intelligence = clamp_for(StatKind::Intelligence, self.intelligence);
+        self.charisma = clamp_for(StatKind::Charisma, self.charisma);
+        self.wealth = clamp_for(StatKind::Wealth, self.wealth);
+        self.mood = clamp_for(StatKind::Mood, self.mood);
+        self.appearance = clamp_for(StatKind::Appearance, self.appearance);
+        self.reputation = clamp_for(StatKind::Reputation, self.reputation);
+        self.wisdom = clamp_for(StatKind::Wisdom, self.wisdom);
 
         if let Some(ref mut c) = self.curiosity {
-            *c = c.clamp(0.0, 100.0);
+            *c = clamp_for(StatKind::Curiosity, *c);
         }
         if let Some(ref mut e) = self.energy {
-            *e = e.clamp(0.0, 100.0);
+            *e = clamp_for(StatKind::Energy, *e);
         }
         if let Some(ref mut l) = self.libido {
-            *l = l.clamp(0.0, 100.0);
+            *l = clamp_for(StatKind::Libido, *l);
+        }
+    }
+
+    pub fn get(&self, kind: StatKind) -> f32 {
+        match kind {
+            StatKind::Health => self.health,
+            StatKind::Intelligence => self.intelligence,
+            StatKind::Charisma => self.charisma,
+            StatKind::Wealth => self.wealth,
+            StatKind::Mood => self.mood,
+            StatKind::Appearance => self.appearance,
+            StatKind::Reputation => self.reputation,
+            StatKind::Wisdom => self.wisdom,
+            StatKind::Curiosity => self.curiosity.unwrap_or(0.0),
+            StatKind::Energy => self.energy.unwrap_or(0.0),
+            StatKind::Libido => self.libido.unwrap_or(0.0),
+        }
+    }
+
+    pub fn set(&mut self, kind: StatKind, value: f32) {
+        match kind {
+            StatKind::Health => self.health = value,
+            StatKind::Intelligence => self.intelligence = value,
+            StatKind::Charisma => self.charisma = value,
+            StatKind::Wealth => self.wealth = value,
+            StatKind::Mood => self.mood = value,
+            StatKind::Appearance => self.appearance = value,
+            StatKind::Reputation => self.reputation = value,
+            StatKind::Wisdom => self.wisdom = value,
+            StatKind::Curiosity => self.curiosity = Some(value),
+            StatKind::Energy => self.energy = Some(value),
+            StatKind::Libido => self.libido = Some(value),
+        }
+        self.clamp();
+    }
+
+    pub fn apply_delta(&mut self, kind: StatKind, delta: f32) {
+        let current = self.get(kind);
+        self.set(kind, current + delta);
+    }
+
+    pub fn mood_band(&self) -> MoodBand {
+        let m = self.mood;
+        if m <= -6.0 {
+            MoodBand::Despair
+        } else if m < -1.0 {
+            MoodBand::Low
+        } else if m <= 1.0 {
+            MoodBand::Neutral
+        } else if m < 6.0 {
+            MoodBand::High
+        } else {
+            MoodBand::Euphoric
         }
     }
 }
@@ -597,8 +651,27 @@ impl Karma {
         Karma(0.0)
     }
 
+    pub fn apply_delta(&mut self, delta: f32) {
+        self.0 = crate::clamp_karma(self.0 + delta);
+    }
+
     pub fn clamp(&mut self) {
-        self.0 = self.0.clamp(-100.0, 100.0);
+        self.0 = crate::clamp_karma(self.0);
+    }
+
+    pub fn band(&self) -> KarmaBand {
+        let k = self.0;
+        if k <= -60.0 {
+            KarmaBand::Damned
+        } else if k < -10.0 {
+            KarmaBand::Tainted
+        } else if k <= 10.0 {
+            KarmaBand::Balanced
+        } else if k < 60.0 {
+            KarmaBand::Blessed
+        } else {
+            KarmaBand::Ascendant
+        }
     }
 }
 

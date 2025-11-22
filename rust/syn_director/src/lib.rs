@@ -6,7 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use syn_core::{
-    behavior_action_from_tags, NpcId, Relationship, RelationshipState, SimTick, WorldState,
+    behavior_action_from_tags, apply_stat_deltas, NpcId, Relationship, RelationshipState, SimTick,
+    StatDelta, WorldState,
 };
 use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;
@@ -49,23 +50,38 @@ pub struct StoryletRole {
 /// Outcome of a storylet firing: stat changes, relationship shifts, memory entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryletOutcome {
-    pub stat_impacts: HashMap<String, f32>,         // e.g., {"mood": -2.0}
+    /// Unified stat changes from this outcome.
+    ///
+    /// JSON content uses `stat_impacts`; we expose it as `stat_deltas` in code.
+    #[serde(rename = "stat_impacts", alias = "stat_deltas", default)]
+    pub stat_deltas: Vec<StatDelta>,
+    #[serde(default)]
     pub relationship_deltas: Vec<(NpcId, NpcId, Relationship)>, // (from, to, delta)
+    #[serde(default)]
+    pub karma_delta: Option<f32>,
+    #[serde(default)]
     pub memory_event_id: String,
-    pub emotional_intensity: f32,                   // -1.0 to +1.0
-    pub memory_tags: Vec<String>,                   // Tags applied to recorded memory
-    pub heat_spike: f32,                            // Additional world heat delta from choices
+    #[serde(default)]
+    pub emotional_intensity: f32, // -1.0 to +1.0
+    #[serde(default)]
+    pub memory_tags: Vec<String>, // Tags applied to recorded memory
+    #[serde(default)]
+    pub heat_spike: f32, // Additional world heat delta from choices
+    #[serde(default)]
+    pub next_storylet: Option<String>,
 }
 
 impl Default for StoryletOutcome {
     fn default() -> Self {
         StoryletOutcome {
-            stat_impacts: HashMap::new(),
+            stat_deltas: Vec::new(),
             relationship_deltas: Vec::new(),
+            karma_delta: None,
             memory_event_id: "unknown".to_string(),
             emotional_intensity: 0.0,
             memory_tags: Vec::new(),
             heat_spike: 0.0,
+            next_storylet: None,
         }
     }
 }
@@ -279,75 +295,12 @@ impl EventDirector {
         outcome: StoryletOutcome,
         current_tick: SimTick,
     ) {
-        // Apply stat impacts
-        for (stat, delta) in &outcome.stat_impacts {
-            match stat.as_str() {
-                "mood" => world.player_stats.mood = (world.player_stats.mood + *delta).clamp(-10.0, 10.0),
-                _ => {} // Extend as needed
-            }
-        }
-
-        // Apply relationship deltas
-        for (from, to, delta) in &outcome.relationship_deltas {
-            let current = world.get_relationship(*from, *to);
-            let mut updated = Relationship {
-                affection: (current.affection + delta.affection).clamp(-10.0, 10.0),
-                trust: (current.trust + delta.trust).clamp(-10.0, 10.0),
-                attraction: (current.attraction + delta.attraction).clamp(-10.0, 10.0),
-                familiarity: (current.familiarity + delta.familiarity).clamp(-10.0, 10.0),
-                resentment: (current.resentment + delta.resentment).clamp(-10.0, 10.0),
-                state: current.state,  // Preserve state for now; will be updated next
-            };
-            // Compute new state based on axes
-            updated.state = updated.compute_next_state();
-            world.set_relationship(*from, *to, updated);
-        }
-
-        // Update karma (based on outcome emotional intensity)
-        world.player_karma.0 = (world.player_karma.0 + outcome.emotional_intensity * 10.0).clamp(-100.0, 100.0);
-
-        // Global heat reactions: base storylet heat plus optional spikes/damps.
-        world.add_heat(storylet.heat);
-        if outcome.heat_spike > 0.0 {
-            world.add_heat(outcome.heat_spike);
-        } else if outcome.heat_spike < 0.0 {
-            world.reduce_heat(outcome.heat_spike.abs());
-        }
-
-        if outcome
-            .memory_tags
-            .iter()
-            .any(|tag| tag.eq_ignore_ascii_case("trigger"))
-        {
-            world.add_heat(10.0);
-        }
-
-        // Record memory for the player (UI will render via journal)
-        if !outcome.memory_event_id.is_empty() {
-            let mut entry = MemoryEntry::new(
-                format!("mem_player_{}_{}", world.player_id.0, current_tick.0),
-                outcome.memory_event_id.clone(),
-                world.player_id,
-                current_tick,
-                outcome.emotional_intensity,
-            );
-
-            for (stat, delta) in &outcome.stat_impacts {
-                entry = entry.with_stat_impact(stat, *delta);
-            }
-
-            if !outcome.memory_tags.is_empty() {
-                entry = entry.with_tags(outcome.memory_tags.clone());
-            }
-
-            memory.record_memory(entry);
-        }
-
-        // Mark cooldown
-        if let Some(first_role) = storylet.roles.first() {
-            self.cooldowns.mark_cooldown(
-                &storylet.id,
-                first_role.npc_id,
+    apply_storylet_outcome(world, memory, storylet, &outcome, current_tick);
+    // Mark cooldown
+    if let Some(first_role) = storylet.roles.first() {
+        self.cooldowns.mark_cooldown(
+            &storylet.id,
+            first_role.npc_id,
                 storylet.cooldown_ticks,
                 current_tick,
             );
@@ -360,6 +313,77 @@ impl EventDirector {
     }
 }
 
+pub fn apply_storylet_outcome(
+    world: &mut WorldState,
+    memory: &mut MemorySystem,
+    storylet: &Storylet,
+    outcome: &StoryletOutcome,
+    current_tick: SimTick,
+) {
+        // Apply stat impacts
+    apply_stat_deltas(&mut world.player_stats, &outcome.stat_deltas);
+
+    // Apply relationship deltas
+    for (from, to, delta) in &outcome.relationship_deltas {
+        let current = world.get_relationship(*from, *to);
+        let mut updated = Relationship {
+            affection: (current.affection + delta.affection).clamp(-10.0, 10.0),
+            trust: (current.trust + delta.trust).clamp(-10.0, 10.0),
+            attraction: (current.attraction + delta.attraction).clamp(-10.0, 10.0),
+            familiarity: (current.familiarity + delta.familiarity).clamp(-10.0, 10.0),
+            resentment: (current.resentment + delta.resentment).clamp(-10.0, 10.0),
+            state: current.state, // Preserve state for now; will be updated next
+        };
+        updated.state = updated.compute_next_state();
+        world.set_relationship(*from, *to, updated);
+    }
+
+    // Update karma (based on outcome emotional intensity)
+    world
+        .player_karma
+        .apply_delta(outcome.emotional_intensity * 10.0);
+    if let Some(k) = outcome.karma_delta {
+        world.player_karma.apply_delta(k);
+    }
+
+    // Global heat reactions: base storylet heat plus optional spikes/damps.
+    world.add_heat(storylet.heat);
+    if outcome.heat_spike > 0.0 {
+        world.add_heat(outcome.heat_spike);
+    } else if outcome.heat_spike < 0.0 {
+        world.reduce_heat(outcome.heat_spike.abs());
+    }
+
+    if outcome
+        .memory_tags
+        .iter()
+        .any(|tag| tag.eq_ignore_ascii_case("trigger"))
+    {
+        world.add_heat(10.0);
+    }
+
+    // Record memory for the player (UI will render via journal)
+    if !outcome.memory_event_id.is_empty() {
+        let mut entry = MemoryEntry::new(
+            format!("mem_player_{}_{}", world.player_id.0, current_tick.0),
+            outcome.memory_event_id.clone(),
+            world.player_id,
+            current_tick,
+            outcome.emotional_intensity,
+        );
+
+        if !outcome.stat_deltas.is_empty() {
+            entry = entry.with_stat_deltas(outcome.stat_deltas.clone());
+        }
+
+        if !outcome.memory_tags.is_empty() {
+            entry = entry.with_tags(outcome.memory_tags.clone());
+        }
+
+        memory.record_memory(entry);
+    }
+}
+
 impl Default for EventDirector {
     fn default() -> Self {
         Self::new()
@@ -369,7 +393,7 @@ impl Default for EventDirector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use syn_core::{NpcId, WorldSeed, WorldState};
+    use syn_core::{NpcId, WorldSeed, WorldState, StatDelta, StatKind};
 
     #[test]
     fn test_storylet_creation() {
@@ -544,12 +568,58 @@ mod tests {
         };
 
         let mut outcome = StoryletOutcome::default();
-        outcome.stat_impacts.insert("mood".to_string(), -2.0);
+        outcome.stat_deltas.push(StatDelta {
+            kind: StatKind::Mood,
+            delta: -2.0,
+            source: Some("test".into()),
+        });
 
-        let initial_mood = world.player_stats.mood;
+        let initial_mood = world.player_stats.get(StatKind::Mood);
         director.fire_storylet(&storylet, &mut world, &mut memory, outcome, SimTick(0));
 
-        assert_eq!(world.player_stats.mood, initial_mood - 2.0);
+        assert_eq!(world.player_stats.get(StatKind::Mood), initial_mood - 2.0);
+    }
+
+    #[test]
+    fn apply_storylet_outcome_uses_stat_deltas_and_karma() {
+        let mut world = WorldState::new(WorldSeed(1), NpcId(1));
+        let mut memory = MemorySystem::new();
+        let storylet = Storylet {
+            id: "outcome_test".to_string(),
+            name: "Outcome Test".to_string(),
+            tags: vec![],
+            prerequisites: StoryletPrerequisites {
+                min_relationship_affection: None,
+                min_relationship_resentment: None,
+                stat_conditions: HashMap::new(),
+                life_stages: vec![],
+                tags: vec![],
+                relationship_states: vec![],
+                memory_tags_required: vec![],
+                memory_tags_forbidden: vec![],
+                memory_recency_ticks: None,
+            },
+            heat: 0.0,
+            weight: 1.0,
+            cooldown_ticks: 0,
+            roles: vec![],
+        };
+        let outcome = StoryletOutcome {
+            stat_deltas: vec![
+                StatDelta { kind: StatKind::Mood, delta: -5.0, source: Some("test".into()) },
+                StatDelta { kind: StatKind::Reputation, delta: 10.0, source: Some("test".into()) },
+            ],
+            karma_delta: Some(-20.0),
+            ..Default::default()
+        };
+
+        apply_storylet_outcome(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
+
+        assert!(world.player_stats.get(StatKind::Mood) <= 10.0);
+        assert!(world.player_stats.get(StatKind::Mood) >= -10.0);
+        assert_eq!(world.player_stats.get(StatKind::Reputation), 10.0);
+        let karma_val = world.player_karma.0;
+        assert!(karma_val >= -100.0 && karma_val <= 100.0);
     }
 
     #[test]

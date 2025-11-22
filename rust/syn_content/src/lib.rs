@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use syn_core::{Persistence, StoryletRecord};
 use syn_director::Storylet;
+pub mod storylet;
+pub use storylet::*;
 
 /// Load all storylets stored inside the SQLite database at `db_path`.
 pub fn load_storylets_from_db(db_path: &str) -> Result<Vec<Storylet>> {

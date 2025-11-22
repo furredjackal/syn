@@ -10,11 +10,13 @@ pub mod types;
 pub mod rng;
 pub mod persistence;
 pub mod errors;
+pub mod stats;
 
 pub use types::*;
 pub use rng::*;
 pub use persistence::*;
 pub use errors::*;
+pub use stats::*;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
