@@ -6,8 +6,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use syn_core::{
-    behavior_action_from_tags, apply_stat_deltas, NpcId, Relationship, RelationshipState, SimTick,
-    StatDelta, WorldState,
+    behavior_action_from_tags,
+    apply_stat_deltas,
+    NpcId,
+    Relationship,
+    RelationshipState,
+    SimTick,
+    StatDelta,
+    WorldState,
 };
 use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;

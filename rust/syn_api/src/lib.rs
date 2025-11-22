@@ -109,8 +109,8 @@ impl GameEngine {
     }
 
     /// Get player stats (serialized for Dart).
-    pub fn player_stats(&self) -> PlayerStatsDto {
-        PlayerStatsDto {
+    pub fn player_stats(&self) -> ApiStatsSnapshot {
+        ApiStatsSnapshot {
             stats: ALL_STAT_KINDS
                 .iter()
                 .map(|kind| ApiStat {
@@ -120,6 +120,19 @@ impl GameEngine {
                 .collect(),
             mood_band: format!("{:?}", self.world.player_stats.mood_band()),
         }
+    }
+
+    /// Alias for FRB: get unified stats snapshot.
+    pub fn get_player_stats(&self) -> ApiStatsSnapshot {
+        self.player_stats()
+    }
+
+    pub fn get_mood_band(&self) -> String {
+        format!("{:?}", self.world.player_stats.mood_band())
+    }
+
+    pub fn get_karma_band(&self) -> String {
+        format!("{:?}", self.world.player_karma.band())
     }
 
     // ==================== Simulation ====================
@@ -298,10 +311,12 @@ impl GameEngine {
 
 /// Player stats DTO for serialization to Dart.
 #[derive(Debug, Clone)]
-pub struct PlayerStatsDto {
+pub struct ApiStatsSnapshot {
     pub stats: Vec<ApiStat>,
     pub mood_band: String,
 }
+
+pub type PlayerStatsDto = ApiStatsSnapshot;
 
 #[derive(Debug, Clone)]
 pub struct ApiStat {
@@ -380,7 +395,7 @@ pub fn engine_player_mood() -> f32 {
     let engine = ENGINE.lock().unwrap();
     engine
         .as_ref()
-        .map(|e| e.player_stats().mood)
+        .map(|e| e.world.player_stats.get(StatKind::Mood))
         .unwrap_or(0.0)
 }
 
