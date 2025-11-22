@@ -273,7 +273,7 @@ class TopBarComponent extends PositionComponent with HasGameReference<SynGame> {
 
     if (_flashAlpha > 0) {
       _flashAlpha =
-          (_flashAlpha - dt * _kFlashFadePerSecond).clamp(0.0, 1.0) as double;
+          (_flashAlpha - dt * _kFlashFadePerSecond).clamp(0.0, 1.0);
     }
   }
 

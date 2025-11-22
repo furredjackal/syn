@@ -44,7 +44,7 @@ class SynGame extends FlameGame
         'splash': Route(() => SplashScreenComponent()),
         'menu': Route(() => MainMenuComponent()),
         'character_creation': Route(() => CharacterCreationComponent()),
-        'gameplay': Route(() => FocusLayoutHubComponent()),
+        'gameplay': Route(() => MagneticDockHubComponent()),
         'detailed_stat': Route(() => DetailedStatComponent()),
         'relationship_network': Route(() => RelationshipNetworkComponent()),
         'memory_journal': Route(() => MemoryJournalComponent()),

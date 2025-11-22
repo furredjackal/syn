@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
-import 'package:flame/events.dart';
+import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
@@ -13,17 +13,16 @@ class EventCardComponent extends PositionComponent
     with HasGameReference<SynGame> {
   final GameEvent event;
   final Function(int) onChoice;
-  
+
   // Child references for layout updates
   late final _EventCanvasBackground _background;
   late final _EventBorder _border;
   late final _EventHeader _header;
   late final _SlashAccent _accent;
-  
+
   // Content container - PositionComponent allows transform/scale
   final PositionComponent _contentRoot = PositionComponent();
-  
-  double _entranceTimer = 0;
+
 
   EventCardComponent({
     required this.event,
@@ -35,7 +34,7 @@ class EventCardComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    
+
     // Ensure we have a default size if initialized with zero
     if (size.isZero()) size = Vector2(600, 800);
 
@@ -50,7 +49,7 @@ class EventCardComponent extends PositionComponent
       age: event.age,
       parentSize: size,
     );
-    
+
     addAll([_background, _border, _accent, _contentRoot, _header]);
 
     // 2. Build Dynamic Content (Text, Buttons)
@@ -63,28 +62,28 @@ class EventCardComponent extends PositionComponent
   @override
   void onGameResize(Vector2 newSize) {
     super.onGameResize(newSize);
-    // If we haven't loaded yet, don't try to resize children
     if (!isLoaded) return;
 
     _background.resize(newSize);
     _border.resize(newSize);
     _accent.resize(newSize);
     _header.resize(newSize);
-    
-    _rebuildContent(); 
+
+    _rebuildContent();
   }
 
   void _rebuildContent() {
     _contentRoot.removeAll(_contentRoot.children);
 
     // Layout constants
-    const double horizontalPadding = 36.0;
-    const double spacingAfterHeader = 24.0;
-    
-    // Header overlaps top, so start content lower
-    double layoutY = 90.0 + spacingAfterHeader; 
+    const double horizontalPadding = 42.0; 
+    const double spacingAfterHeader = 32.0; 
+    const double buttonHeight = 64.0;
+    const double buttonGap = 16.0;
 
-    // Ensure we have a valid width before layout
+    // Header overlaps top, so start content lower
+    double layoutY = 90.0 + spacingAfterHeader;
+
     if (size.x <= horizontalPadding * 2) return;
 
     final contentWidth = size.x - horizontalPadding * 2;
@@ -95,7 +94,7 @@ class EventCardComponent extends PositionComponent
       width: contentWidth,
     )..position = Vector2(horizontalPadding, layoutY);
     _contentRoot.add(titleBanner);
-    layoutY += titleBanner.height + 12.0;
+    layoutY += titleBanner.height + 20.0;
 
     // 2. Tags (if any)
     if (event.tags.isNotEmpty) {
@@ -104,7 +103,7 @@ class EventCardComponent extends PositionComponent
         maxWidth: contentWidth,
       )..position = Vector2(horizontalPadding, layoutY);
       _contentRoot.add(tagsRow);
-      layoutY += tagsRow.computedHeight + 12.0;
+      layoutY += tagsRow.computedHeight + 20.0;
     }
 
     // 3. Description Text
@@ -113,8 +112,8 @@ class EventCardComponent extends PositionComponent
         text: event.description,
         style: SynTextStyles.body.copyWith(
           fontSize: 18,
-          height: 1.45,
-          color: SynColors.textPrimary.withValues(alpha: 0.9),
+          height: 1.6,
+          color: SynColors.textPrimary.withValues(alpha: 0.95),
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -123,14 +122,14 @@ class EventCardComponent extends PositionComponent
     final description = _TextPainterComponent(painter: descriptionPainter)
       ..position = Vector2(horizontalPadding, layoutY);
     _contentRoot.add(description);
-    layoutY += description.size.y + 14.0;
+    layoutY += description.size.y + 28.0;
 
     // 4. Divider
     final accentDivider = _AccentDivider(
       width: contentWidth * 0.7,
     )..position = Vector2(horizontalPadding, layoutY);
     _contentRoot.add(accentDivider);
-    layoutY += accentDivider.size.y + 26.0;
+    layoutY += accentDivider.size.y + 36.0;
 
     // 5. Impact Summary (if any)
     if (event.deltas.isNotEmpty) {
@@ -139,59 +138,113 @@ class EventCardComponent extends PositionComponent
         maxWidth: contentWidth,
       )..position = Vector2(horizontalPadding, layoutY);
       _contentRoot.add(impactRow);
-      layoutY += impactRow.size.y + 20.0;
+      layoutY += impactRow.size.y + 28.0;
     }
 
     // 6. Choices
     for (var i = 0; i < event.choices.length; i++) {
       final choice = event.choices[i];
+      final skewOffset = 8.0;
+
       final choiceButton = ChoiceButtonComponent(
         choice: choice,
         index: i,
         onPressed: () => onChoice(i),
-        position: Vector2(horizontalPadding, layoutY),
-        size: Vector2(contentWidth, 76),
+        position: Vector2(horizontalPadding + skewOffset, layoutY),
+        size: Vector2(contentWidth - skewOffset, buttonHeight),
       );
 
-      final buttonWrapper = _TappableButtonWrapper(
-        child: choiceButton,
-        staggerDelay: 0.25 + (i * 0.12),
-        onTap: () => choiceButton.simulateTap(),
+      // Initialize invisible
+      choiceButton.setOpacity(0);
+
+      // Entrance Animation: Use EffectController startDelay instead of TimerComponent
+      // This avoids the "onFinish undefined" error
+      choiceButton.add(
+        _CustomOpacityEffect(
+          target: choiceButton,
+          duration: 0.4,
+          startDelay: 0.1 + (0.1 * i), // Stagger here
+        ),
       );
-      _contentRoot.add(buttonWrapper);
-      layoutY += 76.0 + 12.0; 
+
+      choiceButton.add(
+        MoveEffect.by(
+          Vector2(0, -10),
+          EffectController(
+            duration: 0.4, 
+            curve: Curves.easeOut,
+            startDelay: 0.1 + (0.1 * i), // Sync stagger
+          ),
+        ),
+      );
+
+      // Start offset down for slide up effect
+      choiceButton.position.y += 10;
+
+      _contentRoot.add(choiceButton);
+      layoutY += buttonHeight + buttonGap;
     }
 
     // 7. Overflow Scaling
-    final maxH = size.y - 20;
+    final maxH = size.y - 40;
     if (layoutY > maxH && maxH > 0) {
-      final factor = (maxH / layoutY).clamp(0.7, 1.0);
+      final factor = (maxH / layoutY).clamp(0.6, 1.0);
       _contentRoot.scale = Vector2.all(factor);
+      _contentRoot.position.y = (size.y - (layoutY * factor)) / 2 + 20;
     } else {
       _contentRoot.scale = Vector2.all(1.0);
+      _contentRoot.position.y = 0;
     }
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-    _entranceTimer += dt;
+  }
+}
+
+// Custom Effect to bridge Flame's timing with our custom setOpacity
+class _CustomOpacityEffect extends Component {
+  final ChoiceButtonComponent target;
+  final double duration;
+  final double startDelay;
+  double _timer = 0;
+
+  _CustomOpacityEffect({
+    required this.target,
+    required this.duration,
+    this.startDelay = 0,
+  });
+
+  @override
+  void update(double dt) {
+    _timer += dt;
+    if (_timer < startDelay) return;
+
+    final progress = ((_timer - startDelay) / duration).clamp(0.0, 1.0);
+    target.setOpacity(progress);
+    
+    if (progress >= 1.0) removeFromParent();
   }
 }
 
 // ---------------------------------------------------------------------------
 // SUB-COMPONENTS
 // ---------------------------------------------------------------------------
+// (Keep the _EventCanvasBackground, _EventBorder, _SlashAccent, _EventHeader, 
+// _EventTitleBanner, _AccentDivider, _TextPainterComponent, _EventTagChipRow, 
+// _ImpactSummaryRow, _SlashTransition classes as they were in the previous fixed version)
+// Be sure to remove _TappableButtonWrapper entirely.
 
 class _EventCanvasBackground extends PositionComponent {
   _EventCanvasBackground({required Vector2 parentSize}) {
     resize(parentSize);
   }
-  
+
   final Paint _fillPaint = Paint()
     ..color = const Color(0xFF000000).withValues(alpha: 0.75)
     ..style = PaintingStyle.fill;
-    
+
   final Paint _gradPaint = Paint();
   final Path _path = Path();
 
@@ -253,7 +306,7 @@ class _EventBorder extends PositionComponent {
       ..lineTo(0, size.y)
       ..close();
 
-    const innerOffset = 4.0; 
+    const innerOffset = 4.0;
     _innerPath.reset();
     _innerPath
       ..moveTo(angleOffset + innerOffset, innerOffset)
@@ -290,7 +343,7 @@ class _SlashAccent extends PositionComponent {
   void resize(Vector2 newSize) {
     size = newSize;
     const slashWidth = 80.0;
-    
+
     _slashPath.reset();
     _slashPath
       ..moveTo(size.x - slashWidth, -size.y * 0.1)
@@ -298,7 +351,7 @@ class _SlashAccent extends PositionComponent {
       ..lineTo(size.x - slashWidth + 8, size.y * 0.8)
       ..lineTo(size.x + slashWidth - 8, -size.y * 0.1)
       ..close();
-      
+
     const coreW = 40.0;
     _corePath.reset();
     _corePath
@@ -317,13 +370,17 @@ class _SlashAccent extends PositionComponent {
 }
 
 class _EventHeader extends PositionComponent {
-  _EventHeader({required this.lifeStage, required this.age, required Vector2 parentSize}) {
-    resize(parentSize);
+  _EventHeader({
+    required this.lifeStage,
+    required this.age,
+    required Vector2 parentSize,
+  }) {
+    _relayout(parentSize);
   }
 
   final String lifeStage;
   final int age;
-  
+
   final Paint _fillPaint = Paint();
   final Paint _strokePaint = Paint()
     ..style = PaintingStyle.stroke
@@ -331,18 +388,20 @@ class _EventHeader extends PositionComponent {
     ..color = const Color(0xFF00D9FF);
 
   final Path _bgPath = Path();
-  
-  // FIXED: Changed from `late final` to `late` (or nullable) 
-  // so they can be re-created in resize().
-  late TextPainter _stageLabel;
-  late TextPainter _lifeStageValue;
-  late TextPainter _ageLabel;
-  late TextPainter _ageValue;
+
+  TextPainter? _stageLabel;
+  TextPainter? _lifeStageValue;
+  TextPainter? _ageLabel;
+  TextPainter? _ageValue;
 
   void resize(Vector2 parentSize) {
+    _relayout(parentSize);
+  }
+
+  void _relayout(Vector2 parentSize) {
     final headerW = math.max(parentSize.x - 32.0, parentSize.x * 0.75);
     size = Vector2(headerW, 90);
-    
+
     position = Vector2((parentSize.x - headerW) / 2, -18.0);
 
     const stageTop = 10.0;
@@ -350,21 +409,20 @@ class _EventHeader extends PositionComponent {
     final stageWidth = math.min(size.x * 0.45, 240.0);
     const skew = 24.0;
 
-    _bgPath.reset();
     _bgPath
+      ..reset()
       ..moveTo(skew, stageTop)
       ..lineTo(stageWidth, stageTop)
       ..lineTo(stageWidth - skew, stageTop + stageHeight)
       ..lineTo(0, stageTop + stageHeight)
       ..close();
 
-    _fillPaint.shader = LinearGradient(
-      colors: const [Color(0xFF162037), Color(0xFF0D1426)],
+    _fillPaint.shader = const LinearGradient(
+      colors: [Color(0xFF162037), Color(0xFF0D1426)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     ).createShader(_bgPath.getBounds());
-    
-    // Re-layout text painters
+
     _stageLabel = TextPainter(
       text: const TextSpan(
         text: 'STAGE',
@@ -392,7 +450,7 @@ class _EventHeader extends PositionComponent {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    
+
     _ageLabel = TextPainter(
       text: const TextSpan(
         text: 'AGE',
@@ -424,42 +482,69 @@ class _EventHeader extends PositionComponent {
   void render(Canvas canvas) {
     canvas.drawPath(_bgPath, _fillPaint);
     canvas.drawPath(_bgPath, _strokePaint);
-    
-    _stageLabel.paint(canvas, const Offset(18, 16));
-    _lifeStageValue.paint(canvas, const Offset(18, 30));
+
+    _stageLabel?.paint(canvas, const Offset(18, 16));
+    _lifeStageValue?.paint(canvas, const Offset(18, 30));
 
     const hexRadius = 34.0;
     final hexCenter = Offset(size.x - 70, 40 + 4);
-    
+
     final hexPath = Path();
     for (var i = 0; i < 6; i++) {
       final angle = math.pi / 3 * i - math.pi / 2;
       final x = hexCenter.dx + hexRadius * math.cos(angle);
       final y = hexCenter.dy + hexRadius * math.sin(angle);
-      if (i == 0) hexPath.moveTo(x, y); else hexPath.lineTo(x, y);
+      if (i == 0) {
+        hexPath.moveTo(x, y);
+      } else {
+        hexPath.lineTo(x, y);
+      }
     }
     hexPath.close();
 
-    canvas.drawPath(hexPath, Paint()..shader = LinearGradient(
-      colors: const [Color(0xFF00D9FF), Color(0xFF7B5CFF)],
-      begin: Alignment.topCenter, end: Alignment.bottomCenter,
-    ).createShader(hexPath.getBounds()));
-    
-    canvas.drawPath(hexPath, Paint()..style=PaintingStyle.stroke..color=Colors.white..strokeWidth=2);
+    canvas.drawPath(
+      hexPath,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [Color(0xFF00D9FF), Color(0xFF7B5CFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(hexPath.getBounds()),
+    );
 
-    _ageLabel.paint(canvas, Offset(hexCenter.dx - _ageLabel.width/2, hexCenter.dy - 22));
-    _ageValue.paint(canvas, Offset(hexCenter.dx - _ageValue.width/2, hexCenter.dy - 2));
+    canvas.drawPath(
+      hexPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..color = Colors.white
+        ..strokeWidth = 2,
+    );
+
+    if (_ageLabel != null) {
+      _ageLabel!.paint(
+          canvas,
+          Offset(hexCenter.dx - _ageLabel!.width / 2, hexCenter.dy - 22));
+    }
+    if (_ageValue != null) {
+      _ageValue!.paint(
+          canvas,
+          Offset(hexCenter.dx - _ageValue!.width / 2, hexCenter.dy - 2));
+    }
   }
 }
 
 class _EventTitleBanner extends PositionComponent {
-  _EventTitleBanner({required this.title, required this.width}) : super(size: Vector2(width, 82));
-  
+  _EventTitleBanner({required this.title, required this.width})
+      : super(size: Vector2(width, 82));
+
   final String title;
   final double width;
   final Path _path = Path();
   final Paint _fillPaint = Paint();
-  final Paint _borderPaint = Paint()..style=PaintingStyle.stroke..strokeWidth=3..color=Colors.white;
+  final Paint _borderPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 3
+    ..color = Colors.white;
   late final TextPainter _tp;
 
   @override
@@ -485,7 +570,7 @@ class _EventTitleBanner extends PositionComponent {
       text: TextSpan(
         text: title.toUpperCase(),
         style: SynTextStyles.h1Event.copyWith(fontSize: 30, shadows: [
-           const Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 0)
+          const Shadow(color: Colors.black, offset: Offset(2, 2), blurRadius: 0)
         ]),
       ),
       maxLines: 2,
@@ -515,9 +600,12 @@ class _AccentDivider extends PositionComponent {
       ..lineTo(size.x * 0.3, size.y)
       ..close();
 
-    canvas.drawPath(path, Paint()..shader = const LinearGradient(
-      colors: [Color(0xFF00D9FF), Color(0xFF7B5CFF)],
-    ).createShader(size.toRect()));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Color(0xFF00D9FF), Color(0xFF7B5CFF)],
+          ).createShader(size.toRect()));
   }
 }
 
@@ -529,70 +617,12 @@ class _TextPainterComponent extends PositionComponent {
   void render(Canvas canvas) => painter.paint(canvas, Offset.zero);
 }
 
-class _TappableButtonWrapper extends PositionComponent
-    with HasGameReference<SynGame>, TapCallbacks {
-  final ChoiceButtonComponent child;
-  final double staggerDelay;
-  final VoidCallback onTap;
-  double elapsedTime = 0;
-  double fadeOpacity = 0;
-
-  _TappableButtonWrapper({
-    required this.child,
-    required this.staggerDelay,
-    required this.onTap,
-  }) : super(size: child.size, position: child.position);
-
-  @override
-  Future<void> onLoad() async {
-    add(child);
-    child.scale = Vector2.all(0.8); // Start small
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    elapsedTime += dt;
-
-    if (elapsedTime > staggerDelay) {
-      final t = ((elapsedTime - staggerDelay) / 0.2).clamp(0.0, 1.0);
-      fadeOpacity = t;
-      child.scale.setValues(0.8 + (0.2 * t), 0.8 + (0.2 * t));
-    }
-    _updateHoverState();
-  }
-
-  @override
-  void render(Canvas canvas) {
-    if (fadeOpacity < 1.0) {
-      canvas.saveLayer(
-        size.toRect(), 
-        Paint()..color = Colors.white.withValues(alpha: fadeOpacity)
-      );
-      super.render(canvas);
-      canvas.restore();
-    } else {
-      super.render(canvas);
-    }
-  }
-
-  void _updateHoverState() {
-    final pointer = game.mousePosition;
-    if (pointer != null) {
-       child.setHovered(containsLocalPoint(absoluteToLocal(pointer)));
-    }
-  }
-  
-  @override
-  void onTapUp(TapUpEvent event) => onTap();
-}
-
 class _EventTagChipRow extends PositionComponent {
   _EventTagChipRow({required this.tags, required this.maxWidth});
   final List<String> tags;
   final double maxWidth;
-  
-  double get computedHeight => 30.0; 
+
+  double get computedHeight => 30.0;
 }
 
 class _ImpactSummaryRow extends PositionComponent {
@@ -602,24 +632,27 @@ class _ImpactSummaryRow extends PositionComponent {
 }
 
 class _SlashTransition extends PositionComponent {
-  _SlashTransition({required Vector2 size, required this.duration}) : super(size: size);
+  _SlashTransition({required Vector2 size, required this.duration})
+      : super(size: size);
   final double duration;
   double _t = 0;
-  
+
   @override
   void update(double dt) {
     _t += dt;
     if (_t >= duration) removeFromParent();
   }
-  
+
   @override
   void render(Canvas canvas) {
     final p = _t / duration;
     final x = size.x * (1.0 - p);
     canvas.drawLine(
-      Offset(x, 0), 
-      Offset(x - 100, size.y), 
-      Paint()..color = const Color(0xFF00D9FF).withValues(alpha: 1.0 - p)..strokeWidth = 50
-    );
+        Offset(x, 0),
+        Offset(x - 100, size.y),
+        Paint()
+          ..color = const Color(0xFF00D9FF).withValues(alpha: 1.0 - p)
+          ..strokeWidth = 50);
   }
 }
+

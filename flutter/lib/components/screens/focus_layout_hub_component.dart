@@ -1,5 +1,6 @@
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
+import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/game_state.dart';
@@ -11,85 +12,93 @@ import '../ui/panels/stat_panel_component.dart';
 import '../ui/panels/top_bar_component.dart';
 import '../ui/system/background_layer_component.dart';
 
-enum HubState {
-  idle, // Standard gameplay: Event Card is hero
-  statFocus, // Stats expanded
-  socialFocus // Relationships expanded
-}
-
-class FocusLayoutHubComponent extends PositionComponent
-    with HasGameReference<SynGame> {
+/// Magnetic Dock System: Edge panels that expand on hover/click
+/// Event card dominates center, stats/relationships magnetically dock to edges
+class MagneticDockHubComponent extends PositionComponent
+    with HasGameReference<SynGame>, HoverCallbacks {
+  
   // -- Child Components --
   late final BackgroundLayerComponent _background;
   late final TopBarComponent _topBar;
-  late final StatPanelComponent _statPanel;
-  late final RelationshipPanelComponent _relationshipPanel;
+  late final MagneticDock _leftDock;   // Stats
+  late final MagneticDock _rightDock;  // Relationships
   late final QuickMenuBarComponent _quickMenu;
   late final EventCardComponent _eventCard;
 
-  // -- Layout State --
-  HubState _state = HubState.idle;
-
-  // Animation Config - "Snappy & Aggressive"
-  static const double _morphDuration = 0.45;
-  static const Curve _morphCurve = Curves.easeInOutQuart;
-
-  // Safe Zone for Focused Content (90% of screen center)
-  late Rect _focusRect;
+  // -- Layout Constants --
+  static const double _dockCollapsedWidth = 48.0;
+  static const double _dockExpandedWidth = 420.0;
+  static const double _dockAnimDuration = 0.35;
+  static const Curve _dockCurve = Curves.easeOutCubic;
+  
+  static const double _eventCardWidth = 650.0;
+  static const double _eventCardMinWidth = 500.0;
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     size = game.size.clone();
-    _updateFocusRect();
 
-    // 1. Initialize Children (Using your extracted classes)
+    // 1. Background
     _background = BackgroundLayerComponent()..priority = 0;
 
+    // 2. Top Bar
     _topBar = TopBarComponent(
       gameState: game.gameState,
-      onStats: () => _switchState(HubState.statFocus), // Hook up the button!
+      onStats: () => _leftDock.toggle(),
       onSettings: game.showSettings,
       onSave: game.showSaveLoad,
       onPause: game.togglePauseOverlay,
       onNotifications: () {},
     )..priority = 20;
 
-    // Note: Pass callbacks to handle "Back" actions from panels
-    _statPanel = StatPanelComponent(
-      gameState: game.gameState,
-      onClose: () => _switchState(HubState.idle),
+    // 3. Left Dock (Stats)
+    _leftDock = MagneticDock(
+      side: DockSide.left,
+      collapsedWidth: _dockCollapsedWidth,
+      expandedWidth: _dockExpandedWidth,
+      child: StatPanelComponent(
+        gameState: game.gameState,
+        onClose: () => _leftDock.collapse(),
+      ),
+      onExpansionChanged: (expanded) => _reLayoutEventCard(),
     )..priority = 15;
 
-    _relationshipPanel = RelationshipPanelComponent(
-      relationships: game.gameState.relationships,
-      onOpenNetwork: () => _switchState(HubState.socialFocus),
+    // 4. Right Dock (Relationships)
+    _rightDock = MagneticDock(
+      side: DockSide.right,
+      collapsedWidth: _dockCollapsedWidth,
+      expandedWidth: _dockExpandedWidth,
+      child: RelationshipPanelComponent(
+        relationships: game.gameState.relationships,
+        onOpenNetwork: () => _rightDock.toggle(),
+      ),
+      onExpansionChanged: (expanded) => _reLayoutEventCard(),
     )..priority = 15;
 
+    // 5. Event Card (center stage, dynamically sized)
+    _eventCard = EventCardComponent(
+      event: game.gameState.currentEvent ?? _placeholderEvent(),
+      onChoice: (i) => {},
+    )..priority = 10;
+
+    // 6. Quick Menu (bottom center)
     _quickMenu = QuickMenuBarComponent(
       onMemory: game.showMemoryJournal,
       onMap: game.showWorldMap,
       onPossessions: game.showPossessions,
     )..priority = 15;
-    _quickMenu.size = Vector2(size.x * 0.68, 80);
-
-    _eventCard = EventCardComponent(
-      event: game.gameState.currentEvent ??
-          _placeholderEvent(), // Placeholder until backend hook-up
-      onChoice: (i) => {}, // TODO: wire choice handling when backend is ready
-    )..priority = 10;
 
     addAll([
       _background,
       _topBar,
-      _statPanel,
-      _relationshipPanel,
+      _leftDock,
+      _rightDock,
+      _eventCard,
       _quickMenu,
-      _eventCard
     ]);
 
-    // 2. Initial Layout (Instant)
-    _applyLayoutState(_state, animated: false);
+    _applyLayout(animated: false);
   }
 
   @override
@@ -97,145 +106,210 @@ class FocusLayoutHubComponent extends PositionComponent
     super.onGameResize(newSize);
     size = newSize;
     _background.size = newSize;
-    _topBar.size = Vector2(newSize.x, 92.0); // Use SynTopBar.height
-    _updateFocusRect();
-    // Re-apply current state without animation on resize to keep positions correct
-    _applyLayoutState(_state, animated: false);
+    _topBar.size = Vector2(newSize.x, 92.0);
+    _applyLayout(animated: false);
   }
 
-  void _updateFocusRect() {
-    // The "Stage" where focused panels go
-    _focusRect = Rect.fromCenter(
-      center:
-          size.toOffset() / 2 + const Offset(0, 40), // Slight offset for TopBar
-      width: size.x * 0.85,
-      height: size.y * 0.75,
-    );
-  }
-
-  void _switchState(HubState newState) {
-    if (_state == newState) return;
-    _state = newState;
-    _applyLayoutState(newState, animated: true);
-  }
-
-  void _applyLayoutState(HubState state, {required bool animated}) {
-    // Define specific layouts for each state
-    switch (state) {
-      case HubState.idle:
-        _layoutIdle(animated);
-        break;
-      case HubState.statFocus:
-        _layoutStatFocus(animated);
-        break;
-      case HubState.socialFocus:
-        _layoutSocialFocus(animated);
-        break;
-    }
-  }
-
-  // --- LAYOUT DEFINITIONS ---
-
-  void _layoutIdle(bool animated) {
+  void _applyLayout({required bool animated}) {
     final w = size.x;
     final h = size.y;
+    final topBarHeight = 92.0;
 
-    // 1. Event Card: Center Stage
-    _morph(_eventCard,
-        pos: Vector2((w - 600) / 2, h * 0.25),
-        scale: 1.0,
-        opacity: 1.0,
-        animated: animated);
+    // 1. Position docks at edges
+    final leftDockX = 0.0;
+    final rightDockX = w - _rightDock.currentWidth;
+    
+    _morphPosition(_leftDock, 
+      Vector2(leftDockX, topBarHeight), 
+      animated: animated);
+    _morphPosition(_rightDock, 
+      Vector2(rightDockX, topBarHeight), 
+      animated: animated);
+    
+    _leftDock.size = Vector2(_leftDock.currentWidth, h - topBarHeight);
+    _rightDock.size = Vector2(_rightDock.currentWidth, h - topBarHeight);
 
-    // 2. Stat Panel: Compact, Left Edge (Peeking in)
-    _morph(_statPanel,
-        pos: Vector2(w * 0.05, h * 0.25),
-        scale: 0.85,
-        opacity: 1.0,
-        animated: animated);
+    // 2. Event card in remaining center space
+    _reLayoutEventCard(animated: animated);
 
-    // 3. Relationship Panel: Compact, Right Edge
-    _morph(_relationshipPanel,
-        pos: Vector2(w - (w * 0.25) - (w * 0.05), h * 0.25),
-        scale: 0.85,
-        opacity: 1.0,
-        animated: animated);
-
-    // 4. Quick Menu: Bottom Center
-    _morph(_quickMenu,
-        pos: Vector2((w - _quickMenu.width) / 2, h - 100),
-        scale: 1.0,
-        opacity: 1.0,
-        animated: animated);
+    // 3. Quick menu at bottom center
+    final availableWidth = w - _leftDock.currentWidth - _rightDock.currentWidth;
+    _quickMenu.size = Vector2(availableWidth.clamp(400, 800).toDouble(), 80);
+    _morphPosition(_quickMenu,
+      Vector2(
+        _leftDock.currentWidth + (availableWidth - _quickMenu.width) / 2,
+        h - 100,
+      ),
+      animated: animated);
   }
 
-  void _layoutStatFocus(bool animated) {
-    // 1. Event Card: Slashes off-screen to the bottom-right
-    _morph(_eventCard,
-        pos: Vector2(size.x + 100, size.y),
-        scale: 1.2,
-        opacity: 0.0,
-        animated: animated);
+  void _reLayoutEventCard({bool animated = true}) {
+    final w = size.x;
+    final h = size.y;
+    final topBarHeight = 92.0;
 
-    // 2. Stat Panel: Takes Center Stage
-    _morph(_statPanel,
-        pos: Vector2(_focusRect.left, _focusRect.top),
-        scale: 1.0,
-        opacity: 1.0,
-        animated: animated);
+    final availableWidth = w - _leftDock.currentWidth - _rightDock.currentWidth;
+    final cardWidth = availableWidth.clamp(_eventCardMinWidth, _eventCardWidth).toDouble();
+    final cardX = _leftDock.currentWidth + (availableWidth - cardWidth) / 2;
 
-    // 3. Others: Fade out / retreat
-    _morph(_relationshipPanel,
-        pos: Vector2(size.x + 200, size.y * 0.25),
-        scale: 0.8,
-        opacity: 0.0,
-        animated: animated);
-    _morph(_quickMenu,
-        pos: Vector2(size.x / 2, size.y + 200),
-        scale: 1.0,
-        opacity: 0.0,
-        animated: animated);
+    _eventCard.size = Vector2(cardWidth, h * 0.55);
+    _morphPosition(_eventCard,
+      Vector2(cardX, topBarHeight + (h - topBarHeight) * 0.15),
+      animated: animated);
   }
 
-  void _layoutSocialFocus(bool animated) {
-    // Similar logic for Social Focus...
-    // Stat panel moves left/fades, Relationship panel moves to center
-  }
-
-  // --- THE TWEEN ENGINE ---
-
-  void _morph(PositionComponent c,
-      {required Vector2 pos,
-      double scale = 1.0,
-      double opacity = 1.0,
-      required bool animated}) {
-    c.removeWhere((component) => component is Effect); // Clear old animations
-
+  void _morphPosition(PositionComponent c, Vector2 pos, {required bool animated}) {
+    c.removeWhere((component) => component is MoveEffect);
+    
     if (!animated) {
       c.position = pos;
-      c.scale = Vector2.all(scale);
-      if (c is OpacityProvider) {
-        (c as OpacityProvider).opacity = opacity;
-      }
       return;
     }
 
     c.add(MoveEffect.to(
-        pos, EffectController(duration: _morphDuration, curve: _morphCurve)));
-    c.add(ScaleEffect.to(Vector2.all(scale),
-        EffectController(duration: _morphDuration, curve: _morphCurve)));
-    if (c is OpacityProvider) {
-      c.add(OpacityEffect.to(opacity,
-          EffectController(duration: _morphDuration, curve: _morphCurve)));
+      pos,
+      EffectController(duration: _dockAnimDuration, curve: _dockCurve),
+    ));
+  }
+
+  GameEvent _placeholderEvent() => GameEvent(
+    id: 'xx',
+    title: 'LOADING',
+    description: '...',
+    choices: [],
+    lifeStage: 'Child',
+    age: 6,
+  );
+}
+
+// ============================================================================
+// MAGNETIC DOCK - Self-contained collapsible panel
+// ============================================================================
+
+enum DockSide { left, right }
+
+class MagneticDock extends PositionComponent with HoverCallbacks {
+  final DockSide side;
+  final double collapsedWidth;
+  final double expandedWidth;
+  final PositionComponent child;
+  final void Function(bool expanded)? onExpansionChanged;
+
+  bool _isExpanded = false;
+  double _currentWidth;
+  bool _isHovering = false;
+
+  MagneticDock({
+    required this.side,
+    required this.collapsedWidth,
+    required this.expandedWidth,
+    required this.child,
+    this.onExpansionChanged,
+  }) : _currentWidth = collapsedWidth;
+
+  double get currentWidth => _currentWidth;
+  bool get isExpanded => _isExpanded;
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    add(child);
+    child.size = Vector2(collapsedWidth, size.y);
+  }
+
+  @override
+  void onHoverEnter() {
+    _isHovering = true;
+    if (!_isExpanded) {
+      _showPreview();
     }
   }
 
-  // Placeholder helper
-  GameEvent _placeholderEvent() => GameEvent(
-      id: 'xx',
-      title: 'LOADING',
-      description: '...',
-      choices: [],
-      lifeStage: 'Child',
-      age: 6);
+  @override
+  void onHoverExit() {
+    _isHovering = false;
+    if (!_isExpanded) {
+      _hidePreview();
+    }
+  }
+
+  void toggle() {
+    if (_isExpanded) {
+      collapse();
+    } else {
+      expand();
+    }
+  }
+
+  void expand() {
+    if (_isExpanded) return;
+    _isExpanded = true;
+    _animateWidth(expandedWidth);
+    onExpansionChanged?.call(true);
+  }
+
+  void collapse() {
+    if (!_isExpanded) return;
+    _isExpanded = false;
+    _animateWidth(collapsedWidth);
+    onExpansionChanged?.call(false);
+  }
+
+  void _showPreview() {
+    // Subtle peek on hover (20% expansion)
+    _animateWidth(collapsedWidth + (expandedWidth - collapsedWidth) * 0.2, 
+      duration: 0.2);
+  }
+
+  void _hidePreview() {
+    if (!_isExpanded) {
+      _animateWidth(collapsedWidth, duration: 0.2);
+    }
+  }
+
+  void _animateWidth(double targetWidth, {double duration = 0.35}) {
+    final startWidth = _currentWidth;
+    final delta = targetWidth - startWidth;
+
+    removeWhere((component) => component is _WidthTween);
+    
+    add(_WidthTween(
+      duration: duration,
+      onUpdate: (progress) {
+        _currentWidth = startWidth + (delta * progress);
+        child.size = Vector2(_currentWidth, size.y);
+      },
+    ));
+  }
+}
+
+// Simple tween helper for width animation
+class _WidthTween extends Component {
+  final double duration;
+  final void Function(double progress) onUpdate;
+  double _elapsed = 0;
+
+  _WidthTween({required this.duration, required this.onUpdate});
+
+  @override
+  void update(double dt) {
+    _elapsed += dt;
+    final progress = (_elapsed / duration).clamp(0.0, 1.0);
+    
+    // Ease out cubic
+    final eased = 1 - pow(1 - progress, 3);
+    onUpdate(eased);
+
+    if (progress >= 1.0) {
+      removeFromParent();
+    }
+  }
+}
+
+double pow(double x, int exp) {
+  double result = 1;
+  for (int i = 0; i < exp; i++) {
+    result *= x;
+  }
+  return result;
 }
