@@ -20,7 +20,7 @@ class EventCardComponent extends PositionComponent
   late final _EventHeader _header;
   late final _SlashAccent _accent;
   
-  // Content container - CHANGED to PositionComponent to allow transform/scale
+  // Content container - PositionComponent allows transform/scale
   final PositionComponent _contentRoot = PositionComponent();
   
   double _entranceTimer = 0;
@@ -35,7 +35,8 @@ class EventCardComponent extends PositionComponent
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    // Ensure we have a default size if none provided
+    
+    // Ensure we have a default size if initialized with zero
     if (size.isZero()) size = Vector2(600, 800);
 
     // 1. Initialize Static Layers (Bottom to Top)
@@ -62,13 +63,14 @@ class EventCardComponent extends PositionComponent
   @override
   void onGameResize(Vector2 newSize) {
     super.onGameResize(newSize);
-    // Update decorative layers
+    // If we haven't loaded yet, don't try to resize children
+    if (!isLoaded) return;
+
     _background.resize(newSize);
     _border.resize(newSize);
     _accent.resize(newSize);
     _header.resize(newSize);
     
-    // Re-flow content if width changed significantly
     _rebuildContent(); 
   }
 
@@ -81,6 +83,9 @@ class EventCardComponent extends PositionComponent
     
     // Header overlaps top, so start content lower
     double layoutY = 90.0 + spacingAfterHeader; 
+
+    // Ensure we have a valid width before layout
+    if (size.x <= horizontalPadding * 2) return;
 
     final contentWidth = size.x - horizontalPadding * 2;
 
@@ -148,24 +153,22 @@ class EventCardComponent extends PositionComponent
         size: Vector2(contentWidth, 76),
       );
 
-      // Staggered entrance wrapper
       final buttonWrapper = _TappableButtonWrapper(
         child: choiceButton,
         staggerDelay: 0.25 + (i * 0.12),
         onTap: () => choiceButton.simulateTap(),
       );
       _contentRoot.add(buttonWrapper);
-      layoutY += 76.0 + 12.0; // Button Height + Gap
+      layoutY += 76.0 + 12.0; 
     }
 
     // 7. Overflow Scaling
-    // If content is too tall, scale the container down to fit
     final maxH = size.y - 20;
     if (layoutY > maxH && maxH > 0) {
       final factor = (maxH / layoutY).clamp(0.7, 1.0);
-      _contentRoot.scale = Vector2.all(factor); // FIXED: now works on PositionComponent
+      _contentRoot.scale = Vector2.all(factor);
     } else {
-      _contentRoot.scale = Vector2.all(1.0); // FIXED: now works on PositionComponent
+      _contentRoot.scale = Vector2.all(1.0);
     }
   }
 
@@ -173,14 +176,11 @@ class EventCardComponent extends PositionComponent
   void update(double dt) {
     super.update(dt);
     _entranceTimer += dt;
-
-    // FIXED: Removed unused variable calculation
-    // Logic reserved for future entrance effects handled by FocusLayoutHub
   }
 }
 
 // ---------------------------------------------------------------------------
-// SUB-COMPONENTS (Optimized)
+// SUB-COMPONENTS
 // ---------------------------------------------------------------------------
 
 class _EventCanvasBackground extends PositionComponent {
@@ -192,7 +192,7 @@ class _EventCanvasBackground extends PositionComponent {
     ..color = const Color(0xFF000000).withValues(alpha: 0.75)
     ..style = PaintingStyle.fill;
     
-  final Paint _gradPaint = Paint(); // Shader set in resize
+  final Paint _gradPaint = Paint();
   final Path _path = Path();
 
   void resize(Vector2 newSize) {
@@ -332,10 +332,12 @@ class _EventHeader extends PositionComponent {
 
   final Path _bgPath = Path();
   
-  late final TextPainter _stageLabel;
-  late final TextPainter _lifeStageValue;
-  late final TextPainter _ageLabel;
-  late final TextPainter _ageValue;
+  // FIXED: Changed from `late final` to `late` (or nullable) 
+  // so they can be re-created in resize().
+  late TextPainter _stageLabel;
+  late TextPainter _lifeStageValue;
+  late TextPainter _ageLabel;
+  late TextPainter _ageValue;
 
   void resize(Vector2 parentSize) {
     final headerW = math.max(parentSize.x - 32.0, parentSize.x * 0.75);
@@ -362,6 +364,7 @@ class _EventHeader extends PositionComponent {
       end: Alignment.bottomRight,
     ).createShader(_bgPath.getBounds());
     
+    // Re-layout text painters
     _stageLabel = TextPainter(
       text: const TextSpan(
         text: 'STAGE',
@@ -616,7 +619,7 @@ class _SlashTransition extends PositionComponent {
     canvas.drawLine(
       Offset(x, 0), 
       Offset(x - 100, size.y), 
-      Paint()..color = const Color(0xFF00D9FF).withValues(alpha: 1.0 - p)..strokeWidth = 50 // FIXED: using withValues
+      Paint()..color = const Color(0xFF00D9FF).withValues(alpha: 1.0 - p)..strokeWidth = 50
     );
   }
 }
