@@ -7,6 +7,8 @@ use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
 use crate::relationship_milestones::RelationshipMilestoneState;
 use crate::relationship_pressure::RelationshipPressureState;
 use crate::digital_legacy::DigitalLegacyState;
+use crate::npc::{NpcPrototype};
+use crate::time::GameTime;
 
 /// Unique identifier for a world seed (ensures determinism).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -729,6 +731,16 @@ pub struct WorldState {
     /// Digital legacy / imprint data for PostLife simulation.
     #[serde(default)]
     pub digital_legacy: DigitalLegacyState,
+    /// All NPC prototypes known in this world (immutable definition data).
+    #[serde(default)]
+    pub npc_prototypes: HashMap<NpcId, NpcPrototype>,
+    /// IDs of NPCs the player has “encountered” or is aware of.
+    #[serde(default)]
+    pub known_npcs: Vec<NpcId>,
+
+    /// Current in-world time (ticks/day/phase).
+    #[serde(default)]
+    pub game_time: GameTime,
 }
 
 impl WorldState {
@@ -749,6 +761,9 @@ impl WorldState {
             relationship_pressure: RelationshipPressureState::default(),
             relationship_milestones: RelationshipMilestoneState::default(),
             digital_legacy: DigitalLegacyState::default(),
+            npc_prototypes: HashMap::new(),
+            known_npcs: Vec::new(),
+            game_time: GameTime::default(),
         }
     }
 
@@ -774,9 +789,23 @@ impl WorldState {
         }
     }
 
+    /// Lookup NPC prototype by id.
+    pub fn npc_prototype(&self, id: NpcId) -> Option<&NpcPrototype> {
+        self.npc_prototypes.get(&id)
+    }
+
+    /// Ensure NPC id is marked as known to the player.
+    pub fn ensure_npc_known(&mut self, id: NpcId) {
+        if !self.known_npcs.contains(&id) {
+            self.known_npcs.push(id);
+        }
+    }
+
     /// Advance world by one tick.
     pub fn tick(&mut self) {
         self.current_tick.0 += 1;
+        // Advance coarse-grained game time with 24 ticks per day (4 phases x 6 ticks each)
+        self.game_time.advance_ticks(1, 24);
         // Age player every 24 ticks (1 simulated day)
         if self.current_tick.0 % 24 == 0 {
             self.player_age += 1;

@@ -7,5 +7,6 @@ edition = "2021"
 syn_core = { path = "../syn_core" }
 syn_query = { path = "../syn_query" }
 syn_memory = { path = "../syn_memory" }
+syn_sim = { path = "../syn_sim" }
 serde = { version = "1.0", features = ["derive"] }
 

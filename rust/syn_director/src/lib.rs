@@ -16,8 +16,14 @@ use syn_core::{
     relationship_milestones::RelationshipMilestoneEvent,
     LifeStage, NpcId, RelationshipState, SimTick, StatDelta, WorldState,
 };
+use syn_core::npc::{NpcRoleTag};
+use crate as syn_director; // ensure path for re-exports
 use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;
+use syn_core::npc_behavior::{BehaviorKind, BehaviorSnapshot};
+use syn_sim::npc_registry::NpcRegistry;
+use syn_core::npc::NpcActivityKind;
+use syn_core::time::DayPhase;
 
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +39,12 @@ pub struct Storylet {
     /// Optional heat category for pacing alignment.
     #[serde(default)]
     pub heat_category: Option<StoryletHeatCategory>,
+    /// Optional actor hints for focusing NPCs.
+    #[serde(default)]
+    pub actors: Option<StoryletActors>,
+    /// Optional interaction tone hint used for NPC intent biasing.
+    #[serde(default)]
+    pub interaction_tone: Option<InteractionTone>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -41,6 +53,16 @@ pub enum StoryletHeatCategory {
     RisingTension,
     HighDrama,
     CriticalArc,
+}
+
+/// High-level tone hint for storylet interactions.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum InteractionTone {
+    Support,
+    Conflict,
+    Attention,
+    Withdrawal,
+    Stability,
 }
 
 /// Relationship-based prerequisite (additive, non-breaking).
@@ -121,6 +143,21 @@ pub struct StoryletPrerequisites {
     /// Optional digital legacy prerequisite for PostLife storylets.
     #[serde(default)]
     pub digital_legacy_prereq: Option<DigitalLegacyPrereq>,
+
+    /// Optional time/location gating aligned with NPC schedule.
+    #[serde(default)]
+    pub time_and_location: Option<TimeAndLocationPrereqs>,
+}
+
+/// Optional time/location prerequisites for storylets.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TimeAndLocationPrereqs {
+    /// Allowed day phases for this storylet (if empty: any).
+    #[serde(default)]
+    pub allowed_phases: Vec<DayPhase>,
+    /// Required NPC activity kinds for primary actor (if any).
+    #[serde(default)]
+    pub allowed_npc_activities: Vec<NpcActivityKind>,
 }
 
 /// A role in a storylet (e.g., "target", "rival", "manager").
@@ -128,6 +165,174 @@ pub struct StoryletPrerequisites {
 pub struct StoryletRole {
     pub name: String,
     pub npc_id: NpcId,
+}
+
+/// Storylet actor reference used by Director to locate/focus NPCs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StoryActorRef {
+    /// Direct NPC id; rarely used in content, more in system-authored events.
+    NpcId(u64),
+
+    /// By role tag (e.g. “closest Friend with this role”).
+    RoleTag(NpcRoleTag),
+
+    /// Player (for clarity).
+    Player,
+}
+
+/// Optional actors involved in this storylet.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryletActors {
+    #[serde(default)]
+    pub primary: Option<StoryActorRef>,
+
+    #[serde(default)]
+    pub secondary: Option<StoryActorRef>,
+}
+
+/// For now, keep this simple:
+/// - RoleTag => pick some NPC with that role tag known to the player.
+/// - NpcId(u64) => wrap into NpcId.
+pub fn resolve_actor_ref_to_npc(
+    world: &WorldState,
+    registry: &NpcRegistry,
+    actor_ref: &StoryActorRef,
+) -> Option<NpcId> {
+    match actor_ref {
+        StoryActorRef::Player => None,
+        StoryActorRef::NpcId(id) => {
+            let npc_id = NpcId(*id);
+            if npc_is_available_for_player(world, registry, npc_id) { Some(npc_id) } else { None }
+        }
+        StoryActorRef::RoleTag(tag) => {
+            for npc_id in &world.known_npcs {
+                if let Some(proto) = world.npc_prototype(*npc_id) {
+                    if proto.role_tags.contains(tag) {
+                        let id = *npc_id;
+                        if npc_is_available_for_player(world, registry, id) {
+                            return Some(id);
+                        }
+                    }
+                }
+            }
+            None
+        }
+    }
+}
+
+/// Is this NPC available to share a scene with the player right now?
+/// Simple rule: offscreen / online-only may only work for certain storylets.
+fn npc_is_available_for_player(
+    world: &WorldState,
+    registry: &NpcRegistry,
+    npc_id: NpcId,
+) -> bool {
+    if let Some(inst) = registry.get(npc_id) {
+        match inst.current_activity {
+            NpcActivityKind::Offscreen => false,
+            NpcActivityKind::Nightlife => {
+                matches!(world.game_time.phase, DayPhase::Evening | DayPhase::Night)
+            }
+            NpcActivityKind::OnlineOnly => true,
+            _ => true,
+        }
+    } else {
+        // If NPC not instantiated yet, allow Director to spawn them
+        true
+    }
+}
+
+/// Check time and NPC location/activity prerequisites against current world/registry state.
+fn check_time_and_location_prereqs(
+    world: &WorldState,
+    registry: &NpcRegistry,
+    storylet: &Storylet,
+) -> bool {
+    let Some(pr) = &storylet.prerequisites.time_and_location else { return true; };
+
+    // Phase gating
+    if !pr.allowed_phases.is_empty() && !pr.allowed_phases.contains(&world.game_time.phase) {
+        return false;
+    }
+
+    // NPC activity gating (if we have an NPC actor)
+    if pr.allowed_npc_activities.is_empty() { return true; }
+
+    let Some(actors) = &storylet.actors else { return true; };
+    if let Some(ref primary) = actors.primary {
+        if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary) {
+            if let Some(inst) = registry.get(npc_id) {
+                return pr.allowed_npc_activities.contains(&inst.current_activity);
+            }
+        }
+    }
+    true
+}
+
+/// Internal: access an NPC's current behavior snapshot from the registry.
+fn get_npc_behavior<'a>(
+    registry: &'a NpcRegistry,
+    npc_id: NpcId,
+)
+-> Option<&'a BehaviorSnapshot> {
+    registry.get(npc_id)?.behavior.as_ref()
+}
+
+fn tone_matches_behavior(tone: &InteractionTone, beh: &BehaviorKind) -> bool {
+    match (tone, beh) {
+        (InteractionTone::Support, BehaviorKind::SeekSocial) => true,
+        (InteractionTone::Attention, BehaviorKind::SeekRecognition) => true,
+        (InteractionTone::Conflict, BehaviorKind::SeekAutonomy) => true,
+        (InteractionTone::Withdrawal, BehaviorKind::SeekComfort) => true,
+        (InteractionTone::Stability, BehaviorKind::SeekSecurity) => true,
+        _ => false,
+    }
+}
+
+/// Public helper: compute an intent-based score multiplier for a storylet.
+/// Additive and side-effect free.
+pub fn npc_intent_score_multiplier(
+    world: &WorldState,
+    registry: &NpcRegistry,
+    storylet: &Storylet,
+) -> f32 {
+    let tone = match &storylet.interaction_tone { Some(t) => t, None => return 1.0 };
+
+    let Some(actors) = &storylet.actors else { return 1.0 };
+
+    if let Some(primary_ref) = &actors.primary {
+        if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary_ref) {
+            if let Some(snapshot) = get_npc_behavior(registry, npc_id) {
+                if tone_matches_behavior(tone, &snapshot.chosen_intent.kind) { return 1.3; }
+                else { return 0.9; }
+            }
+        }
+    }
+
+    1.0
+}
+
+/// Prepare storylet execution by focusing relevant NPCs in the simulation registry.
+pub fn prepare_storylet_execution(
+    world: &mut WorldState,
+    registry: &mut syn_sim::npc_registry::NpcRegistry,
+    storylet: &Storylet,
+    tick: u64,
+) {
+    if let Some(actors) = &storylet.actors {
+        if let Some(ref primary) = actors.primary {
+            if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary) {
+                registry.focus_npc_for_scene(world, npc_id, tick);
+                world.ensure_npc_known(npc_id);
+            }
+        }
+        if let Some(ref secondary) = actors.secondary {
+            if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, secondary) {
+                registry.focus_npc_for_scene(world, npc_id, tick);
+                world.ensure_npc_known(npc_id);
+            }
+        }
+    }
 }
 
 /// Outcome of a storylet firing: stat changes, relationship shifts, memory entries.
@@ -551,6 +756,43 @@ fn score_storylet_full(
         score *= 0.5;
     }
     score
+}
+
+/// Variant scoring that considers NPC intent via the registry.
+pub fn score_storylet_full_with_registry(
+    director: &EventDirector,
+    world: &WorldState,
+    registry: &NpcRegistry,
+    storylet: &Storylet,
+    hot_event: Option<&RelationshipPressureEvent>,
+) -> f32 {
+    // If time/location prereqs fail, short-circuit to 0 score.
+    if !check_time_and_location_prereqs(world, registry, storylet) {
+        return 0.0;
+    }
+    let base = score_storylet_full(director, world, storylet, hot_event);
+    let intent_mult = npc_intent_score_multiplier(world, registry, storylet);
+    (base * intent_mult).clamp(0.0, 100.0)
+}
+
+/// Variant selection API that uses NPC intent when available.
+pub fn select_next_event_with_registry<'a>(
+    director: &'a EventDirector,
+    world: &WorldState,
+    registry: &NpcRegistry,
+    memory: &MemorySystem,
+    current_tick: SimTick,
+) -> Option<&'a Storylet> {
+    let eligible = director.find_eligible(world, memory, current_tick);
+    if eligible.is_empty() { return None; }
+    let hot_event_opt = world.relationship_pressure.peek_next_event();
+    let mut best_storylet: Option<&Storylet> = None;
+    let mut best_score = f32::MIN;
+    for storylet in eligible {
+        let score = score_storylet_full_with_registry(director, world, registry, storylet, hot_event_opt);
+        if score > best_score { best_score = score; best_storylet = Some(storylet); }
+    }
+    best_storylet
 }
 
 /// Cooldown tracker to prevent storylet repetition.

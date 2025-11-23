@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use syn_core::{NpcId, SimTick, StatDelta};
 pub use syn_core::relationships::RelationshipDelta;
+use syn_core::npc_behavior::BehaviorKind;
 
 /// A single memory entry recording an event and its impact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,6 +235,61 @@ pub fn tag_counts_for_actor(memories: &[MemoryEntry], actor_id: u64) -> HashMap<
     }
 
     counts
+}
+
+/// Helper: record a lightweight memory echo when an NPC exhibits a notable behavior toward the player.
+pub fn add_npc_behavior_memory(
+    memory: &mut MemorySystem,
+    npc_id: u64,
+    player_id: u64,
+    behavior_kind: &BehaviorKind,
+    tick: SimTick,
+) {
+    let mut tags = Vec::new();
+    tags.push("npc_behavior".to_string());
+
+    match behavior_kind {
+        BehaviorKind::SeekSocial => tags.push("support".to_string()),
+        BehaviorKind::SeekRecognition => tags.push("attention".to_string()),
+        BehaviorKind::SeekAutonomy => tags.push("conflict".to_string()),
+        BehaviorKind::SeekComfort => tags.push("withdrawal".to_string()),
+        BehaviorKind::SeekSecurity => tags.push("stability".to_string()),
+        BehaviorKind::Idle => {}
+    }
+
+    let id = format!("behav:{}:{}:{}", npc_id, player_id, tick.0);
+    let mut entry = MemoryEntry::new(
+        id,
+        "npc_behavior".to_string(),
+        NpcId(npc_id),
+        tick,
+        0.0,
+    );
+    entry.tags = tags;
+    entry.participants = vec![npc_id, player_id];
+    memory.record_memory(entry);
+}
+
+/// Expanded helper: record a behavior memory with explicit tags.
+/// Non-breaking additive API; useful for NPC action execution layer.
+pub fn add_npc_behavior_memory_with_tags(
+    memory: &mut MemorySystem,
+    npc_id: u64,
+    player_id: u64,
+    tags: Vec<String>,
+    tick: SimTick,
+){
+    let id = format!("behav_tags:{}:{}:{}", npc_id, player_id, tick.0);
+    let mut entry = MemoryEntry::new(
+        id,
+        "npc_behavior_action".to_string(),
+        NpcId(npc_id),
+        tick,
+        0.0,
+    );
+    entry.tags = tags;
+    entry.participants = vec![npc_id, player_id];
+    memory.record_memory(entry);
 }
 
 #[cfg(test)]

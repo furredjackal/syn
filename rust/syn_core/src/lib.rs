@@ -18,6 +18,10 @@ pub mod relationship_milestones;
 pub mod narrative_heat;
 pub mod life_stage;
 pub mod digital_legacy;
+pub mod npc;
+pub mod npc_behavior;
+pub mod npc_actions;
+pub mod time;
 
 pub use types::*;
 pub use rng::*;

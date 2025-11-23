@@ -1,125 +1,3 @@
-//! syn_sim: Simulation tick and world state advancement.
-//!
-//! Handles the core simulation loop, NPC updates, time progression, and LOD tier management.
-
-use syn_core::{
-    narrative_heat::{compute_heat_delta, NarrativeHeatConfig, NarrativeHeatInputs},
-    AbstractNpc, BehaviorAction, BehaviorNeed, DeterministicRng, NpcId, StatKind, Stats, WorldState,
-};
-use syn_core::life_stage::LifeStageConfig;
-use syn_core::LifeStage;
-use std::collections::HashMap;
-
-pub mod relationship_drift;
-pub mod post_life;
-use syn_core::relationship_model::RelationshipVector as CoreRelationshipVector;
-
-/// Level of Detail tier for NPC simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LodTier {
-    /// Active NPCs: full utility scoring, complex mood updates, complete memory checks
-    High,
-    /// Background NPCs: simplified behavior, limited event evaluation
-    Medium,
-    /// Dormant NPCs: stat drift only, no minute-to-minute decisions
-    Low,
-}
-
-/// NPC state during simulation (instantiated in ECS-like system).
-#[derive(Debug, Clone)]
-pub struct SimulatedNpc {
-    pub id: NpcId,
-    pub abstract_npc: AbstractNpc,
-    pub stats: Stats,
-    pub lod_tier: LodTier,
-    pub needs: HashMap<String, f32>, // e.g., {"social": 0.7, "stimulation": 0.4}
-    pub behavioral_cooldowns: HashMap<String, u32>, // e.g., {"dialogue": 5 ticks}
-}
-
-impl SimulatedNpc {
-    pub fn new(abstract_npc: AbstractNpc) -> Self {
-        SimulatedNpc {
-            id: abstract_npc.id,
-            abstract_npc,
-            stats: Stats::default(),
-            lod_tier: LodTier::Low,
-            needs: HashMap::new(),
-            behavioral_cooldowns: HashMap::new(),
-        }
-    }
-
-    /// Advance NPC cooldowns by one tick.
-    pub fn tick_cooldowns(&mut self) {
-        self.behavioral_cooldowns.retain(|_, remaining| {
-            *remaining = remaining.saturating_sub(1);
-            *remaining > 0
-        });
-    }
-
-    /// Apply mood decay toward baseline (linear slow drift).
-    pub fn apply_mood_decay(&mut self) {
-        const MOOD_DECAY_RATE: f32 = 0.05;
-        let current = self.stats.get(StatKind::Mood);
-        let delta = -current * MOOD_DECAY_RATE;
-        self.stats.apply_delta(StatKind::Mood, delta);
-    }
-
-    /// Recalculate needs based on stats, mood, and personality.
-    pub fn update_needs(&mut self) {
-        let mut needs = HashMap::new();
-        let mood = self.stats.get(StatKind::Mood);
-
-        // Social need: influenced by mood and sociability
-        let social_base = (self.abstract_npc.traits.sociability - 50.0) / 100.0;
-        let social_mood = if mood < -5.0 { 1.0 } else if mood > 5.0 { -0.5 } else { 0.0 };
-        needs.insert("social".to_string(), (social_base + social_mood).clamp(0.0, 1.0));
-
-        // Stimulation need: curiosity, impulsivity, boredom
-        let stim_base = (self.abstract_npc.traits.impulsivity - 50.0) / 100.0;
-        needs.insert("stimulation".to_string(), stim_base.clamp(0.0, 1.0));
-
-        // Security need: affected by stability and health
-        let security_stability = (100.0 - self.abstract_npc.traits.stability) / 100.0;
-        let security_health = if self.stats.get(StatKind::Health) < 30.0 { 0.7 } else { 0.0 };
-        needs.insert("security".to_string(), (security_stability + security_health).clamp(0.0, 1.0));
-
-        // Recognition need: ambition + mood boost
-        let recognition_base = (self.abstract_npc.traits.ambition - 50.0) / 100.0;
-        let recognition_mood = mood.max(0.0) / 10.0;
-        needs.insert("recognition".to_string(), (recognition_base + recognition_mood).clamp(0.0, 1.0));
-
-        // Comfort need: mood dips + stability
-        let comfort_base = ((0.0 - mood).max(0.0) / 10.0) + ((100.0 - self.abstract_npc.traits.stability) / 200.0);
-        needs.insert("comfort".to_string(), comfort_base.clamp(0.0, 1.0));
-
-        self.needs = needs;
-    }
-
-    fn need_value(&self, need: BehaviorNeed) -> f32 {
-        let value = self
-            .needs
-            .get(need.as_key())
-            .copied()
-            .unwrap_or(0.5);
-        (0.8 + value).clamp(0.4, 1.8)
-    }
-
-    /// Score a behavior action using the full utility equation.
-    pub fn score_action(&self, action: BehaviorAction, world: &WorldState) -> f32 {
-        let base = action.base_weight();
-        let trait_bias = action.trait_bias(&self.abstract_npc.traits);
-        let attachment_bias = action.attachment_bias(self.abstract_npc.attachment_style);
-        let primary = self.need_value(action.primary_need());
-        let need_component = if let Some(secondary) = action.secondary_need() {
-            (primary + self.need_value(secondary)) / 2.0
-        } else {
-            primary
-        };
-        let mood_mult = action.mood_multiplier(self.stats.get(StatKind::Mood));
-        let context = action.context_fit(world);
-        (base * trait_bias * attachment_bias * need_component * mood_mult * context).clamp(0.0, 100.0)
-    }
-}
 
 /// Simulation engine: advances world state by one tick.
 pub struct Simulator {
@@ -319,6 +197,254 @@ impl Simulator {
     }
 }
 
+/// Wrap SimulatedNpc with ID + LOD + last_tick for registry use.
+#[derive(Debug)]
+pub struct NpcInstance {
+    pub id: NpcId,
+    pub lod: NpcLod,
+    pub sim: SimulatedNpc,
+    /// Last sim tick index this NPC was updated (for LOD throttling).
+    pub last_tick: u64,
+    /// Current evaluated behavior snapshot (Tier1/Tier2 only).
+    pub behavior: Option<BehaviorSnapshot>,
+    /// If > current tick, NPC is considered busy and won't take new major actions.
+    pub busy_until_tick: u64,
+    /// Last executed action snapshot for debugging / UI.
+    pub last_action: Option<NpcActionInstance>,
+
+    /// Current coarse-grained location/activity derived from schedule + busy state.
+    pub current_activity: NpcActivityKind,
+}
+
+/// Create a SimulatedNpc from a prototype & world state deterministically.
+pub fn instantiate_simulated_npc_from_prototype(
+    proto: &NpcPrototype,
+    world: &WorldState,
+    _tick: u64,
+) -> SimulatedNpc {
+    // Deterministic construction of AbstractNpc from prototype.
+    let seed = world.seed.0 ^ proto.id.0 ^ 0x9E37_79B9_7F4A_7C15u64;
+
+    // Map minimal fields; keep defaults for others.
+    let abstract_npc = AbstractNpc {
+        id: proto.id,
+        age: 18,
+        job: String::new(),
+        district: String::from(""),
+        household_id: 0,
+        traits: Default::default(),
+        seed,
+        attachment_style: Default::default(),
+    };
+
+    let mut sim = SimulatedNpc::new(abstract_npc);
+    // Initialize stats from prototype baseline deterministically.
+    sim.stats = proto.base_stats;
+    sim.stats.clamp();
+    sim
+}
+
+/// Evaluate current behavior for this NPC using prototype + stats + relationship to player.
+pub fn evaluate_npc_behavior(world: &WorldState, npc: &mut NpcInstance) {
+    // 1) Prototype & personality
+    let proto = match world.npc_prototype(npc.id) {
+        Some(p) => p,
+        None => {
+            npc.behavior = None;
+            return;
+        }
+    };
+
+    // 2) Stats snapshot
+    let stats = npc.sim.current_stats();
+
+    // 3) Relationship to player if exists (use relationship_model vectors if available elsewhere)
+    let rel_to_player = world
+        .relationships
+        .get(&(npc.id, world.player_id))
+        .or_else(|| world.relationships.get(&(world.player_id, npc.id)))
+        .map(|r| {
+            // Convert crate::types::Relationship to relationship_model::RelationshipVector for band methods
+            syn_core::relationship_model::RelationshipVector {
+                affection: r.affection,
+                trust: r.trust,
+                attraction: r.attraction,
+                familiarity: r.familiarity,
+                resentment: r.resentment,
+            }
+        });
+
+    // We need an Option<&RelationshipVector>, so create a temp and take ref
+    let rel_tmp;
+    let rel_ref_opt = if let Some(rv) = rel_to_player {
+        rel_tmp = rv;
+        Some(&rel_tmp)
+    } else {
+        None
+    };
+
+    let needs = compute_needs_from_state(stats, &proto.personality, rel_ref_opt);
+    let intents = compute_behavior_intents(&needs, &proto.personality);
+    let best = choose_best_intent(&intents);
+
+    // Target heuristics
+    let mut target_player = false;
+    let target_npc_id = None;
+
+    if matches!(
+        best.kind,
+        syn_core::npc_behavior::BehaviorKind::SeekSocial
+            | syn_core::npc_behavior::BehaviorKind::SeekRecognition
+            | syn_core::npc_behavior::BehaviorKind::SeekAutonomy
+    ) {
+        if let Some(rel_vec) = rel_ref_opt {
+            use syn_core::relationship_model::AffectionBand::*;
+            let aff = rel_vec.affection_band();
+            if matches!(aff, Friendly | Close | Devoted) {
+                target_player = true;
+            }
+        }
+    }
+
+    npc.behavior = Some(BehaviorSnapshot {
+        needs,
+        chosen_intent: best,
+        target_player,
+        target_npc_id,
+    });
+}
+
+/// Apply the concrete effects of an NPC action to world and memory.
+fn apply_npc_action_effect(
+    world: &mut WorldState,
+    npc: &mut NpcInstance,
+    action: &NpcActionInstance,
+    tick: u64,
+    memory_opt: Option<&mut MemorySystem>,
+) {
+    let eff = &action.effect;
+    // NPC stat deltas
+    {
+        let stats = npc.sim.stats_mut();
+        apply_stat_deltas(stats, &eff.npc_stat_deltas);
+    }
+
+    // Player stat deltas
+    {
+        let player_stats = &mut world.player_stats;
+        apply_stat_deltas(player_stats, &eff.player_stat_deltas);
+    }
+
+    // Relationship deltas: resolve target id
+    if !eff.relationship_deltas.is_empty() {
+        let mut resolved = Vec::with_capacity(eff.relationship_deltas.len());
+        let target_id = if action.targets_player {
+            world.player_id
+        } else if let Some(t) = action.target_npc_id { t } else { world.player_id };
+        for mut d in eff.relationship_deltas.clone() {
+            d.target_id = target_id;
+            resolved.push(d);
+        }
+        apply_rel_deltas(world, &resolved);
+    }
+
+    // Optional memory echo
+    if let Some(memory) = memory_opt {
+        if action.targets_player && !eff.memory_tags_for_player.is_empty() {
+            // Build a memory entry with tags and participants [npc, player]
+            syn_memory::add_npc_behavior_memory_with_tags(
+                memory,
+                npc.id.0,
+                world.player_id.0,
+                eff.memory_tags_for_player.clone(),
+                syn_core::SimTick::new(tick),
+            );
+        }
+    }
+}
+
+/// Decide and execute an action for a single NPC, if not busy.
+pub fn maybe_run_npc_action(
+    world: &mut WorldState,
+    npc: &mut NpcInstance,
+    tick: u64,
+) {
+    maybe_run_npc_action_with_memory(world, npc, tick, None);
+}
+
+/// Variant that can write memories if provided.
+pub fn maybe_run_npc_action_with_memory(
+    world: &mut WorldState,
+    npc: &mut NpcInstance,
+    tick: u64,
+    mut memory_opt: Option<&mut MemorySystem>,
+) {
+    if npc.busy_until_tick > tick { return; }
+    let behavior = match &npc.behavior { Some(b) => b, None => return };
+    // Schedule-aware selection
+    let activity = npc.current_activity;
+    let action = build_action_instance_from_behavior_and_schedule(npc.id, behavior, activity);
+    // Apply effects
+    apply_npc_action_effect(world, npc, &action, tick, memory_opt.as_deref_mut());
+    // Busy
+    if action.effect.busy_for_ticks > 0 { npc.busy_until_tick = tick + action.effect.busy_for_ticks; }
+    npc.last_action = Some(action);
+}
+
+/// High-fidelity tick for Tier2Active NPCs.
+pub fn tick_simulated_npc_full(npc: &mut SimulatedNpc, _world: &mut WorldState, _tick: u64) {
+    npc.apply_mood_decay();
+    npc.update_needs();
+    npc.tick_cooldowns();
+}
+
+/// Medium-fidelity tick for Tier1Neighborhood NPCs.
+pub fn tick_simulated_npc_medium(npc: &mut SimulatedNpc, _world: &mut WorldState, _tick: u64) {
+    let mood = npc.stats.get(StatKind::Mood) * 0.98;
+    npc.stats.set(StatKind::Mood, mood);
+    npc.tick_cooldowns();
+}
+
+/// Coarse tick for Tier0Dormant NPCs.
+pub fn tick_simulated_npc_coarse(npc: &mut SimulatedNpc, _world: &mut WorldState, _tick: u64) {
+    // Minimal or no-op; still tick cooldowns to avoid stalling.
+    npc.tick_cooldowns();
+}
+
+/// LOD-aware ticking over a registry of NPCs.
+pub fn tick_npcs_lod(world: &mut WorldState, registry: &mut crate::npc_registry::NpcRegistry, tick: u64) {
+    for (_id, npc) in registry.iter_mut() {
+        // Update scheduled/current activity first
+        update_npc_activity_state(world, npc, tick);
+        match npc.lod {
+            NpcLod::Tier2Active => {
+                tick_simulated_npc_full(&mut npc.sim, world, tick);
+                evaluate_npc_behavior(world, npc);
+                maybe_run_npc_action(world, npc, tick);
+                npc.last_tick = tick;
+            }
+            NpcLod::Tier1Neighborhood => {
+                let freq = 5u64;
+                if tick % freq == 0 {
+                    tick_simulated_npc_medium(&mut npc.sim, world, tick);
+                    evaluate_npc_behavior(world, npc);
+                    maybe_run_npc_action(world, npc, tick);
+                    npc.last_tick = tick;
+                }
+            }
+            NpcLod::Tier0Dormant => {
+                let freq = 50u64;
+                if tick % freq == 0 {
+                    tick_simulated_npc_coarse(&mut npc.sim, world, tick);
+                    // For Tier0, skip behavior evaluation, or do it rarely.
+                    npc.behavior = None;
+                    npc.last_tick = tick;
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,5 +634,84 @@ mod tests {
         let updated = simulator.get_active_npc(NpcId(2)).unwrap();
         assert!(updated.stats.get(StatKind::Mood) < 5.0);
         assert!(updated.stats.get(StatKind::Mood) <= 10.0);
+    }
+}
+
+/// Determine scheduled activity for NPC given world time.
+fn scheduled_activity_for_npc(world: &WorldState, npc_id: NpcId) -> NpcActivityKind {
+    let phase = world.game_time.phase;
+    if let Some(proto) = world.npc_prototype(npc_id) {
+        proto.schedule.activity_for_phase(phase)
+    } else {
+        NpcActivityKind::Home
+    }
+}
+
+/// Update NPC's current_activity each tick, considering busy state and last action.
+fn update_npc_activity_state(world: &WorldState, npc: &mut NpcInstance, tick: u64) {
+    let scheduled = scheduled_activity_for_npc(world, npc.id);
+    if npc.busy_until_tick > tick {
+        if let Some(last_action) = &npc.last_action {
+            use syn_core::npc_actions::NpcActionKind::*;
+            npc.current_activity = match last_action.kind {
+                WorkShift => NpcActivityKind::Work,
+                SocializeWithNpc => NpcActivityKind::Errands,
+                SocialVisitPlayer => NpcActivityKind::Home,
+                WithdrawAlone => NpcActivityKind::Home,
+                ProvokePlayer => NpcActivityKind::Home,
+                SelfImprovement => NpcActivityKind::Home,
+                Idle => scheduled,
+            };
+        } else {
+            npc.current_activity = scheduled;
+        }
+    } else {
+        npc.current_activity = scheduled;
+    }
+}
+
+/// Given a BehaviorKind's action candidates and current activity, filter deterministically.
+fn filter_actions_by_schedule(
+    candidates: &[NpcActionKind],
+    activity: NpcActivityKind,
+) -> Vec<NpcActionKind> {
+    use NpcActivityKind::*;
+    use NpcActionKind::*;
+
+    let mut filtered = Vec::new();
+    for &kind in candidates {
+        let allowed = match activity {
+            Work => matches!(kind, WorkShift | SelfImprovement | Idle),
+            School => matches!(kind, SelfImprovement | SocializeWithNpc | Idle),
+            Nightlife => matches!(kind, SocialVisitPlayer | SocializeWithNpc | WithdrawAlone | Idle),
+            Home => matches!(kind, SocialVisitPlayer | WithdrawAlone | SelfImprovement | Idle),
+            Errands => matches!(kind, SocializeWithNpc | WithdrawAlone | Idle),
+            OnlineOnly => matches!(kind, SocialVisitPlayer | WithdrawAlone | Idle),
+            Offscreen => matches!(kind, Idle),
+        };
+        if allowed { filtered.push(kind); }
+    }
+    if filtered.is_empty() {
+        filtered.push(NpcActionKind::Idle);
+    }
+    filtered
+}
+
+/// Build action instance considering schedule constraints.
+pub fn build_action_instance_from_behavior_and_schedule(
+    npc_id: NpcId,
+    behavior: &BehaviorSnapshot,
+    activity: NpcActivityKind,
+) -> NpcActionInstance {
+    let base_candidates = behavior_to_candidate_actions(behavior.chosen_intent.kind);
+    let candidates = filter_actions_by_schedule(&base_candidates, activity);
+    let kind = candidates.first().copied().unwrap_or(NpcActionKind::Idle);
+    let effect = base_effect_for_action(kind);
+    NpcActionInstance {
+        npc_id,
+        kind,
+        targets_player: behavior.target_player,
+        target_npc_id: behavior.target_npc_id,
+        effect,
     }
 }

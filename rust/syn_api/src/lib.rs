@@ -89,6 +89,7 @@ fn register_storylets_from_db(director: &mut EventDirector) {
                             npc_id: r.npc_id,
                         })
                         .collect(),
+                    interaction_tone: None,
                 };
                 director.register_storylet(director_storylet);
             }
