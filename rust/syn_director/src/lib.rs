@@ -65,6 +65,40 @@ pub struct RelationshipPrereq {
     pub max_band: Option<String>,
 }
 
+/// Digital legacy prerequisite for PostLife storylets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigitalLegacyPrereq {
+    /// Only relevant in Digital/PostLife; if true and stage != Digital, prereq fails.
+    #[serde(default)]
+    pub require_post_life: bool,
+
+    /// Optional bounds on legacy components (-1.0 .. 1.0)
+    #[serde(default)]
+    pub min_compassion_vs_cruelty: Option<f32>,
+    #[serde(default)]
+    pub max_compassion_vs_cruelty: Option<f32>,
+
+    #[serde(default)]
+    pub min_ambition_vs_comfort: Option<f32>,
+    #[serde(default)]
+    pub max_ambition_vs_comfort: Option<f32>,
+
+    #[serde(default)]
+    pub min_connection_vs_isolation: Option<f32>,
+    #[serde(default)]
+    pub max_connection_vs_isolation: Option<f32>,
+
+    #[serde(default)]
+    pub min_stability_vs_chaos: Option<f32>,
+    #[serde(default)]
+    pub max_stability_vs_chaos: Option<f32>,
+
+    #[serde(default)]
+    pub min_light_vs_shadow: Option<f32>,
+    #[serde(default)]
+    pub max_light_vs_shadow: Option<f32>,
+}
+
 /// Conditions that must be met for a storylet to be eligible.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryletPrerequisites {
@@ -84,6 +118,9 @@ pub struct StoryletPrerequisites {
     /// Optional allowed life stages for this storylet.
     #[serde(default)]
     pub allowed_life_stages: Vec<LifeStage>,
+    /// Optional digital legacy prerequisite for PostLife storylets.
+    #[serde(default)]
+    pub digital_legacy_prereq: Option<DigitalLegacyPrereq>,
 }
 
 /// A role in a storylet (e.g., "target", "rival", "manager").
@@ -301,6 +338,50 @@ fn check_life_stage_prereqs(world: &WorldState, pre: &StoryletPrerequisites) -> 
     pre.allowed_life_stages.contains(&world.player_life_stage)
 }
 
+fn check_digital_legacy_prereq(
+    world: &WorldState,
+    pre: &Option<DigitalLegacyPrereq>,
+) -> bool {
+    let Some(pre) = pre else {
+        return true;
+    };
+
+    // If require_post_life is true, and we're not in Digital, fail.
+    if pre.require_post_life && !matches!(world.player_life_stage, LifeStage::Digital) {
+        return false;
+    }
+
+    let imprint = match &world.digital_legacy.primary_imprint {
+        Some(i) => i,
+        None => {
+            // No imprint yet; if we require any bounds, fail.
+            return false;
+        }
+    };
+
+    let lv = &imprint.legacy_vector;
+
+    let between = |v: f32, min: &Option<f32>, max: &Option<f32>| {
+        if let Some(m) = min {
+            if v < *m {
+                return false;
+            }
+        }
+        if let Some(m) = max {
+            if v > *m {
+                return false;
+            }
+        }
+        true
+    };
+
+    between(lv.compassion_vs_cruelty, &pre.min_compassion_vs_cruelty, &pre.max_compassion_vs_cruelty)
+        && between(lv.ambition_vs_comfort, &pre.min_ambition_vs_comfort, &pre.max_ambition_vs_comfort)
+        && between(lv.connection_vs_isolation, &pre.min_connection_vs_isolation, &pre.max_connection_vs_isolation)
+        && between(lv.stability_vs_chaos, &pre.min_stability_vs_chaos, &pre.max_stability_vs_chaos)
+        && between(lv.light_vs_shadow, &pre.min_light_vs_shadow, &pre.max_light_vs_shadow)
+}
+
 fn memory_tags_for_pair(memory: &MemorySystem, actor_id: u64, target_id: u64) -> Vec<String> {
     memory
         .journals
@@ -420,6 +501,40 @@ fn life_stage_score_multiplier(world: &WorldState, pre: &StoryletPrerequisites) 
     }
 }
 
+fn digital_legacy_score_multiplier(world: &WorldState, pre: &Option<DigitalLegacyPrereq>) -> f32 {
+    let Some(pre) = pre else {
+        return 1.0;
+    };
+
+    if !matches!(world.player_life_stage, LifeStage::Digital) {
+        return 1.0;
+    }
+
+    if world.digital_legacy.primary_imprint.is_none() {
+        return 1.0;
+    }
+
+    // For now: if we have any bound at all, and prereq passes, give a small boost.
+    // (We already checked prereqs in find_eligible.)
+    let has_any_bounds =
+        pre.min_compassion_vs_cruelty.is_some()
+        || pre.max_compassion_vs_cruelty.is_some()
+        || pre.min_ambition_vs_comfort.is_some()
+        || pre.max_ambition_vs_comfort.is_some()
+        || pre.min_connection_vs_isolation.is_some()
+        || pre.max_connection_vs_isolation.is_some()
+        || pre.min_stability_vs_chaos.is_some()
+        || pre.max_stability_vs_chaos.is_some()
+        || pre.min_light_vs_shadow.is_some()
+        || pre.max_light_vs_shadow.is_some();
+
+    if has_any_bounds {
+        1.25
+    } else {
+        1.0
+    }
+}
+
 fn score_storylet_full(
     director: &EventDirector,
     world: &WorldState,
@@ -430,7 +545,8 @@ fn score_storylet_full(
     let heat_band = world.narrative_heat.band();
     let heat_mult = heat_score_multiplier(heat_band, storylet);
     let stage_mult = life_stage_score_multiplier(world, &storylet.prerequisites);
-    let mut score = base * heat_mult * stage_mult;
+    let legacy_mult = digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
+    let mut score = base * heat_mult * stage_mult * legacy_mult;
     if storylet.heat_category.is_some() && !storylet_heat_band_match(heat_band, storylet) {
         score *= 0.5;
     }
@@ -597,6 +713,11 @@ impl EventDirector {
             &storylet.prerequisites.relationship_prereqs,
             world.player_id,
         ) {
+            return false;
+        }
+
+        // Digital legacy prereqs for PostLife storylets.
+        if !check_digital_legacy_prereq(world, &storylet.prerequisites.digital_legacy_prereq) {
             return false;
         }
 

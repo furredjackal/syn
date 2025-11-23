@@ -95,12 +95,23 @@ fn derive_role_label_produces_expected_labels() {
     let label = derive_role_label(&rel_vec);
     assert_eq!(label, "Rival");
 
-    // Test "Friend" - high affection + trust
+    // Test "Family" - devoted affection + deep trust
     let rel_vec = RelationshipVector {
         affection: 8.0, // Devoted
         trust: 8.0,     // DeepTrust
         attraction: 1.0,
         familiarity: 6.0,
+        resentment: 0.0,
+    };
+    let label = derive_role_label(&rel_vec);
+    assert_eq!(label, "Family");
+
+    // Test "Friend" - close affection + trusted
+    let rel_vec = RelationshipVector {
+        affection: 6.0, // Close
+        trust: 6.0,     // Trusted
+        attraction: 1.0,
+        familiarity: 5.0,
         resentment: 0.0,
     };
     let label = derive_role_label(&rel_vec);
@@ -128,4 +139,3 @@ fn derive_role_label_produces_expected_labels() {
     let label = derive_role_label(&rel_vec);
     assert_eq!(label, "Stranger");
 }
-

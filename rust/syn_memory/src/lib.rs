@@ -20,6 +20,7 @@ pub struct MemoryEntry {
     pub stat_deltas: Vec<StatDelta>,             // e.g., [{"kind": Mood, "delta": -2.0}]
     #[serde(default)]
     pub relationship_deltas: Vec<RelationshipDelta>,
+    #[serde(default)]
     pub tags: Vec<String>,                      // e.g., ["betrayal", "trauma", "relationship"]
     /// Optional list of participant IDs involved in this memory.
     #[serde(default)]
@@ -215,6 +216,24 @@ impl Default for MemorySystem {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Build a frequency map of normalized tags for a given actor id.
+pub fn tag_counts_for_actor(memories: &[MemoryEntry], actor_id: u64) -> HashMap<String, u32> {
+    let mut counts = HashMap::new();
+
+    for m in memories {
+        if !m.participants.contains(&actor_id) {
+            continue;
+        }
+
+        for tag in &m.tags {
+            let norm = tag.to_lowercase();
+            *counts.entry(norm).or_insert(0) += 1;
+        }
+    }
+
+    counts
 }
 
 #[cfg(test)]

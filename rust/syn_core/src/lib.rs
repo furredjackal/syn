@@ -17,6 +17,7 @@ pub mod relationship_pressure;
 pub mod relationship_milestones;
 pub mod narrative_heat;
 pub mod life_stage;
+pub mod digital_legacy;
 
 pub use types::*;
 pub use rng::*;

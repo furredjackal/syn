@@ -12,7 +12,7 @@ class SplashScreenComponent extends PositionComponent
 
     add(
       TextComponent(
-        text: 'S Y N',
+        text: 'S Y n',
         anchor: Anchor.center,
         position: size / 2,
         textRenderer: TextPaint(

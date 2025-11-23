@@ -11,6 +11,7 @@ use syn_core::LifeStage;
 use std::collections::HashMap;
 
 pub mod relationship_drift;
+pub mod post_life;
 use syn_core::relationship_model::RelationshipVector as CoreRelationshipVector;
 
 /// Level of Detail tier for NPC simulation.

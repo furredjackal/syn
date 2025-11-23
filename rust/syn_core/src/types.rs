@@ -6,6 +6,7 @@ use crate::{KarmaBand, MoodBand, StatKind, clamp_for};
 use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
 use crate::relationship_milestones::RelationshipMilestoneState;
 use crate::relationship_pressure::RelationshipPressureState;
+use crate::digital_legacy::DigitalLegacyState;
 
 /// Unique identifier for a world seed (ensures determinism).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -725,6 +726,9 @@ pub struct WorldState {
     /// Tracks relationship role history & queued milestones.
     #[serde(default)]
     pub relationship_milestones: RelationshipMilestoneState,
+    /// Digital legacy / imprint data for PostLife simulation.
+    #[serde(default)]
+    pub digital_legacy: DigitalLegacyState,
 }
 
 impl WorldState {
@@ -744,6 +748,7 @@ impl WorldState {
             npcs: HashMap::new(),
             relationship_pressure: RelationshipPressureState::default(),
             relationship_milestones: RelationshipMilestoneState::default(),
+            digital_legacy: DigitalLegacyState::default(),
         }
     }
 

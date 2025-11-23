@@ -45,6 +45,21 @@ fn register_storylets_from_db(director: &mut EventDirector) {
                         stat_conditions: content_storylet.prerequisites.stat_conditions,
                         life_stages: content_storylet.prerequisites.life_stages,
                         tags: content_storylet.prerequisites.tags,
+                        digital_legacy_prereq: content_storylet.prerequisites.digital_legacy_prereq.as_ref().map(|p| {
+                            syn_director::DigitalLegacyPrereq {
+                                require_post_life: p.require_post_life,
+                                min_compassion_vs_cruelty: p.min_compassion_vs_cruelty,
+                                max_compassion_vs_cruelty: p.max_compassion_vs_cruelty,
+                                min_ambition_vs_comfort: p.min_ambition_vs_comfort,
+                                max_ambition_vs_comfort: p.max_ambition_vs_comfort,
+                                min_connection_vs_isolation: p.min_connection_vs_isolation,
+                                max_connection_vs_isolation: p.max_connection_vs_isolation,
+                                min_stability_vs_chaos: p.min_stability_vs_chaos,
+                                max_stability_vs_chaos: p.max_stability_vs_chaos,
+                                min_light_vs_shadow: p.min_light_vs_shadow,
+                                max_light_vs_shadow: p.max_light_vs_shadow,
+                            }
+                        }),
                 relationship_states: content_storylet.prerequisites.relationship_states,
                 memory_tags_required: content_storylet.prerequisites.memory_tags_required,
                 memory_tags_forbidden: content_storylet.prerequisites.memory_tags_forbidden,
@@ -242,7 +257,17 @@ impl GameEngine {
 
     /// Advance the simulation by one tick.
     pub fn tick(&mut self) {
+        let previous_stage = self.world.player_life_stage;
         self.simulator.tick(&mut self.world);
+
+        // Auto-create digital imprint if we just entered Digital stage
+        if previous_stage != self.world.player_life_stage
+            && matches!(self.world.player_life_stage, LifeStage::Digital) {
+            self.ensure_digital_imprint();
+        }
+
+        // Tick PostLife drift if in Digital stage
+        syn_sim::post_life::tick_postlife_drift(&mut self.world);
     }
 
     /// Advance the simulation by N ticks.
@@ -372,6 +397,59 @@ impl GameEngine {
             .unwrap_or_default()
     }
 
+    // ==================== Digital Legacy ====================
+
+    /// Ensure digital imprint is created when entering PostLife/Digital stage.
+    pub fn ensure_digital_imprint(&mut self) {
+        // Collect all memory entries for the builder
+        let all_memories: Vec<MemoryEntry> = self.memory
+            .journals
+            .values()
+            .flat_map(|journal| journal.entries.clone())
+            .collect();
+
+        syn_sim::post_life::ensure_digital_imprint_for_postlife(&mut self.world, &all_memories);
+    }
+
+    /// Get digital legacy snapshot for UI.
+    pub fn get_digital_legacy_snapshot(&self) -> ApiDigitalLegacySnapshot {
+        if let Some(imprint) = &self.world.digital_legacy.primary_imprint {
+            let lv = &imprint.legacy_vector;
+            let api_lv = ApiLegacyVector {
+                compassion_vs_cruelty: lv.compassion_vs_cruelty,
+                ambition_vs_comfort: lv.ambition_vs_comfort,
+                connection_vs_isolation: lv.connection_vs_isolation,
+                stability_vs_chaos: lv.stability_vs_chaos,
+                light_vs_shadow: lv.light_vs_shadow,
+            };
+
+            let roles = imprint
+                .relationship_roles
+                .iter()
+                .map(|(target_id, role)| ApiLegacyRelationshipRole {
+                    target_id: target_id.0 as i64,
+                    role: role.to_string(),
+                })
+                .collect::<Vec<_>>();
+
+            ApiDigitalLegacySnapshot {
+                has_imprint: true,
+                imprint: Some(ApiDigitalImprint {
+                    id: imprint.id as i64,
+                    created_at_stage: format!("{:?}", imprint.created_at_stage),
+                    created_at_age_years: imprint.created_at_age_years as i32,
+                    legacy_vector: api_lv,
+                    relationship_roles: roles,
+                }),
+            }
+        } else {
+            ApiDigitalLegacySnapshot {
+                has_imprint: false,
+                imprint: None,
+            }
+        }
+    }
+
     // ==================== Events ====================
 
     /// Register a storylet with the Event Director.
@@ -386,6 +464,7 @@ impl GameEngine {
                 stat_conditions: std::collections::HashMap::new(),
                 life_stages: vec![],
                 tags: vec![],
+                digital_legacy_prereq: None,
                 relationship_states: vec![],
                 memory_tags_required: vec![],
                 memory_tags_forbidden: vec![],
@@ -502,6 +581,40 @@ pub struct EventDto {
     pub heat: f32,
 }
 
+/// Digital legacy vector DTO for serialization to Dart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiLegacyVector {
+    pub compassion_vs_cruelty: f32,
+    pub ambition_vs_comfort: f32,
+    pub connection_vs_isolation: f32,
+    pub stability_vs_chaos: f32,
+    pub light_vs_shadow: f32,
+}
+
+/// Legacy relationship role DTO for serialization to Dart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiLegacyRelationshipRole {
+    pub target_id: i64,
+    pub role: String,
+}
+
+/// Digital imprint DTO for serialization to Dart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiDigitalImprint {
+    pub id: i64,
+    pub created_at_stage: String,
+    pub created_at_age_years: i32,
+    pub legacy_vector: ApiLegacyVector,
+    pub relationship_roles: Vec<ApiLegacyRelationshipRole>,
+}
+
+/// Digital legacy snapshot DTO for serialization to Dart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiDigitalLegacySnapshot {
+    pub has_imprint: bool,
+    pub imprint: Option<ApiDigitalImprint>,
+}
+
 // ==================== Frb Wrapper (Async Support) ====================
 
 /// Global engine instance (protected by Mutex for thread safety).
@@ -609,6 +722,28 @@ pub fn engine_register_npc(npc_id: u64, age: u32, job: String, district: String)
     }
 }
 
+/// Ensure digital imprint is created for PostLife stage.
+#[frb(sync)]
+pub fn engine_ensure_digital_imprint() {
+    let mut engine = ENGINE.lock().unwrap();
+    if let Some(ref mut e) = *engine {
+        e.ensure_digital_imprint();
+    }
+}
+
+/// Get digital legacy snapshot (imprint).
+#[frb(sync)]
+pub fn engine_get_digital_legacy() -> ApiDigitalLegacySnapshot {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.get_digital_legacy_snapshot())
+        .unwrap_or(ApiDigitalLegacySnapshot {
+            has_imprint: false,
+            imprint: None,
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -655,5 +790,43 @@ mod tests {
         assert_eq!(engine.narrative_heat(), 10.0);
         assert_eq!(engine.narrative_heat_level(), "Low");
         assert_eq!(engine.narrative_heat_trend(), 0.0);
+    }
+
+    #[test]
+    fn test_digital_legacy_snapshot_exposes_imprint() {
+        use std::collections::HashMap;
+        use syn_core::digital_legacy::{DigitalImprint, LegacyVector};
+        use syn_core::relationship_model::RelationshipRole;
+
+        let mut engine = GameEngine::new(99);
+        let mut relationship_roles = HashMap::new();
+        relationship_roles.insert(NpcId(2), RelationshipRole::Friend);
+
+        engine.world.digital_legacy.primary_imprint = Some(DigitalImprint {
+            id: 7,
+            created_at_stage: LifeStage::Digital,
+            created_at_age_years: 93,
+            final_stats: Stats::default(),
+            final_karma: Karma(12.0),
+            legacy_vector: LegacyVector {
+                compassion_vs_cruelty: 0.25,
+                ..Default::default()
+            },
+            relationship_roles,
+            relationship_milestones: Vec::new(),
+            memory_tag_counts: HashMap::new(),
+        });
+
+        let snapshot = engine.get_digital_legacy_snapshot();
+        assert!(snapshot.has_imprint);
+
+        let imprint = snapshot.imprint.expect("imprint should be present");
+        assert_eq!(imprint.id, 7);
+        assert_eq!(imprint.created_at_stage, "Digital");
+        assert_eq!(imprint.created_at_age_years, 93);
+        assert!((imprint.legacy_vector.compassion_vs_cruelty - 0.25).abs() < f32::EPSILON);
+        assert_eq!(imprint.relationship_roles.len(), 1);
+        assert_eq!(imprint.relationship_roles[0].target_id, 2);
+        assert_eq!(imprint.relationship_roles[0].role, "Friend");
     }
 }

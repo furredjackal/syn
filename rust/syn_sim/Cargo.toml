@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 syn_core = { path = "../syn_core" }
+syn_memory = { path = "../syn_memory" }
 serde = { version = "1.0", features = ["derive"] }

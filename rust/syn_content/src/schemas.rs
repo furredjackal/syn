@@ -46,6 +46,40 @@ pub struct RelationshipPrereq {
     pub max_band: Option<String>,
 }
 
+/// Digital legacy prerequisite for PostLife storylets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigitalLegacyPrereq {
+    /// Only relevant in Digital/PostLife; if true and stage != Digital, prereq fails.
+    #[serde(default)]
+    pub require_post_life: bool,
+
+    /// Optional bounds on legacy components (-1.0 .. 1.0)
+    #[serde(default)]
+    pub min_compassion_vs_cruelty: Option<f32>,
+    #[serde(default)]
+    pub max_compassion_vs_cruelty: Option<f32>,
+
+    #[serde(default)]
+    pub min_ambition_vs_comfort: Option<f32>,
+    #[serde(default)]
+    pub max_ambition_vs_comfort: Option<f32>,
+
+    #[serde(default)]
+    pub min_connection_vs_isolation: Option<f32>,
+    #[serde(default)]
+    pub max_connection_vs_isolation: Option<f32>,
+
+    #[serde(default)]
+    pub min_stability_vs_chaos: Option<f32>,
+    #[serde(default)]
+    pub max_stability_vs_chaos: Option<f32>,
+
+    #[serde(default)]
+    pub min_light_vs_shadow: Option<f32>,
+    #[serde(default)]
+    pub max_light_vs_shadow: Option<f32>,
+}
+
 /// Conditions that must be met for a storylet to be eligible.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoryletPrerequisites {
@@ -65,6 +99,9 @@ pub struct StoryletPrerequisites {
     /// Optional allowed life stages for this storylet (typed).
     #[serde(default)]
     pub allowed_life_stages: Vec<LifeStage>,
+    /// Optional digital legacy prerequisite for PostLife storylets.
+    #[serde(default)]
+    pub digital_legacy_prereq: Option<DigitalLegacyPrereq>,
 }
 
 /// A role in a storylet (e.g., "target", "rival", "manager").

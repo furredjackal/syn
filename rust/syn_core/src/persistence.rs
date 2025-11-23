@@ -184,6 +184,7 @@ impl Persistence {
                 npcs: Default::default(),
                 relationship_pressure: Default::default(),
                 relationship_milestones: Default::default(),
+                digital_legacy: Default::default(),
             };
 
             Ok(world)
