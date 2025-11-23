@@ -28,6 +28,7 @@ fn storylet_outcome_applies_new_relationship_deltas() {
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 0.0,
         weight: 1.0,
@@ -36,6 +37,8 @@ fn storylet_outcome_applies_new_relationship_deltas() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     let outcome = StoryletOutcome {

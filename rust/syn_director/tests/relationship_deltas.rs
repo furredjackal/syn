@@ -41,6 +41,7 @@ fn apply_storylet_outcome_with_memory_applies_relationship_deltas() {
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 0.0,
         weight: 1.0,
@@ -49,6 +50,8 @@ fn apply_storylet_outcome_with_memory_applies_relationship_deltas() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     apply_storylet_outcome_with_memory(

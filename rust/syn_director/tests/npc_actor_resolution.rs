@@ -4,7 +4,7 @@ use syn_director::{
     prepare_storylet_execution, resolve_actor_ref_to_npc, StoryActorRef, Storylet, StoryletActors,
     StoryletPrerequisites, StoryletRole,
 };
-use syn_sim::npc_registry::NpcRegistry;
+use syn_sim::NpcRegistry;
 
 fn make_world_with_known_tag(id: NpcId, tag: NpcRoleTag) -> WorldState {
     let mut world = WorldState::new(WorldSeed(7), NpcId(1));
@@ -79,6 +79,7 @@ fn test_prepare_storylet_execution_focuses_npc() {
             primary: Some(StoryActorRef::RoleTag(NpcRoleTag::Family)),
             secondary: None,
         }),
+        interaction_tone: None,
     };
 
     prepare_storylet_execution(&mut world, &mut registry, &storylet, 0);

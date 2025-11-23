@@ -9,9 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use syn_content::load_storylets_from_db;
 use syn_core::relationship_model::{derive_role_label, RelationshipVector};
-use syn_director::{
-    apply_choice_and_advance, select_next_event_view, DirectorEventView, StoryletLibrary,
-};
+use syn_director::{apply_choice_and_advance, select_next_event_view, DirectorEventView};
 use syn_sim::SimState;
 
 // Re-export core types for Dart
@@ -517,7 +515,6 @@ impl GameEngine {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
-                time_and_location: None,
                 time_and_location: None,
             },
             heat,

@@ -104,6 +104,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                digital_legacy_prereq: None,
             },
             heat: 40.0,
             weight: 0.5,

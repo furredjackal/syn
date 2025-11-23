@@ -2,8 +2,6 @@
 //!
 //! Central narrative brain: evaluates world state, personality vectors, and relationship
 //! pressures to select and fire emergent storylets.
-
-use crate as syn_director; // ensure path for re-exports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use syn_core::npc::NpcActivityKind;
@@ -15,15 +13,15 @@ use syn_core::{
     narrative_heat::NarrativeHeatBand,
     relationship_milestones::RelationshipMilestoneEvent,
     relationship_model::{
-        AffectionBand, AttractionBand, RelationshipAxis, RelationshipDelta, RelationshipVector,
+        AffectionBand, AttractionBand, RelationshipAxis as ModelRelationshipAxis, RelationshipDelta, RelationshipVector,
         ResentmentBand, TrustBand,
     },
     relationship_pressure::{RelationshipEventKind, RelationshipPressureEvent},
-    LifeStage, NpcId, RelationshipState, SimTick, StatDelta, StoryletUsageState, WorldState,
+    LifeStage, NpcId, RelationshipAxis as CoreRelationshipAxis, RelationshipState, SimTick, StatDelta, StoryletUsageState, WorldState,
 };
 use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;
-use syn_sim::{npc_registry::NpcRegistry, tick_world, SimState};
+use syn_sim::{tick_world, NpcRegistry, SimState};
 
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,7 +103,7 @@ pub struct RelationshipPrereq {
     /// Target NPC the prereq references.
     pub target_id: u64,
     /// Relationship axis to inspect.
-    pub axis: RelationshipAxis,
+    pub axis: ModelRelationshipAxis,
     /// Optional numeric bounds for the axis value.
     #[serde(default)]
     pub min_value: Option<f32>,
@@ -356,7 +354,7 @@ pub fn npc_intent_score_multiplier(
 /// Prepare storylet execution by focusing relevant NPCs in the simulation registry.
 pub fn prepare_storylet_execution(
     world: &mut WorldState,
-    registry: &mut syn_sim::npc_registry::NpcRegistry,
+    registry: &mut NpcRegistry,
     storylet: &Storylet,
     tick: u64,
 ) {
@@ -473,20 +471,20 @@ fn familiarity_band_rank(value: f32) -> u8 {
     }
 }
 
-fn band_rank_for(axis: RelationshipAxis, rel: &RelationshipVector) -> u8 {
+fn band_rank_for(axis: ModelRelationshipAxis, rel: &RelationshipVector) -> u8 {
     match axis {
-        RelationshipAxis::Affection => affection_band_rank(rel.affection_band()),
-        RelationshipAxis::Trust => trust_band_rank(rel.trust_band()),
-        RelationshipAxis::Attraction => attraction_band_rank(rel.attraction_band()),
-        RelationshipAxis::Familiarity => familiarity_band_rank(rel.familiarity),
-        RelationshipAxis::Resentment => resentment_band_rank(rel.resentment_band()),
+        ModelRelationshipAxis::Affection => affection_band_rank(rel.affection_band()),
+        ModelRelationshipAxis::Trust => trust_band_rank(rel.trust_band()),
+        ModelRelationshipAxis::Attraction => attraction_band_rank(rel.attraction_band()),
+        ModelRelationshipAxis::Familiarity => familiarity_band_rank(rel.familiarity),
+        ModelRelationshipAxis::Resentment => resentment_band_rank(rel.resentment_band()),
     }
 }
 
-fn band_rank_from_name(axis: RelationshipAxis, name: &str) -> Option<u8> {
+fn band_rank_from_name(axis: ModelRelationshipAxis, name: &str) -> Option<u8> {
     let lowered = name.to_ascii_lowercase();
     match axis {
-        RelationshipAxis::Affection | RelationshipAxis::Familiarity => {
+        ModelRelationshipAxis::Affection | ModelRelationshipAxis::Familiarity => {
             Some(affection_band_rank(match lowered.as_str() {
                 "stranger" => AffectionBand::Stranger,
                 "acquaintance" => AffectionBand::Acquaintance,
@@ -496,7 +494,7 @@ fn band_rank_from_name(axis: RelationshipAxis, name: &str) -> Option<u8> {
                 _ => AffectionBand::Stranger,
             }))
         }
-        RelationshipAxis::Trust => Some(trust_band_rank(match lowered.as_str() {
+        ModelRelationshipAxis::Trust => Some(trust_band_rank(match lowered.as_str() {
             "unknown" => TrustBand::Unknown,
             "wary" => TrustBand::Wary,
             "neutral" => TrustBand::Neutral,
@@ -504,7 +502,7 @@ fn band_rank_from_name(axis: RelationshipAxis, name: &str) -> Option<u8> {
             "deeptrust" | "deep_trust" | "deep trust" => TrustBand::DeepTrust,
             _ => TrustBand::Unknown,
         })),
-        RelationshipAxis::Attraction => Some(attraction_band_rank(match lowered.as_str() {
+        ModelRelationshipAxis::Attraction => Some(attraction_band_rank(match lowered.as_str() {
             "none" => AttractionBand::None,
             "curious" => AttractionBand::Curious,
             "interested" => AttractionBand::Interested,
@@ -512,7 +510,7 @@ fn band_rank_from_name(axis: RelationshipAxis, name: &str) -> Option<u8> {
             "intense" => AttractionBand::Intense,
             _ => AttractionBand::None,
         })),
-        RelationshipAxis::Resentment => Some(resentment_band_rank(match lowered.as_str() {
+        ModelRelationshipAxis::Resentment => Some(resentment_band_rank(match lowered.as_str() {
             "none" => ResentmentBand::None,
             "irritated" => ResentmentBand::Irritated,
             "resentful" => ResentmentBand::Resentful,
@@ -677,10 +675,10 @@ fn storylet_matches_pressure_kind(
     use RelationshipEventKind::*;
 
     let axis = match event.kind {
-        AffectionBandChanged => Some(RelationshipAxis::Affection),
-        TrustBandChanged => Some(RelationshipAxis::Trust),
-        AttractionBandChanged => Some(RelationshipAxis::Attraction),
-        ResentmentBandChanged => Some(RelationshipAxis::Resentment),
+        AffectionBandChanged => Some(ModelRelationshipAxis::Affection),
+        TrustBandChanged => Some(ModelRelationshipAxis::Trust),
+        AttractionBandChanged => Some(ModelRelationshipAxis::Attraction),
+        ResentmentBandChanged => Some(ModelRelationshipAxis::Resentment),
     };
 
     axis.map(|axis| pre.relationship_prereqs.iter().any(|r| r.axis == axis))
@@ -1410,7 +1408,11 @@ pub fn storylet_is_eligible(
     true
 }
 
-pub fn score_storylet_full(world: &WorldState, sim: &SimState, storylet: &Storylet) -> f32 {
+pub fn score_storylet_full_simple(
+    world: &WorldState,
+    sim: &SimState,
+    storylet: &Storylet,
+) -> f32 {
     let base = if storylet.weight > 0.0 {
         storylet.weight
     } else {
@@ -1439,7 +1441,7 @@ pub fn select_storylet_weighted<'a>(
         .iter()
         .filter(|s| storylet_is_eligible(world, sim, s, usage))
         .map(|s| {
-            let score = score_storylet_full(world, sim, s).max(0.0);
+            let score = score_storylet_full_simple(world, sim, s).max(0.0);
             (s, score)
         })
         .collect();
@@ -1457,8 +1459,8 @@ pub fn select_storylet_weighted<'a>(
     let mut rng = deterministic_rng_from_world(world);
     let roll = rng.gen_f32() * total;
     let mut acc = 0.0;
-    for (s, w) in scored {
-        acc += w;
+    for (s, w) in &scored {
+        acc += *w;
         if roll <= acc {
             return Some(s);
         }
@@ -1481,7 +1483,14 @@ pub fn apply_storylet_outcome(
             let actor = NpcId(delta.actor_id);
             let target = NpcId(delta.target_id);
             let mut rel = world.get_relationship(actor, target);
-            rel.apply_delta(delta.axis, delta.delta);
+            let axis = match delta.axis {
+                ModelRelationshipAxis::Affection => CoreRelationshipAxis::Affection,
+                ModelRelationshipAxis::Trust => CoreRelationshipAxis::Trust,
+                ModelRelationshipAxis::Attraction => CoreRelationshipAxis::Attraction,
+                ModelRelationshipAxis::Familiarity => CoreRelationshipAxis::Familiarity,
+                ModelRelationshipAxis::Resentment => CoreRelationshipAxis::Resentment,
+            };
+            rel.apply_delta(axis, delta.delta);
             rel.state = rel.compute_next_state();
             world.set_relationship(actor, target, rel);
         }
@@ -1553,8 +1562,8 @@ pub fn apply_choice_and_advance(
 mod tests {
     use super::*;
     use syn_core::{
-        relationship_model::RelationshipAxis, NpcId, Relationship, StatDelta, StatKind, WorldSeed,
-        WorldState,
+        relationship_model::RelationshipAxis as ModelRelationshipAxis, NpcId, Relationship,
+        StatDelta, StatKind, WorldSeed, WorldState,
     };
 
     #[test]
@@ -1576,6 +1585,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1587,6 +1597,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         assert_eq!(storylet.id, "event_001");
@@ -1613,6 +1625,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1621,6 +1634,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         director.register_storylet(storylet);
@@ -1670,6 +1685,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 60.0,
             weight: 0.5,
@@ -1678,6 +1694,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         let conflict_storylet = Storylet {
@@ -1692,8 +1710,8 @@ mod tests {
 
     #[test]
     fn test_event_director_score() {
-        let director = EventDirector::new();
-        let world = WorldState::new(WorldSeed(42), NpcId(1));
+        let mut director = EventDirector::new();
+        let mut world = WorldState::new(WorldSeed(42), NpcId(1));
 
         let storylet = Storylet {
             id: "event_001".to_string(),
@@ -1712,6 +1730,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 75.0,
             weight: 0.8,
@@ -1720,6 +1739,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         let score = director.score_storylet(&storylet, &world);
@@ -1749,6 +1770,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1760,6 +1782,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         let mut outcome = StoryletOutcome::default();
@@ -1796,6 +1820,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 0.0,
             weight: 1.0,
@@ -1804,6 +1829,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
         let outcome = StoryletOutcome {
             stat_deltas: vec![
@@ -1860,6 +1887,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 20.0,
             weight: 1.0,
@@ -1871,6 +1899,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         let mut outcome = StoryletOutcome::default();
@@ -1923,6 +1953,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.7,
@@ -1934,6 +1965,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         // Set up a Stranger relationship
@@ -2010,6 +2043,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -2021,6 +2055,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         // Create outcome that boosts relationship values
@@ -2034,28 +2070,28 @@ mod tests {
         outcome.relationship_deltas.push(RelationshipDelta {
             actor_id: 1,
             target_id: 2,
-            axis: RelationshipAxis::Affection,
+            axis: ModelRelationshipAxis::Affection,
             delta: 3.0,
             source: None,
         });
         outcome.relationship_deltas.push(RelationshipDelta {
             actor_id: 1,
             target_id: 2,
-            axis: RelationshipAxis::Trust,
+            axis: ModelRelationshipAxis::Trust,
             delta: 4.0,
             source: None,
         });
         outcome.relationship_deltas.push(RelationshipDelta {
             actor_id: 1,
             target_id: 2,
-            axis: RelationshipAxis::Attraction,
+            axis: ModelRelationshipAxis::Attraction,
             delta: 6.0,
             source: None,
         });
         outcome.relationship_deltas.push(RelationshipDelta {
             actor_id: 1,
             target_id: 2,
-            axis: RelationshipAxis::Familiarity,
+            axis: ModelRelationshipAxis::Familiarity,
             delta: 3.0,
             source: None,
         });
@@ -2090,6 +2126,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 60.0,
             weight: 0.6,
@@ -2101,6 +2138,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         // Best Friend relationship should NOT allow conflict based on state check
@@ -2165,6 +2204,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 60.0,
             weight: 0.8,
@@ -2176,6 +2216,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         director.register_storylet(echo_storylet.clone());
@@ -2239,6 +2281,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 50.0,
             weight: 0.7,
@@ -2250,6 +2293,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         director.register_storylet(fragile_storylet.clone());
@@ -2314,6 +2359,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 55.0,
             weight: 0.65,
@@ -2325,6 +2371,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         director.register_storylet(follow_up_storylet.clone());
@@ -2404,6 +2452,7 @@ mod tests {
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
                 time_and_location: None,
+                digital_legacy_prereq: None,
             },
             heat: 80.0,
             weight: 0.9,
@@ -2415,6 +2464,8 @@ mod tests {
             max_uses: None,
             choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
 
         director.register_storylet(complex_storylet.clone());

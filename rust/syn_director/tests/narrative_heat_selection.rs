@@ -23,6 +23,7 @@ fn basic_storylet(id: &str, category: StoryletHeatCategory) -> Storylet {
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 10.0,
         weight: 1.0,
@@ -31,6 +32,8 @@ fn basic_storylet(id: &str, category: StoryletHeatCategory) -> Storylet {
         max_uses: None,
         choices: vec![],
         heat_category: Some(category),
+        actors: None,
+        interaction_tone: None,
     }
 }
 

@@ -53,6 +53,7 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 1.0,
@@ -61,6 +62,8 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     let storylet_b = Storylet {
@@ -88,6 +91,7 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 1.0,
@@ -96,6 +100,8 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     let mut director = EventDirector::new();

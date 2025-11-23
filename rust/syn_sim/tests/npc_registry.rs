@@ -1,6 +1,6 @@
 use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
 use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
-use syn_sim::{instantiate_simulated_npc_from_prototype, npc_registry::NpcRegistry, NpcLod};
+use syn_sim::{instantiate_simulated_npc_from_prototype, NpcLod, NpcRegistry};
 
 fn make_world_with_proto(id: NpcId) -> WorldState {
     let mut world = WorldState::new(WorldSeed(99), NpcId(1));
@@ -18,6 +18,7 @@ fn make_world_with_proto(id: NpcId) -> WorldState {
         },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
+        schedule: Default::default(),
     };
     world.npc_prototypes.insert(id, proto);
     world

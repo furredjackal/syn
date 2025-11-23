@@ -18,6 +18,7 @@ fn make_world_with_proto(id: NpcId) -> WorldState {
         },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
+        schedule: Default::default(),
     };
     world.npc_prototypes.insert(id, proto);
     world
@@ -46,6 +47,7 @@ fn tick_world_advances_time_and_ticks_tiers() {
         },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
+        schedule: Default::default(),
     };
     world.npc_prototypes.insert(NpcId(3), proto2);
     sim.npc_registry

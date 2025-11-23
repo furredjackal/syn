@@ -67,6 +67,7 @@ fn relationship_prereqs_pass_when_affection_in_range() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -78,6 +79,8 @@ fn relationship_prereqs_pass_when_affection_in_range() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     // Register the storylet and check eligibility via find_eligible
@@ -147,6 +150,7 @@ fn relationship_prereqs_fail_when_affection_below_min() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -158,6 +162,8 @@ fn relationship_prereqs_fail_when_affection_below_min() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     // Register the storylet and check it's not eligible
@@ -227,6 +233,7 @@ fn relationship_prereqs_pass_with_band_based_criteria() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -238,6 +245,8 @@ fn relationship_prereqs_pass_with_band_based_criteria() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     // Register the storylet and check eligibility
@@ -294,6 +303,7 @@ fn relationship_prereqs_fail_when_relationship_missing() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -305,6 +315,8 @@ fn relationship_prereqs_fail_when_relationship_missing() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     // Register the storylet and check it's not eligible
@@ -389,6 +401,7 @@ fn relationship_prereqs_with_explicit_actor_id() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -397,6 +410,8 @@ fn relationship_prereqs_with_explicit_actor_id() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     // Register the storylet and check eligibility

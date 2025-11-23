@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use syn_api::{
-    api_choose_option, api_get_current_event, api_reset_runtime, Storylet, StoryletChoice,
-    StoryletLibrary, StoryletOutcome, StoryletPrerequisites, WorldSeed, WorldState,
+    api_choose_option, api_get_current_event, api_reset_runtime, Storylet, StoryletChoice, StoryletOutcome, WorldSeed, WorldState,
 };
+use syn_director::StoryletLibrary;
 use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::{NpcId, StatDelta, StatKind};
 use syn_sim::SimState;
 
-fn basic_prereqs() -> StoryletPrerequisites {
-    StoryletPrerequisites {
+fn basic_prereqs() -> syn_director::StoryletPrerequisites {
+    syn_director::StoryletPrerequisites {
         min_relationship_affection: None,
         min_relationship_resentment: None,
         stat_conditions: HashMap::new(),

@@ -66,6 +66,7 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
             }],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 1.0,
         weight: 1.0,
@@ -77,6 +78,8 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     let outcome = StoryletOutcome {

@@ -2,7 +2,7 @@ use syn_core::npc::{NpcPrototype, PersonalityVector};
 use syn_core::types::Stats;
 use syn_core::{LifeStage, NpcId, StatKind, WorldSeed, WorldState};
 use syn_sim::{evaluate_npc_behavior, maybe_run_npc_action};
-use syn_sim::{npc_registry::NpcRegistry, NpcLod};
+use syn_sim::{NpcLod, NpcRegistry};
 
 #[test]
 fn run_action_applies_effects_and_busy() {
@@ -32,6 +32,7 @@ fn run_action_applies_effects_and_busy() {
             ..Stats::default()
         },
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
+        schedule: Default::default(),
     };
     world.npc_prototypes.insert(npc_id, proto);
 

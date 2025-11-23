@@ -19,6 +19,8 @@ fn storylet_with_stage(id: &str, allowed: Vec<LifeStage>) -> Storylet {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: allowed,
+            time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 10.0,
         weight: 1.0,
@@ -27,6 +29,8 @@ fn storylet_with_stage(id: &str, allowed: Vec<LifeStage>) -> Storylet {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     }
 }
 

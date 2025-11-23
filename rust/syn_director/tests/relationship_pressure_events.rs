@@ -42,6 +42,7 @@ fn storylet_outcomes_enqueue_relationship_pressure_events() {
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
             time_and_location: None,
+            digital_legacy_prereq: None,
         },
         heat: 0.0,
         weight: 1.0,
@@ -53,6 +54,8 @@ fn storylet_outcomes_enqueue_relationship_pressure_events() {
         max_uses: None,
         choices: vec![],
         heat_category: None,
+        actors: None,
+        interaction_tone: None,
     };
 
     let outcome = StoryletOutcome {
