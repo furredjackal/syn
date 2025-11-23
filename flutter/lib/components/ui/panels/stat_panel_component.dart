@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
-import '../../../ui/ui_signal_bus.dart';
 import '../buttons/icon_button_component.dart';
 import '../display/stat_bar_component.dart';
 import '../paint/angled_panel.dart';

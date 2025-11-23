@@ -3,6 +3,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::{KarmaBand, MoodBand, StatKind, clamp_for};
+use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
+use crate::relationship_milestones::RelationshipMilestoneState;
+use crate::relationship_pressure::RelationshipPressureState;
 
 /// Unique identifier for a world seed (ensures determinism).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -309,7 +312,7 @@ impl BehaviorAction {
     }
 
     pub fn context_fit(&self, world: &WorldState) -> f32 {
-        let heat = world.narrative_heat;
+        let heat = world.narrative_heat.value();
         match self {
             BehaviorAction::Conflict | BehaviorAction::Risk => {
                 (0.8 + (heat / 150.0)).clamp(0.5, 1.6)
@@ -691,6 +694,9 @@ impl Default for Karma {
     }
 }
 
+/// Legacy alias for compatibility; the new state lives in `relationship_pressure`.
+pub type RelationshipPressureFlags = crate::relationship_pressure::RelationshipPressureState;
+
 /// Global world state snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldState {
@@ -699,16 +705,26 @@ pub struct WorldState {
     pub player_id: NpcId,
     pub player_stats: Stats,
     pub player_age: u32,
+    /// Player age in years (alias for player_age for stage progression).
+    #[serde(default)]
+    pub player_age_years: u32,
     pub player_life_stage: LifeStage,
     pub player_karma: Karma,
     /// Narrative heat (0.0..100.0+): controls pacing and event intensity
-    pub narrative_heat: f32,
+    #[serde(default)]
+    pub narrative_heat: NarrativeHeat,
     /// Heat momentum captures the trend (positive = rising heat, negative = cooling)
     pub heat_momentum: f32,
     /// Relationship storage: (npc_id, other_id) → Relationship
     pub relationships: HashMap<(NpcId, NpcId), Relationship>,
     /// NPC population cache
     pub npcs: HashMap<NpcId, AbstractNpc>,
+    /// Relationship pressure flags for tracking band changes
+    #[serde(default)]
+    pub relationship_pressure: RelationshipPressureState,
+    /// Tracks relationship role history & queued milestones.
+    #[serde(default)]
+    pub relationship_milestones: RelationshipMilestoneState,
 }
 
 impl WorldState {
@@ -719,12 +735,15 @@ impl WorldState {
             player_id,
             player_stats: Stats::default(),
             player_age: 6, // Start at age 6
+            player_age_years: 6,
             player_life_stage: LifeStage::Child,
             player_karma: Karma::default(),
-            narrative_heat: 0.0,
+            narrative_heat: NarrativeHeat::default(),
             heat_momentum: 0.0,
             relationships: HashMap::new(),
             npcs: HashMap::new(),
+            relationship_pressure: RelationshipPressureState::default(),
+            relationship_milestones: RelationshipMilestoneState::default(),
         }
     }
 
@@ -756,10 +775,11 @@ impl WorldState {
         // Age player every 24 ticks (1 simulated day)
         if self.current_tick.0 % 24 == 0 {
             self.player_age += 1;
-            self.player_life_stage = LifeStage::from_age(self.player_age);
+            self.player_age_years = self.player_age;
+            self.player_life_stage = LifeStage::from_age(self.player_age_years);
         }
         // Decay narrative heat over time (-0.1 per tick)
-        self.narrative_heat = (self.narrative_heat - 0.1).max(0.0);
+        self.narrative_heat.add(-0.1);
         // Momentum decays faster so persistent spikes eventually cool
         self.heat_momentum *= 0.9;
         if self.heat_momentum.abs() < 0.05 {
@@ -769,27 +789,27 @@ impl WorldState {
 
     /// Get narrative heat level descriptor.
     pub fn heat_level(&self) -> &'static str {
-        match self.narrative_heat {
-            0.0..=25.0 => "Low",        // Slice-of-life, routine
-            25.1..=50.0 => "Medium",    // Rising tension, complications
-            50.1..=75.0 => "High",      // Major confrontations
-            _ => "Critical",             // 75+: Climactic moments
+        match self.narrative_heat.band() {
+            NarrativeHeatBand::Low => "Low",
+            NarrativeHeatBand::Medium => "Medium",
+            NarrativeHeatBand::High => "High",
+            NarrativeHeatBand::Critical => "Critical",
         }
     }
 
     /// Increment narrative heat by amount (clamped to reasonable max).
     pub fn add_heat(&mut self, amount: f32) {
         let clamped_amount = amount.max(0.0);
-        self.narrative_heat = (self.narrative_heat + clamped_amount).clamp(0.0, 200.0);
+        self.narrative_heat.add(clamped_amount);
         self.heat_momentum = (self.heat_momentum + clamped_amount * 0.5).clamp(-50.0, 50.0);
     }
 
     /// Reduce heat explicitly (e.g., calming choices or cooldown events).
     pub fn reduce_heat(&mut self, amount: f32) {
         let clamped_amount = amount.max(0.0);
-        self.narrative_heat = (self.narrative_heat - clamped_amount).max(0.0);
+        self.narrative_heat.add(-clamped_amount);
         self.heat_momentum = (self.heat_momentum - clamped_amount * 0.5).clamp(-50.0, 50.0);
-        if self.narrative_heat == 0.0 && self.heat_momentum < 0.2 {
+        if (self.narrative_heat.value() == 0.0) && self.heat_momentum < 0.2 {
             self.heat_momentum = 0.0;
         }
     }
@@ -800,7 +820,7 @@ impl WorldState {
         // Medium heat: baseline, multiplier 1.0
         // High heat: more intense events, multiplier 1.5
         // Critical heat: climactic events only, multiplier 2.0
-        let base = 0.5 + (self.narrative_heat / 50.0).clamp(0.0, 1.5);
+        let base = 0.5 + (self.narrative_heat.value() / 50.0).clamp(0.0, 1.5);
         let momentum_bonus = (self.heat_momentum / 100.0).clamp(-0.25, 0.5);
         (base + momentum_bonus).clamp(0.25, 2.25)
     }
@@ -872,18 +892,18 @@ mod tests {
     fn test_heat_decay_and_momentum() {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
         world.add_heat(40.0);
-        assert!(world.narrative_heat > 0.0);
+        assert!(world.narrative_heat.value() > 0.0);
         assert!(world.heat_momentum > 0.0);
 
         for _ in 0..10 {
             world.tick();
         }
 
-        assert!(world.narrative_heat < 40.0);
+        assert!(world.narrative_heat.value() < 40.0);
         assert!(world.heat_momentum < 20.0);
 
         world.reduce_heat(100.0);
-        assert_eq!(world.narrative_heat, 0.0);
+        assert_eq!(world.narrative_heat.value(), 0.0);
         assert!(world.heat_momentum <= 0.0);
     }
 

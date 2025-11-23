@@ -13,6 +13,32 @@ pub enum RelationshipAxis {
     Resentment,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RelationshipRole {
+    Stranger,
+    Acquaintance,
+    Friend,
+    Rival,
+    Ally,
+    Romance,
+    Family,
+}
+
+impl std::fmt::Display for RelationshipRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            RelationshipRole::Stranger => "Stranger",
+            RelationshipRole::Acquaintance => "Acquaintance",
+            RelationshipRole::Friend => "Friend",
+            RelationshipRole::Rival => "Rival",
+            RelationshipRole::Ally => "Ally",
+            RelationshipRole::Romance => "Crush",
+            RelationshipRole::Family => "Family",
+        };
+        write!(f, "{s}")
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RelationshipVector {
     pub affection: f32,
@@ -107,6 +133,50 @@ impl RelationshipVector {
             ResentmentBand::Vindictive
         }
     }
+
+    pub fn role(&self) -> RelationshipRole {
+        let aff = self.affection_band();
+        let trust = self.trust_band();
+        let attr = self.attraction_band();
+        let resent = self.resentment_band();
+
+        if matches!(resent, ResentmentBand::Hostile | ResentmentBand::Vindictive) {
+            return RelationshipRole::Rival;
+        }
+
+        if matches!(attr, AttractionBand::Strong | AttractionBand::Intense)
+            && matches!(
+                aff,
+                AffectionBand::Friendly | AffectionBand::Close | AffectionBand::Devoted
+            )
+        {
+            return RelationshipRole::Romance;
+        }
+
+        if matches!(aff, AffectionBand::Devoted)
+            && matches!(trust, TrustBand::Trusted | TrustBand::DeepTrust)
+        {
+            return RelationshipRole::Family;
+        }
+
+        if matches!(aff, AffectionBand::Close | AffectionBand::Friendly)
+            && matches!(trust, TrustBand::Trusted | TrustBand::DeepTrust)
+        {
+            return RelationshipRole::Friend;
+        }
+
+        if matches!(aff, AffectionBand::Acquaintance | AffectionBand::Friendly) {
+            return RelationshipRole::Acquaintance;
+        }
+
+        RelationshipRole::Stranger
+    }
+}
+
+/// Derive a high-level role label from a relationship vector.
+/// Returns labels like "Romance", "Friend", "Rival", "Acquaintance", "Stranger".
+pub fn derive_role_label(rel: &RelationshipVector) -> String {
+    rel.role().to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,6 +188,19 @@ pub enum AffectionBand {
     Devoted,
 }
 
+impl std::fmt::Display for AffectionBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AffectionBand::Stranger => "Stranger",
+            AffectionBand::Acquaintance => "Acquaintance",
+            AffectionBand::Friendly => "Friendly",
+            AffectionBand::Close => "Close",
+            AffectionBand::Devoted => "Devoted",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrustBand {
     Unknown,
@@ -125,6 +208,19 @@ pub enum TrustBand {
     Neutral,
     Trusted,
     DeepTrust,
+}
+
+impl std::fmt::Display for TrustBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TrustBand::Unknown => "Unknown",
+            TrustBand::Wary => "Wary",
+            TrustBand::Neutral => "Neutral",
+            TrustBand::Trusted => "Trusted",
+            TrustBand::DeepTrust => "DeepTrust",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -136,6 +232,19 @@ pub enum AttractionBand {
     Intense,
 }
 
+impl std::fmt::Display for AttractionBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AttractionBand::None => "None",
+            AttractionBand::Curious => "Curious",
+            AttractionBand::Interested => "Interested",
+            AttractionBand::Strong => "Strong",
+            AttractionBand::Intense => "Intense",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResentmentBand {
     None,
@@ -143,6 +252,19 @@ pub enum ResentmentBand {
     Resentful,
     Hostile,
     Vindictive,
+}
+
+impl std::fmt::Display for ResentmentBand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ResentmentBand::None => "None",
+            ResentmentBand::Irritated => "Irritated",
+            ResentmentBand::Resentful => "Resentful",
+            ResentmentBand::Hostile => "Hostile",
+            ResentmentBand::Vindictive => "Vindictive",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -4,8 +4,10 @@
 //! This is the "public interface" of the Rust backend.
 
 use flutter_rust_bridge::frb;
+use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use syn_content::load_storylets_from_db;
+use syn_core::relationship_model::{derive_role_label, RelationshipVector};
 
 // Re-export core types for Dart
 pub use syn_core::{
@@ -31,8 +33,49 @@ fn register_storylets_from_db(director: &mut EventDirector) {
     let db_path = std::env::var("SYN_STORYLET_DB").unwrap_or_else(|_| DEFAULT_STORYLET_DB.to_string());
     match load_storylets_from_db(&db_path) {
         Ok(storylets) => {
-            for storylet in storylets {
-                director.register_storylet(storylet);
+            for content_storylet in storylets {
+                // Convert syn_content::Storylet to syn_director::Storylet
+                let director_storylet = Storylet {
+                    id: content_storylet.id,
+                    name: content_storylet.name,
+                    tags: content_storylet.tags,
+                    prerequisites: syn_director::StoryletPrerequisites {
+                        min_relationship_affection: content_storylet.prerequisites.min_relationship_affection,
+                        min_relationship_resentment: content_storylet.prerequisites.min_relationship_resentment,
+                        stat_conditions: content_storylet.prerequisites.stat_conditions,
+                        life_stages: content_storylet.prerequisites.life_stages,
+                        tags: content_storylet.prerequisites.tags,
+                relationship_states: content_storylet.prerequisites.relationship_states,
+                memory_tags_required: content_storylet.prerequisites.memory_tags_required,
+                memory_tags_forbidden: content_storylet.prerequisites.memory_tags_forbidden,
+                memory_recency_ticks: content_storylet.prerequisites.memory_recency_ticks,
+                relationship_prereqs: content_storylet.prerequisites.relationship_prereqs
+                    .into_iter()
+                    .map(|r| syn_director::RelationshipPrereq {
+                        actor_id: r.actor_id,
+                        target_id: r.target_id,
+                        axis: r.axis,
+                        min_value: r.min_value,
+                        max_value: r.max_value,
+                        min_band: r.min_band,
+                        max_band: r.max_band,
+                    })
+                    .collect(),
+                allowed_life_stages: content_storylet.prerequisites.allowed_life_stages,
+            },
+                    heat: content_storylet.heat,
+                    weight: content_storylet.weight,
+                    cooldown_ticks: content_storylet.cooldown_ticks,
+                    heat_category: content_storylet.heat_category,
+                    roles: content_storylet.roles
+                        .into_iter()
+                        .map(|r| syn_director::StoryletRole {
+                            name: r.name,
+                            npc_id: r.npc_id,
+                        })
+                        .collect(),
+                };
+                director.register_storylet(director_storylet);
             }
         }
         Err(err) => {
@@ -84,6 +127,18 @@ impl GameEngine {
         format!("{:?}", self.world.player_stats.mood_band())
     }
 
+    pub fn life_stage_info(&self) -> ApiLifeStageInfo {
+        let cfg = self.world.player_life_stage.config();
+        ApiLifeStageInfo {
+            life_stage: format!("{:?}", self.world.player_life_stage),
+            player_age_years: self.world.player_age_years as i32,
+            show_wealth: cfg.visibility.show_wealth,
+            show_reputation: cfg.visibility.show_reputation,
+            show_wisdom: cfg.visibility.show_wisdom,
+            show_karma: cfg.visibility.show_karma,
+        }
+    }
+
     /// Get player karma.
     pub fn player_karma(&self) -> f32 {
         self.world.player_karma.0
@@ -93,9 +148,16 @@ impl GameEngine {
         format!("{:?}", self.world.player_karma.band())
     }
 
+    /// TEST/utility: override player stage + age (deterministic).
+    pub fn set_player_life_stage(&mut self, stage: LifeStage, age_years: u32) {
+        self.world.player_life_stage = stage;
+        self.world.player_age_years = age_years;
+        self.world.player_age = age_years;
+    }
+
     /// Get current narrative heat.
     pub fn narrative_heat(&self) -> f32 {
-        self.world.narrative_heat
+        self.world.narrative_heat.value()
     }
 
     /// Get textual heat level (Low/Medium/High/Critical).
@@ -133,6 +195,47 @@ impl GameEngine {
 
     pub fn get_karma_band(&self) -> String {
         format!("{:?}", self.world.player_karma.band())
+    }
+
+    /// Get player relationships snapshot (with bands and role labels).
+    pub fn player_relationships(&self) -> ApiRelationshipSnapshot {
+        let player_id = self.world.player_id;
+        let mut relationships = Vec::new();
+
+        for (&(actor_id, target_id), rel) in self.world.relationships.iter() {
+            // Only expose relationships where the actor is the player
+            if actor_id != player_id {
+                continue;
+            }
+
+            // Convert Relationship to RelationshipVector for band methods
+            let rel_vec = RelationshipVector {
+                affection: rel.affection,
+                trust: rel.trust,
+                attraction: rel.attraction,
+                familiarity: rel.familiarity,
+                resentment: rel.resentment,
+            };
+
+            let api_rel = ApiRelationship {
+                actor_id: actor_id.0 as i64,
+                target_id: target_id.0 as i64,
+                affection: rel.affection,
+                trust: rel.trust,
+                attraction: rel.attraction,
+                familiarity: rel.familiarity,
+                resentment: rel.resentment,
+                affection_band: rel_vec.affection_band().to_string(),
+                trust_band: rel_vec.trust_band().to_string(),
+                attraction_band: rel_vec.attraction_band().to_string(),
+                resentment_band: rel_vec.resentment_band().to_string(),
+                role_label: derive_role_label(&rel_vec),
+            };
+
+            relationships.push(api_rel);
+        }
+
+        ApiRelationshipSnapshot { relationships }
     }
 
     // ==================== Simulation ====================
@@ -228,25 +331,6 @@ impl GameEngine {
         }
     }
 
-    /// Get all relationships from the player to others.
-    pub fn player_relationships(&self) -> ApiRelationshipSnapshot {
-        let player = self.world.player_id;
-        let relationships = self
-            .world
-            .relationships
-            .iter()
-            .filter(|((from, _), _)| *from == player)
-            .map(|((_, to), rel)| ApiRelationship {
-                target_id: to.0 as i64,
-                affection: rel.affection,
-                trust: rel.trust,
-                attraction: rel.attraction,
-                familiarity: rel.familiarity,
-                resentment: rel.resentment,
-            })
-            .collect();
-        ApiRelationshipSnapshot { relationships }
-    }
 
     // ==================== Memory ====================
 
@@ -306,11 +390,14 @@ impl GameEngine {
                 memory_tags_required: vec![],
                 memory_tags_forbidden: vec![],
                 memory_recency_ticks: None,
+                relationship_prereqs: vec![],
+                allowed_life_stages: vec![],
             },
             heat,
             weight,
             cooldown_ticks: 100,
             roles: vec![],
+            heat_category: None,
         };
         self.director.register_storylet(storylet);
     }
@@ -334,6 +421,16 @@ impl GameEngine {
 pub struct ApiStatsSnapshot {
     pub stats: Vec<ApiStat>,
     pub mood_band: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiLifeStageInfo {
+    pub life_stage: String,
+    pub player_age_years: i32,
+    pub show_wealth: bool,
+    pub show_reputation: bool,
+    pub show_wisdom: bool,
+    pub show_karma: bool,
 }
 
 pub type PlayerStatsDto = ApiStatsSnapshot;
@@ -364,17 +461,26 @@ pub struct RelationshipDto {
     pub heat: f32,
 }
 
-#[derive(Debug, Clone)]
+/// Relationship DTO for serialization to Dart (with bands and role label).
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRelationship {
+    pub actor_id: i64,
     pub target_id: i64,
     pub affection: f32,
     pub trust: f32,
     pub attraction: f32,
     pub familiarity: f32,
     pub resentment: f32,
+    pub affection_band: String,
+    pub trust_band: String,
+    pub attraction_band: String,
+    pub resentment_band: String,
+    /// High-level summary for UI tags: "Friend", "Rival", "Crush", "Stranger", etc.
+    pub role_label: String,
 }
 
-#[derive(Debug, Clone)]
+/// Snapshot of all player relationships for UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiRelationshipSnapshot {
     pub relationships: Vec<ApiRelationship>,
 }
@@ -470,6 +576,23 @@ pub fn engine_narrative_heat_trend() -> f32 {
         .unwrap_or(0.0)
 }
 
+/// Get life stage info (stage label, age, visibility flags).
+#[frb(sync)]
+pub fn engine_life_stage_info() -> ApiLifeStageInfo {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.life_stage_info())
+        .unwrap_or(ApiLifeStageInfo {
+            life_stage: "Unknown".to_string(),
+            player_age_years: 0,
+            show_wealth: false,
+            show_reputation: false,
+            show_wisdom: false,
+            show_karma: false,
+        })
+}
+
 /// Get all NPC IDs.
 #[frb(sync)]
 pub fn engine_list_npcs() -> Vec<u64> {
@@ -529,7 +652,7 @@ mod tests {
     #[test]
     fn test_narrative_heat_accessors() {
         let engine = GameEngine::new(42);
-        assert_eq!(engine.narrative_heat(), 0.0);
+        assert_eq!(engine.narrative_heat(), 10.0);
         assert_eq!(engine.narrative_heat_level(), "Low");
         assert_eq!(engine.narrative_heat_trend(), 0.0);
     }

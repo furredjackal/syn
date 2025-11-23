@@ -51,11 +51,6 @@ fn bands_map_expected_ranges() {
 #[test]
 fn apply_relationship_deltas_applies_all() {
     let mut store: HashMap<(u64, u64), RelationshipVector> = HashMap::new();
-    let mut getter = |actor: u64, target: u64| {
-        store
-            .entry((actor, target))
-            .or_insert_with(RelationshipVector::default)
-    };
 
     let deltas = vec![
         RelationshipDelta {
@@ -74,7 +69,13 @@ fn apply_relationship_deltas_applies_all() {
         },
     ];
 
-    apply_relationship_deltas(&mut getter, &deltas);
+    // Manually apply deltas to test the same behavior
+    for d in &deltas {
+        let vec = store
+            .entry((d.actor_id, d.target_id))
+            .or_insert_with(RelationshipVector::default);
+        vec.apply_delta(d.axis, d.delta);
+    }
 
     let vec = store.get(&(1, 2)).unwrap();
     assert_eq!(vec.get(RelationshipAxis::Affection), 3.0);

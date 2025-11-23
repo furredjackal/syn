@@ -5,6 +5,7 @@ use syn_core::{
     RelationshipState, StatDelta,
 };
 use syn_core::NpcId;
+use syn_core::LifeStage;
 
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,7 +18,11 @@ pub struct Storylet {
     pub weight: f32,                            // base probability of firing
     pub cooldown_ticks: u32,                    // prevent rapid re-firing
     pub roles: Vec<StoryletRole>,              // required NPC roles
+    #[serde(default)]
+    pub heat_category: Option<StoryletHeatCategory>,
 }
+
+pub use syn_director::StoryletHeatCategory;
 
 /// Relationship-based prerequisite (additive, non-breaking).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +62,9 @@ pub struct StoryletPrerequisites {
     /// Optional relationship-based prerequisites (additive).
     #[serde(default)]
     pub relationship_prereqs: Vec<RelationshipPrereq>,
+    /// Optional allowed life stages for this storylet (typed).
+    #[serde(default)]
+    pub allowed_life_stages: Vec<LifeStage>,
 }
 
 /// A role in a storylet (e.g., "target", "rival", "manager").

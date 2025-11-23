@@ -3,11 +3,15 @@
 //! Handles the core simulation loop, NPC updates, time progression, and LOD tier management.
 
 use syn_core::{
+    narrative_heat::{compute_heat_delta, NarrativeHeatConfig, NarrativeHeatInputs},
     AbstractNpc, BehaviorAction, BehaviorNeed, DeterministicRng, NpcId, StatKind, Stats, WorldState,
 };
+use syn_core::life_stage::LifeStageConfig;
+use syn_core::LifeStage;
 use std::collections::HashMap;
 
 pub mod relationship_drift;
+use syn_core::relationship_model::RelationshipVector as CoreRelationshipVector;
 
 /// Level of Detail tier for NPC simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -122,6 +126,57 @@ pub struct Simulator {
     active_npcs: HashMap<NpcId, SimulatedNpc>,
 }
 
+fn gather_recent_memory_flags(_world: &WorldState) -> (bool, bool, bool) {
+    (false, false, false)
+}
+
+fn update_narrative_heat(world: &mut WorldState, config: &NarrativeHeatConfig, stat_profile: Option<&LifeStageConfig>) {
+    let rel_pairs: Vec<((u64, u64), CoreRelationshipVector)> = world
+        .relationships
+        .iter()
+        .map(|((actor_id, target_id), rel)| {
+            (
+                (actor_id.0, target_id.0),
+                CoreRelationshipVector {
+                    affection: rel.affection,
+                    trust: rel.trust,
+                    attraction: rel.attraction,
+                    familiarity: rel.familiarity,
+                    resentment: rel.resentment,
+                },
+            )
+        })
+        .collect();
+
+    let rel_refs: Vec<(&(u64, u64), &CoreRelationshipVector)> =
+        rel_pairs.iter().map(|(k, v)| (k, v)).collect();
+
+    let (has_recent_trauma, has_recent_betrayal, has_recent_win) =
+        gather_recent_memory_flags(world);
+
+    let inputs = NarrativeHeatInputs {
+        player_stats: &world.player_stats,
+        relationships: &rel_refs,
+        has_recent_trauma,
+        has_recent_betrayal,
+        has_recent_major_win: has_recent_win,
+        stat_profile: stat_profile.map(|cfg| &cfg.stat_profile),
+    };
+
+    let delta = compute_heat_delta(&inputs, config);
+    world.narrative_heat.add(delta);
+    world
+        .narrative_heat
+        .decay_toward(config.base_decay_toward, config.decay_per_tick);
+}
+
+fn update_life_stage_from_age(world: &mut WorldState) {
+    let new_stage = LifeStage::stage_for_age(world.player_age_years);
+    if new_stage != world.player_life_stage {
+        world.player_life_stage = new_stage;
+    }
+}
+
 impl Simulator {
     pub fn new(seed: u64) -> Self {
         Simulator {
@@ -198,6 +253,9 @@ impl Simulator {
         // Advance world clock
         world.tick();
 
+        // Keep stage in sync with age.
+        update_life_stage_from_age(world);
+
         // Update LOD assignments
         self.update_lod_tiers(world, world.player_id);
 
@@ -217,6 +275,9 @@ impl Simulator {
             },
         );
         drift.tick(world);
+
+        let stage_cfg = world.player_life_stage.config();
+        update_narrative_heat(world, &stage_cfg.heat_config, Some(&stage_cfg));
 
         // Derive RNG for next tick's stochastic events
         let next_seed = self.rng.derive_seed();
@@ -328,7 +389,7 @@ mod tests {
         sim_npc.update_needs();
 
         let mut world = WorldState::new(WorldSeed(42), NpcId(99));
-        world.narrative_heat = 30.0;
+        world.narrative_heat.set(30.0);
 
         let first = sim_npc.score_action(BehaviorAction::Work, &world);
         let second = sim_npc.score_action(BehaviorAction::Work, &world);

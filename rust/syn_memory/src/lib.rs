@@ -21,6 +21,9 @@ pub struct MemoryEntry {
     #[serde(default)]
     pub relationship_deltas: Vec<RelationshipDelta>,
     pub tags: Vec<String>,                      // e.g., ["betrayal", "trauma", "relationship"]
+    /// Optional list of participant IDs involved in this memory.
+    #[serde(default)]
+    pub participants: Vec<u64>,
 }
 
 impl MemoryEntry {
@@ -40,6 +43,7 @@ impl MemoryEntry {
             stat_deltas: Vec::new(),
             relationship_deltas: Vec::new(),
             tags: Vec::new(),
+            participants: Vec::new(),
         }
     }
 
@@ -178,6 +182,33 @@ impl MemorySystem {
     pub fn clear(&mut self) {
         self.journals.clear();
     }
+}
+
+pub fn memories_for_pair_with_tags<'a>(
+    entries: &'a [MemoryEntry],
+    actor_id: u64,
+    target_id: u64,
+    required_any_tags: &[&str],
+) -> Vec<&'a MemoryEntry> {
+    entries
+        .iter()
+        .filter(|m| {
+            let has_actor = m.participants.contains(&actor_id);
+            let has_target = m.participants.contains(&target_id);
+            if !(has_actor && has_target) {
+                return false;
+            }
+
+            if required_any_tags.is_empty() {
+                return true;
+            }
+
+            let lower_tags: Vec<String> = m.tags.iter().map(|t| t.to_lowercase()).collect();
+            required_any_tags
+                .iter()
+                .any(|t| lower_tags.contains(&t.to_lowercase()))
+        })
+        .collect()
 }
 
 impl Default for MemorySystem {

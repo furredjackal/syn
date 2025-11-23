@@ -20,12 +20,39 @@ impl RelationshipDriftSystem {
     }
 
     pub fn tick(&self, world: &mut WorldState) {
-        for ((_actor_id, _target_id), rel) in world.relationships.iter_mut() {
+        for ((actor_id, target_id), rel) in world.relationships.iter_mut() {
             rel.affection = drift_toward_zero(rel.affection, self.config.affection_decay_per_tick);
             rel.trust = drift_toward_zero(rel.trust, self.config.trust_decay_per_tick);
             rel.resentment =
                 drift_toward_zero(rel.resentment, self.config.resentment_decay_per_tick);
             rel.familiarity = clamp_axis(rel.familiarity + self.config.familiarity_growth_per_tick);
+
+            let snapshot = RelationshipVector {
+                affection: rel.affection,
+                trust: rel.trust,
+                attraction: rel.attraction,
+                familiarity: rel.familiarity,
+                resentment: rel.resentment,
+            };
+
+            world.relationship_pressure.update_for_pair(
+                actor_id.0,
+                target_id.0,
+                &snapshot,
+                Some("drift".to_string()),
+                Some(world.current_tick.0),
+            );
+
+            world
+                .relationship_milestones
+                .evaluate_and_record_milestones_for_pair(
+                    actor_id.0,
+                    target_id.0,
+                    &snapshot,
+                    &[],
+                    Some("drift".to_string()),
+                    Some(world.current_tick.0),
+                );
         }
     }
 }

@@ -1,6 +1,6 @@
 use serde_json;
 use syn_core::stats::StatKind;
-use syn_content::storylet::StoryletOutcome;
+use syn_content::StoryletOutcome;
 
 #[test]
 fn storylet_outcome_deserializes_stat_impacts_into_stat_deltas() {

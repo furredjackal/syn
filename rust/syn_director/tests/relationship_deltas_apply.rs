@@ -23,11 +23,14 @@ fn storylet_outcome_applies_new_relationship_deltas() {
             memory_tags_required: vec![],
             memory_tags_forbidden: vec![],
             memory_recency_ticks: None,
+            relationship_prereqs: vec![],
+            allowed_life_stages: vec![],
         },
         heat: 0.0,
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        heat_category: None,
     };
 
     let outcome = StoryletOutcome {

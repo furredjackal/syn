@@ -1,5 +1,5 @@
 use serde_json;
-use syn_content::storylet::StoryletOutcome;
+use syn_content::StoryletOutcome;
 use syn_core::relationship_model::RelationshipAxis;
 
 #[test]

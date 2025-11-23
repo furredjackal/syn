@@ -102,11 +102,13 @@ mod tests {
                 memory_tags_forbidden: vec![],
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
+                allowed_life_stages: vec![],
             },
             heat: 40.0,
             weight: 0.5,
             cooldown_ticks: 24,
             roles: vec![],
+            heat_category: None,
         }
     }
 

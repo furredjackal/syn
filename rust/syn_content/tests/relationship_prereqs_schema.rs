@@ -1,11 +1,20 @@
 use serde_json;
-use syn_content::storylet::StoryletPrerequisites;
+use syn_content::StoryletPrerequisites;
 use syn_core::relationship_model::RelationshipAxis;
 
 #[test]
 fn can_deserialize_relationship_prereqs_from_json() {
     let json = r#"
     {
+        "min_relationship_affection": null,
+        "min_relationship_resentment": null,
+        "stat_conditions": {},
+        "life_stages": [],
+        "tags": [],
+        "relationship_states": [],
+        "memory_tags_required": [],
+        "memory_tags_forbidden": [],
+        "memory_recency_ticks": null,
         "relationship_prereqs": [
             {
                 "actor_id": 1,
@@ -32,4 +41,5 @@ fn can_deserialize_relationship_prereqs_from_json() {
     assert_eq!(r.max_value, Some(10.0));
     assert_eq!(r.min_band.as_deref(), Some("Friendly"));
     assert_eq!(r.max_band.as_deref(), Some("Devoted"));
+    assert!(pre.allowed_life_stages.is_empty());
 }

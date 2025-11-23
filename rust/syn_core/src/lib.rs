@@ -13,6 +13,10 @@ pub mod errors;
 pub mod stats;
 pub mod relationships;
 pub mod relationship_model;
+pub mod relationship_pressure;
+pub mod relationship_milestones;
+pub mod narrative_heat;
+pub mod life_stage;
 
 pub use types::*;
 pub use rng::*;

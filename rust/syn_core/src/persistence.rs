@@ -111,7 +111,7 @@ impl Persistence {
                 world.player_age,
                 format!("{:?}", world.player_life_stage),
                 player_karma_json,
-                world.narrative_heat,
+                world.narrative_heat.value(),
                 world.heat_momentum,
             ],
         )?;
@@ -175,12 +175,15 @@ impl Persistence {
                 player_id,
                 player_stats,
                 player_age,
+                player_age_years: player_age,
                 player_life_stage,
                 player_karma: Karma(karma_value),
-                narrative_heat: heat_value,
+                narrative_heat: crate::narrative_heat::NarrativeHeat::new(heat_value),
                 heat_momentum,
                 relationships: Default::default(),
                 npcs: Default::default(),
+                relationship_pressure: Default::default(),
+                relationship_milestones: Default::default(),
             };
 
             Ok(world)
@@ -321,7 +324,7 @@ mod tests {
         let mut db = Persistence::new(db_path).expect("Failed to create persistence");
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
         world.player_age = 25;
-        world.narrative_heat = 40.0;
+        world.narrative_heat = crate::narrative_heat::NarrativeHeat::new(40.0);
         world.heat_momentum = 5.0;
 
         db.save_world(&world).expect("Failed to save world");
@@ -329,7 +332,7 @@ mod tests {
 
         assert_eq!(loaded.player_age, 25);
         assert_eq!(loaded.seed, WorldSeed(42));
-        assert_eq!(loaded.narrative_heat, 40.0);
+        assert_eq!(loaded.narrative_heat.value(), 40.0);
         assert_eq!(loaded.heat_momentum, 5.0);
 
         let _ = fs::remove_file(db_path);

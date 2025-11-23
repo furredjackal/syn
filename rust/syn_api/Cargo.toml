@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 syn_core = { path = "../syn_core" }
@@ -14,3 +14,4 @@ syn_memory = { path = "../syn_memory" }
 syn_director = { path = "../syn_director" }
 syn_content = { path = "../syn_content" }
 flutter_rust_bridge = "2"
+serde = { version = "1.0", features = ["derive"] }

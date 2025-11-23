@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
-import '../../../ui/ui_signal_bus.dart';
 import '../cards/npc_card_component.dart';
 import '../paint/angled_panel.dart';
 import '../syn_theme.dart';

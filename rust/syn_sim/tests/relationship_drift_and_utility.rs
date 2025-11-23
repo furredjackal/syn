@@ -85,3 +85,45 @@ fn conflict_utility_increases_with_resentment() {
 
     assert!(angry_mult > calm_mult);
 }
+
+#[test]
+fn drift_crossing_band_produces_pressure_event() {
+    let mut world = WorldState::new(WorldSeed(2), NpcId(1));
+    let actor_id = NpcId(1);
+    let target_id = NpcId(2);
+    let key = (actor_id, target_id);
+    world.relationships.insert(
+        key,
+        syn_core::Relationship {
+            affection: 6.5, // Close band
+            trust: 0.0,
+            attraction: 0.0,
+            familiarity: 0.0,
+            resentment: 0.0,
+            state: syn_core::RelationshipState::Stranger,
+        },
+    );
+
+    let initial_vec = RelationshipVector {
+        affection: 6.5,
+        trust: 0.0,
+        attraction: 0.0,
+        familiarity: 0.0,
+        resentment: 0.0,
+    };
+    world.relationship_pressure.update_for_pair(actor_id.0, target_id.0, &initial_vec, None, None);
+
+    let system = RelationshipDriftSystem::new(RelationshipDriftConfig {
+        affection_decay_per_tick: 2.5,
+        trust_decay_per_tick: 0.0,
+        resentment_decay_per_tick: 0.0,
+        familiarity_growth_per_tick: 0.0,
+    });
+
+    system.tick(&mut world);
+
+    assert!(
+        !world.relationship_pressure.queue.is_empty(),
+        "Expected a relationship pressure event when affection crosses a band due to drift"
+    );
+}
