@@ -8,13 +8,13 @@
 //! In LifeStage::Digital (PostLife), simulation & storylets can operate on
 //! this imprint instead of physical stats.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{Stats, Karma}; // Re-exported from types
-use crate::types::{LifeStage, NpcId};
-use crate::relationship_model::{RelationshipRole, RelationshipVector};
 use crate::relationship_milestones::RelationshipMilestoneEvent;
+use crate::relationship_model::{RelationshipRole, RelationshipVector};
+use crate::types::{LifeStage, NpcId};
+use crate::{Karma, Stats}; // Re-exported from types
 
 /// Aggregated high-level legacy traits distilled from stats, karma, relationships, memories.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -23,16 +23,16 @@ pub struct LegacyVector {
     pub compassion_vs_cruelty: f32, // -1.0 .. 1.0
 
     /// How obsessively the player pursued impact vs comfort.
-    pub ambition_vs_comfort: f32,   // -1.0 .. 1.0
+    pub ambition_vs_comfort: f32, // -1.0 .. 1.0
 
     /// How relational vs solitary they were.
     pub connection_vs_isolation: f32, // -1.0 .. 1.0
 
     /// How stable vs chaotic their life arc was.
-    pub stability_vs_chaos: f32,    // -1.0 .. 1.0
+    pub stability_vs_chaos: f32, // -1.0 .. 1.0
 
     /// How "bright" vs "dark" their karmic footprint is.
-    pub light_vs_shadow: f32,       // -1.0 .. 1.0
+    pub light_vs_shadow: f32, // -1.0 .. 1.0
 }
 
 /// Digital imprint: a compressed "ghost profile" of a player's life.
@@ -98,19 +98,34 @@ pub fn compute_legacy_vector(inputs: &LegacyInputs<'_>) -> LegacyVector {
     let light_norm = (k + 100.0) / 200.0; // map -100..100 -> 0..1
     vec.light_vs_shadow = (light_norm * 2.0 - 1.0).clamp(-1.0, 1.0);
 
-    let support_count = inputs.memory_tag_counts.get("support").copied().unwrap_or(0) as f32;
-    let betrayal_count = inputs.memory_tag_counts.get("betrayal").copied().unwrap_or(0) as f32;
+    let support_count = inputs
+        .memory_tag_counts
+        .get("support")
+        .copied()
+        .unwrap_or(0) as f32;
+    let betrayal_count = inputs
+        .memory_tag_counts
+        .get("betrayal")
+        .copied()
+        .unwrap_or(0) as f32;
     let total_rel = support_count + betrayal_count + 1.0;
 
     let compassion_score = (support_count - betrayal_count) / total_rel; // -1..1 approx
-    vec.compassion_vs_cruelty = ((vec.light_vs_shadow + compassion_score) * 0.5)
-        .clamp(-1.0, 1.0);
+    vec.compassion_vs_cruelty = ((vec.light_vs_shadow + compassion_score) * 0.5).clamp(-1.0, 1.0);
 
     // 2) Ambition vs comfort: wealth, reputation, major-win tags
     let wealth = inputs.final_stats.wealth;
     let reputation = inputs.final_stats.reputation;
-    let ambition_tags = inputs.memory_tag_counts.get("ambition").copied().unwrap_or(0) as f32
-        + inputs.memory_tag_counts.get("career_win").copied().unwrap_or(0) as f32;
+    let ambition_tags = inputs
+        .memory_tag_counts
+        .get("ambition")
+        .copied()
+        .unwrap_or(0) as f32
+        + inputs
+            .memory_tag_counts
+            .get("career_win")
+            .copied()
+            .unwrap_or(0) as f32;
 
     let wealth_norm = (wealth / 10.0).clamp(0.0, 1.0);
     let rep_norm = ((reputation + 100.0) / 200.0).clamp(0.0, 1.0);
@@ -158,11 +173,7 @@ pub fn compute_legacy_vector(inputs: &LegacyInputs<'_>) -> LegacyVector {
             _ => {}
         }
     }
-    let crisis_tags = inputs
-        .memory_tag_counts
-        .get("crisis")
-        .copied()
-        .unwrap_or(0) as f32;
+    let crisis_tags = inputs.memory_tag_counts.get("crisis").copied().unwrap_or(0) as f32;
 
     let chaos_norm = ((chaotic_events + crisis_tags) / 10.0).min(1.0);
     vec.stability_vs_chaos = (1.0 - chaos_norm) * 2.0 - 1.0; // 1..-1

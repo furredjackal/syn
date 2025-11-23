@@ -1,3 +1,25 @@
+mod npc_registry;
+mod relationship_drift;
+pub mod post_life;
+
+use std::collections::HashMap;
+
+use crate::npc_registry::NpcRegistry;
+use syn_core::life_stage::LifeStageConfig;
+use syn_core::narrative_heat::{compute_heat_delta, NarrativeHeatConfig, NarrativeHeatInputs};
+use syn_core::npc::NpcPrototype;
+use syn_core::npc::{NpcActivityKind};
+use syn_core::npc_actions::{
+    base_effect_for_action, behavior_to_candidate_actions, NpcActionInstance, NpcActionKind,
+};
+use syn_core::npc_behavior::{
+    choose_best_intent, compute_behavior_intents, compute_needs_from_state, BehaviorSnapshot,
+};
+use syn_core::relationship_model::RelationshipVector as CoreRelationshipVector;
+use syn_core::{AbstractNpc, DeterministicRng, LifeStage, NpcId, RelationshipDelta, StatKind, Stats, WorldState};
+use syn_core::apply_stat_deltas;
+use syn_core::time::GameTime;
+use syn_memory::MemorySystem;
 
 /// Simulation engine: advances world state by one tick.
 pub struct Simulator {
@@ -5,11 +27,82 @@ pub struct Simulator {
     active_npcs: HashMap<NpcId, SimulatedNpc>,
 }
 
+/// Legacy LOD tiers used by Simulator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LodTier {
+    High,
+    Medium,
+    Low,
+}
+
+/// Legacy NpcLod used alongside new tiers for compatibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcLod {
+    Tier2Active,
+    Tier1Neighborhood,
+    Tier0Dormant,
+}
+
+/// Minimal simulated NPC container used by the simulator.
+#[derive(Debug, Clone)]
+pub struct SimulatedNpc {
+    pub id: NpcId,
+    pub abstract_npc: AbstractNpc,
+    pub stats: Stats,
+    pub lod_tier: LodTier,
+    pub busy_until_tick: u64,
+    pub last_action: Option<NpcActionInstance>,
+}
+
+impl SimulatedNpc {
+    pub fn new(abstract_npc: AbstractNpc) -> Self {
+        let mut stats = Stats::default();
+        stats.clamp();
+        SimulatedNpc {
+            id: abstract_npc.id,
+            abstract_npc,
+            stats,
+            lod_tier: LodTier::Low,
+            busy_until_tick: 0,
+            last_action: None,
+        }
+    }
+
+    pub fn current_stats(&self) -> &Stats {
+        &self.stats
+    }
+
+    pub fn stats_mut(&mut self) -> &mut Stats {
+        &mut self.stats
+    }
+
+    pub fn apply_mood_decay(&mut self) {
+        let mood = self.stats.get(StatKind::Mood) * 0.99;
+        self.stats.set(StatKind::Mood, mood);
+    }
+
+    pub fn update_needs(&mut self) {
+        // Placeholder: needs model lives in npc_behavior; keep as no-op here.
+    }
+
+    pub fn tick_cooldowns(&mut self) {
+        // Placeholder for future action cooldowns.
+    }
+}
+
 fn gather_recent_memory_flags(_world: &WorldState) -> (bool, bool, bool) {
     (false, false, false)
 }
 
-fn update_narrative_heat(world: &mut WorldState, config: &NarrativeHeatConfig, stat_profile: Option<&LifeStageConfig>) {
+fn apply_rel_deltas(world: &mut WorldState, deltas: &[RelationshipDelta]) {
+    world.apply_relationship_deltas(deltas);
+}
+
+fn update_narrative_heat(
+    world: &mut WorldState,
+    config: &NarrativeHeatConfig,
+    stat_profile: Option<&LifeStageConfig>,
+) {
     let rel_pairs: Vec<((u64, u64), CoreRelationshipVector)> = world
         .relationships
         .iter()
@@ -67,7 +160,7 @@ impl Simulator {
     /// Instantiate an NPC into the active simulation (moves from AbstractNpc to SimulatedNpc).
     pub fn instantiate_npc(&mut self, abstract_npc: AbstractNpc) {
         let mut simulated = SimulatedNpc::new(abstract_npc);
-        
+
         // Initialize stats based on traits and age
         simulated.stats.set(
             StatKind::Health,
@@ -344,7 +437,11 @@ fn apply_npc_action_effect(
         let mut resolved = Vec::with_capacity(eff.relationship_deltas.len());
         let target_id = if action.targets_player {
             world.player_id
-        } else if let Some(t) = action.target_npc_id { t } else { world.player_id };
+        } else if let Some(t) = action.target_npc_id {
+            t
+        } else {
+            world.player_id
+        };
         for mut d in eff.relationship_deltas.clone() {
             d.target_id = target_id;
             resolved.push(d);
@@ -368,11 +465,7 @@ fn apply_npc_action_effect(
 }
 
 /// Decide and execute an action for a single NPC, if not busy.
-pub fn maybe_run_npc_action(
-    world: &mut WorldState,
-    npc: &mut NpcInstance,
-    tick: u64,
-) {
+pub fn maybe_run_npc_action(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
     maybe_run_npc_action_with_memory(world, npc, tick, None);
 }
 
@@ -383,15 +476,22 @@ pub fn maybe_run_npc_action_with_memory(
     tick: u64,
     mut memory_opt: Option<&mut MemorySystem>,
 ) {
-    if npc.busy_until_tick > tick { return; }
-    let behavior = match &npc.behavior { Some(b) => b, None => return };
+    if npc.busy_until_tick > tick {
+        return;
+    }
+    let behavior = match &npc.behavior {
+        Some(b) => b,
+        None => return,
+    };
     // Schedule-aware selection
     let activity = npc.current_activity;
     let action = build_action_instance_from_behavior_and_schedule(npc.id, behavior, activity);
     // Apply effects
     apply_npc_action_effect(world, npc, &action, tick, memory_opt.as_deref_mut());
     // Busy
-    if action.effect.busy_for_ticks > 0 { npc.busy_until_tick = tick + action.effect.busy_for_ticks; }
+    if action.effect.busy_for_ticks > 0 {
+        npc.busy_until_tick = tick + action.effect.busy_for_ticks;
+    }
     npc.last_action = Some(action);
 }
 
@@ -416,7 +516,11 @@ pub fn tick_simulated_npc_coarse(npc: &mut SimulatedNpc, _world: &mut WorldState
 }
 
 /// LOD-aware ticking over a registry of NPCs.
-pub fn tick_npcs_lod(world: &mut WorldState, registry: &mut crate::npc_registry::NpcRegistry, tick: u64) {
+pub fn tick_npcs_lod(
+    world: &mut WorldState,
+    registry: &mut crate::npc_registry::NpcRegistry,
+    tick: u64,
+) {
     for (_id, npc) in registry.iter_mut() {
         // Update scheduled/current activity first
         update_npc_activity_state(world, npc, tick);
@@ -679,21 +783,29 @@ fn filter_actions_by_schedule(
     candidates: &[NpcActionKind],
     activity: NpcActivityKind,
 ) -> Vec<NpcActionKind> {
-    use NpcActivityKind::*;
     use NpcActionKind::*;
+    use NpcActivityKind::*;
 
     let mut filtered = Vec::new();
     for &kind in candidates {
         let allowed = match activity {
             Work => matches!(kind, WorkShift | SelfImprovement | Idle),
             School => matches!(kind, SelfImprovement | SocializeWithNpc | Idle),
-            Nightlife => matches!(kind, SocialVisitPlayer | SocializeWithNpc | WithdrawAlone | Idle),
-            Home => matches!(kind, SocialVisitPlayer | WithdrawAlone | SelfImprovement | Idle),
+            Nightlife => matches!(
+                kind,
+                SocialVisitPlayer | SocializeWithNpc | WithdrawAlone | Idle
+            ),
+            Home => matches!(
+                kind,
+                SocialVisitPlayer | WithdrawAlone | SelfImprovement | Idle
+            ),
             Errands => matches!(kind, SocializeWithNpc | WithdrawAlone | Idle),
             OnlineOnly => matches!(kind, SocialVisitPlayer | WithdrawAlone | Idle),
             Offscreen => matches!(kind, Idle),
         };
-        if allowed { filtered.push(kind); }
+        if allowed {
+            filtered.push(kind);
+        }
     }
     if filtered.is_empty() {
         filtered.push(NpcActionKind::Idle);
@@ -822,9 +934,9 @@ fn tick_npc_tier2(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
     npc.last_tick = tick;
 }
 
-use syn_core::WorldState;
+use crate::{NpcInstance as _, NpcLodTier as _};
 use syn_core::time::GameTime as _; // ensure module imported above; alias to avoid warn if shadowed
-use crate::{NpcInstance as _, NpcLodTier as _}; // bring types into scope to satisfy lints
+use syn_core::WorldState; // bring types into scope to satisfy lints
 
 /// Advance the simulation by `ticks` ticks (hours).
 /// Each tick advances GameTime and ticks NPCs in tier-specific cadences.
@@ -861,7 +973,9 @@ pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
         }
 
         // 4) Global low-frequency systems
-        if low_freq { tick_memory_decay(world); }
+        if low_freq {
+            tick_memory_decay(world);
+        }
 
         // 5) LOD transitions
         tick_lod_transitions(world, sim);

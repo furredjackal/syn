@@ -1,4 +1,4 @@
-use syn_core::{AbstractNpc, AttachmentStyle, StatKind, Traits, NpcId};
+use syn_core::{AbstractNpc, AttachmentStyle, NpcId, StatKind, Traits};
 use syn_sim::SimulatedNpc;
 
 fn make_test_npc() -> SimulatedNpc {

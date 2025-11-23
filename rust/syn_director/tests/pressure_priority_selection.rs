@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use syn_core::relationship_model::RelationshipAxis;
 use syn_core::relationship_pressure::{RelationshipEventKind, RelationshipPressureEvent};
 use syn_core::{NpcId, Relationship, RelationshipState, SimTick, WorldSeed, WorldState};
-use syn_director::{EventDirector, Storylet, StoryletOutcome, StoryletPrerequisites, RelationshipPrereq};
+use syn_director::{
+    EventDirector, RelationshipPrereq, Storylet, StoryletOutcome, StoryletPrerequisites,
+};
 use syn_memory::MemorySystem;
 
 #[test]
@@ -21,15 +23,18 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
         },
     );
 
-    world.relationship_pressure.queue.push_back(RelationshipPressureEvent {
-        actor_id: 1,
-        target_id: 2,
-        kind: RelationshipEventKind::AffectionBandChanged,
-        old_band: "Friendly".to_string(),
-        new_band: "Close".to_string(),
-        source: Some("test".to_string()),
-        tick: Some(1),
-    });
+    world
+        .relationship_pressure
+        .queue
+        .push_back(RelationshipPressureEvent {
+            actor_id: 1,
+            target_id: 2,
+            kind: RelationshipEventKind::AffectionBandChanged,
+            old_band: "Friendly".to_string(),
+            new_band: "Close".to_string(),
+            source: Some("test".to_string()),
+            tick: Some(1),
+        });
 
     let storylet_a = Storylet {
         id: "generic".into(),
@@ -47,11 +52,14 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -79,11 +87,14 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 

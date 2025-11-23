@@ -1,4 +1,4 @@
-use syn_core::{Stats, StatKind, StatDelta, apply_stat_deltas, Karma, MoodBand, KarmaBand};
+use syn_core::{apply_stat_deltas, Karma, KarmaBand, MoodBand, StatDelta, StatKind, Stats};
 
 #[test]
 fn clamps_correctly() {
@@ -60,9 +60,21 @@ fn karma_band_transitions() {
 fn apply_multiple_deltas_deterministically() {
     let mut s = Stats::default();
     let deltas = vec![
-        StatDelta { kind: StatKind::Health, delta: -20.0, source: Some("test1".into()) },
-        StatDelta { kind: StatKind::Health, delta: 10.0, source: Some("test2".into()) },
-        StatDelta { kind: StatKind::Mood, delta: 15.0, source: None },
+        StatDelta {
+            kind: StatKind::Health,
+            delta: -20.0,
+            source: Some("test1".into()),
+        },
+        StatDelta {
+            kind: StatKind::Health,
+            delta: 10.0,
+            source: Some("test2".into()),
+        },
+        StatDelta {
+            kind: StatKind::Mood,
+            delta: 15.0,
+            source: None,
+        },
     ];
     apply_stat_deltas(&mut s, &deltas);
     assert_eq!(s.get(StatKind::Health), 40.0);

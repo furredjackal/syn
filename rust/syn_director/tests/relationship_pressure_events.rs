@@ -4,8 +4,8 @@ use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::relationship_pressure::RelationshipEventKind;
 use syn_core::{NpcId, Relationship, RelationshipState, SimTick, WorldSeed, WorldState};
 use syn_director::{
-    apply_storylet_outcome, next_hot_relationship, Storylet, StoryletOutcome, StoryletPrerequisites,
-    StoryletRole,
+    apply_storylet_outcome_with_memory, next_hot_relationship, Storylet, StoryletOutcome,
+    StoryletPrerequisites, StoryletRole,
 };
 use syn_memory::MemorySystem;
 
@@ -41,6 +41,7 @@ fn storylet_outcomes_enqueue_relationship_pressure_events() {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 0.0,
         weight: 1.0,
@@ -49,6 +50,8 @@ fn storylet_outcomes_enqueue_relationship_pressure_events() {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -63,7 +66,7 @@ fn storylet_outcomes_enqueue_relationship_pressure_events() {
         ..Default::default()
     };
 
-    apply_storylet_outcome(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
+    apply_storylet_outcome_with_memory(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
 
     let event = next_hot_relationship(&mut world).expect("expected a relationship pressure event");
 

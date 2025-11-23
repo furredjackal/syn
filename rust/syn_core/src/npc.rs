@@ -1,11 +1,10 @@
 //! Core NPC identity, personality, and prototype definitions.
 
-use serde::{Deserialize, Serialize};
 use crate::time::DayPhase;
+use serde::{Deserialize, Serialize};
 
-use crate::stats::Stats;
-use crate::LifeStage;
 use crate::types::NpcId;
+use crate::{LifeStage, Stats};
 
 /// High-level role tags for NPCs used by Director/systems.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -109,7 +108,9 @@ impl NpcSchedule {
     /// Get scheduled activity for a given day phase; defaults to Home.
     pub fn activity_for_phase(&self, phase: DayPhase) -> NpcActivityKind {
         for slot in &self.daily_slots {
-            if slot.phase == phase { return slot.activity; }
+            if slot.phase == phase {
+                return slot.activity;
+            }
         }
         NpcActivityKind::Home
     }
@@ -119,11 +120,23 @@ impl NpcPrototype {
     pub fn with_default_work_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![
-                NpcScheduleSlot { phase: DayPhase::Morning, activity: NpcActivityKind::Work },
-                NpcScheduleSlot { phase: DayPhase::Afternoon, activity: NpcActivityKind::Work },
-                NpcScheduleSlot { phase: DayPhase::Evening, activity: NpcActivityKind::Home },
-                NpcScheduleSlot { phase: DayPhase::Night, activity: NpcActivityKind::Home },
-            ]
+                NpcScheduleSlot {
+                    phase: DayPhase::Morning,
+                    activity: NpcActivityKind::Work,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Afternoon,
+                    activity: NpcActivityKind::Work,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Evening,
+                    activity: NpcActivityKind::Home,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Night,
+                    activity: NpcActivityKind::Home,
+                },
+            ],
         };
         self
     }
@@ -131,11 +144,23 @@ impl NpcPrototype {
     pub fn with_default_school_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![
-                NpcScheduleSlot { phase: DayPhase::Morning, activity: NpcActivityKind::School },
-                NpcScheduleSlot { phase: DayPhase::Afternoon, activity: NpcActivityKind::School },
-                NpcScheduleSlot { phase: DayPhase::Evening, activity: NpcActivityKind::Home },
-                NpcScheduleSlot { phase: DayPhase::Night, activity: NpcActivityKind::Home },
-            ]
+                NpcScheduleSlot {
+                    phase: DayPhase::Morning,
+                    activity: NpcActivityKind::School,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Afternoon,
+                    activity: NpcActivityKind::School,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Evening,
+                    activity: NpcActivityKind::Home,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Night,
+                    activity: NpcActivityKind::Home,
+                },
+            ],
         };
         self
     }
@@ -143,11 +168,23 @@ impl NpcPrototype {
     pub fn with_default_nightlife_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![
-                NpcScheduleSlot { phase: DayPhase::Morning, activity: NpcActivityKind::Home },
-                NpcScheduleSlot { phase: DayPhase::Afternoon, activity: NpcActivityKind::Errands },
-                NpcScheduleSlot { phase: DayPhase::Evening, activity: NpcActivityKind::Nightlife },
-                NpcScheduleSlot { phase: DayPhase::Night, activity: NpcActivityKind::Nightlife },
-            ]
+                NpcScheduleSlot {
+                    phase: DayPhase::Morning,
+                    activity: NpcActivityKind::Home,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Afternoon,
+                    activity: NpcActivityKind::Errands,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Evening,
+                    activity: NpcActivityKind::Nightlife,
+                },
+                NpcScheduleSlot {
+                    phase: DayPhase::Night,
+                    activity: NpcActivityKind::Nightlife,
+                },
+            ],
         };
         self
     }

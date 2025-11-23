@@ -1,7 +1,9 @@
 use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::stats::{StatDelta, StatKind};
-use syn_core::{NpcId, WorldSeed, WorldState, SimTick};
-use syn_director::{apply_storylet_outcome, Storylet, StoryletOutcome, StoryletPrerequisites};
+use syn_core::{NpcId, SimTick, WorldSeed, WorldState};
+use syn_director::{
+    apply_storylet_outcome_with_memory, Storylet, StoryletOutcome, StoryletPrerequisites,
+};
 use syn_memory::MemorySystem;
 
 #[test]
@@ -25,16 +27,23 @@ fn storylet_outcome_applies_new_relationship_deltas() {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 0.0,
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
     let outcome = StoryletOutcome {
-        stat_deltas: vec![StatDelta { kind: StatKind::Mood, delta: 0.0, source: None }],
+        stat_deltas: vec![StatDelta {
+            kind: StatKind::Mood,
+            delta: 0.0,
+            source: None,
+        }],
         relationship_deltas: vec![RelationshipDelta {
             actor_id: 1,
             target_id: 2,
@@ -45,7 +54,7 @@ fn storylet_outcome_applies_new_relationship_deltas() {
         ..Default::default()
     };
 
-    apply_storylet_outcome(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
+    apply_storylet_outcome_with_memory(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
 
     let rel = world.relationships.get(&(NpcId(1), NpcId(2))).unwrap();
     assert!((rel.affection - 4.0).abs() < f32::EPSILON);

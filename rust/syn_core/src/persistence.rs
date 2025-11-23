@@ -2,9 +2,9 @@
 //!
 //! Handles schema initialization, save/load, and world state serialization.
 
+use crate::types::*;
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde_json;
-use crate::types::*;
 
 /// Persistence layer for SYN world state.
 pub struct Persistence {
@@ -118,8 +118,7 @@ impl Persistence {
 
         // Save relationships
         for ((from_id, to_id), rel) in &world.relationships {
-            let rel_json = serde_json::to_string(rel)
-                .map_err(|_| rusqlite::Error::InvalidQuery)?;
+            let rel_json = serde_json::to_string(rel).map_err(|_| rusqlite::Error::InvalidQuery)?;
             self.conn.execute(
                 "INSERT OR REPLACE INTO relationships (world_seed, from_npc_id, to_npc_id, relationship_data)
                  VALUES (?, ?, ?, ?)",
@@ -129,8 +128,7 @@ impl Persistence {
 
         // Save NPCs
         for (npc_id, npc) in &world.npcs {
-            let npc_json = serde_json::to_string(npc)
-                .map_err(|_| rusqlite::Error::InvalidQuery)?;
+            let npc_json = serde_json::to_string(npc).map_err(|_| rusqlite::Error::InvalidQuery)?;
             self.conn.execute(
                 "INSERT OR REPLACE INTO npcs (world_seed, npc_id, npc_data) VALUES (?, ?, ?)",
                 params![world.seed.0, npc_id.0, npc_json],
@@ -157,8 +155,7 @@ impl Persistence {
             let heat_value: f32 = row.get(6).unwrap_or(0.0);
             let heat_momentum: f32 = row.get(7).unwrap_or(0.0);
 
-            let player_stats: Stats = serde_json::from_str(&stats_json)
-                .unwrap_or_default();
+            let player_stats: Stats = serde_json::from_str(&stats_json).unwrap_or_default();
             let player_life_stage = match life_stage_str.as_str() {
                 "Child" => LifeStage::Child,
                 "Teen" => LifeStage::Teen,
@@ -185,6 +182,10 @@ impl Persistence {
                 relationship_pressure: Default::default(),
                 relationship_milestones: Default::default(),
                 digital_legacy: Default::default(),
+                npc_prototypes: Default::default(),
+                known_npcs: Default::default(),
+                game_time: Default::default(),
+                storylet_usage: Default::default(),
             };
 
             Ok(world)
@@ -198,8 +199,7 @@ impl Persistence {
             let from_id = NpcId(row.get(0)?);
             let to_id = NpcId(row.get(1)?);
             let rel_json: String = row.get(2)?;
-            let rel: Relationship = serde_json::from_str(&rel_json)
-                .unwrap_or_default();
+            let rel: Relationship = serde_json::from_str(&rel_json).unwrap_or_default();
             Ok(((from_id, to_id), rel))
         })?;
 
@@ -210,14 +210,14 @@ impl Persistence {
         }
 
         // Load NPCs
-        let mut npc_stmt = self.conn.prepare(
-            "SELECT npc_id, npc_data FROM npcs WHERE world_seed = ?"
-        )?;
+        let mut npc_stmt = self
+            .conn
+            .prepare("SELECT npc_id, npc_data FROM npcs WHERE world_seed = ?")?;
         let npcs = npc_stmt.query_map(params![seed.0], |row| {
             let npc_id = NpcId(row.get(0)?);
             let npc_json: String = row.get(1)?;
-            let npc: AbstractNpc = serde_json::from_str(&npc_json)
-                .unwrap_or_else(|_| AbstractNpc {
+            let npc: AbstractNpc =
+                serde_json::from_str(&npc_json).unwrap_or_else(|_| AbstractNpc {
                     id: npc_id,
                     age: 0,
                     job: "Unknown".to_string(),
@@ -244,24 +244,22 @@ impl Persistence {
             "DELETE FROM memory_entries WHERE world_seed = ?",
             params![seed.0],
         )?;
-        self.conn.execute(
-            "DELETE FROM npcs WHERE world_seed = ?",
-            params![seed.0],
-        )?;
+        self.conn
+            .execute("DELETE FROM npcs WHERE world_seed = ?", params![seed.0])?;
         self.conn.execute(
             "DELETE FROM relationships WHERE world_seed = ?",
             params![seed.0],
         )?;
-        self.conn.execute(
-            "DELETE FROM world_state WHERE seed = ?",
-            params![seed.0],
-        )?;
+        self.conn
+            .execute("DELETE FROM world_state WHERE seed = ?", params![seed.0])?;
         Ok(())
     }
 
     /// Check if a world exists.
     pub fn world_exists(&mut self, seed: WorldSeed) -> SqlResult<bool> {
-        let mut stmt = self.conn.prepare("SELECT 1 FROM world_state WHERE seed = ?")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT 1 FROM world_state WHERE seed = ?")?;
         let exists = stmt.exists(params![seed.0])?;
         Ok(exists)
     }
@@ -282,7 +280,9 @@ impl Persistence {
 
     /// Load every storylet JSON blob from SQLite.
     pub fn load_storylet_records(&mut self) -> SqlResult<Vec<StoryletRecord>> {
-        let mut stmt = self.conn.prepare("SELECT id, name, json_data FROM storylets")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, json_data FROM storylets")?;
         let rows = stmt.query_map([], |row| {
             Ok(StoryletRecord {
                 id: row.get(0)?,

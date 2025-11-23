@@ -1,6 +1,6 @@
-use syn_core::{WorldState, WorldSeed, NpcId, Stats, LifeStage};
-use syn_core::npc::{NpcPrototype, PersonalityVector, NpcRoleTag};
-use syn_sim::{npc_registry::NpcRegistry, NpcLod, instantiate_simulated_npc_from_prototype};
+use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
+use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
+use syn_sim::{instantiate_simulated_npc_from_prototype, npc_registry::NpcRegistry, NpcLod};
 
 fn make_world_with_proto(id: NpcId) -> WorldState {
     let mut world = WorldState::new(WorldSeed(99), NpcId(1));
@@ -9,7 +9,13 @@ fn make_world_with_proto(id: NpcId) -> WorldState {
         display_name: "Proto Test".to_string(),
         role_label: None,
         role_tags: vec![NpcRoleTag::Peer],
-        personality: PersonalityVector { warmth: 0.2, dominance: 0.1, volatility: 0.0, conscientiousness: 0.8, openness: 0.6 },
+        personality: PersonalityVector {
+            warmth: 0.2,
+            dominance: 0.1,
+            volatility: 0.0,
+            conscientiousness: 0.8,
+            openness: 0.6,
+        },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
     };

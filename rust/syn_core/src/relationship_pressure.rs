@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
 use crate::relationship_model::{
-    RelationshipVector, AffectionBand, TrustBand, AttractionBand, ResentmentBand,
+    AffectionBand, AttractionBand, RelationshipVector, ResentmentBand, TrustBand,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

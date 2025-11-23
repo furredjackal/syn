@@ -64,7 +64,7 @@ fn get_player_relationships_filters_to_player_only() {
     // Assert - should only have player's relationships
     assert_eq!(snapshot.relationships.len(), 2);
     assert!(snapshot.relationships.iter().all(|r| r.actor_id == 1));
-    
+
     // Verify we have both NPCs
     let target_ids: Vec<i64> = snapshot.relationships.iter().map(|r| r.target_id).collect();
     assert!(target_ids.contains(&2));

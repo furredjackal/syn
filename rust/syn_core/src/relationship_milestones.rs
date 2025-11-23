@@ -96,8 +96,10 @@ impl RelationshipMilestoneState {
     ) -> Option<RelationshipMilestoneKind> {
         let has_tag = |needle: &str| memory_tags.iter().any(|t| t.eq_ignore_ascii_case(needle));
 
-        if matches!(prev, RelationshipRole::Friend | RelationshipRole::Acquaintance)
-            && matches!(new, RelationshipRole::Rival)
+        if matches!(
+            prev,
+            RelationshipRole::Friend | RelationshipRole::Acquaintance
+        ) && matches!(new, RelationshipRole::Rival)
             && (has_tag("betrayal") || has_tag("backstab"))
         {
             return Some(RelationshipMilestoneKind::FriendToRival);
@@ -110,8 +112,10 @@ impl RelationshipMilestoneState {
             return Some(RelationshipMilestoneKind::RivalToAlly);
         }
 
-        if matches!(prev, RelationshipRole::Stranger | RelationshipRole::Acquaintance)
-            && matches!(new, RelationshipRole::Romance)
+        if matches!(
+            prev,
+            RelationshipRole::Stranger | RelationshipRole::Acquaintance
+        ) && matches!(new, RelationshipRole::Romance)
             && (has_tag("chemistry") || has_tag("flirt") || has_tag("romantic_event"))
         {
             return Some(RelationshipMilestoneKind::StrangerToRomance);
@@ -120,7 +124,9 @@ impl RelationshipMilestoneState {
         if matches!(prev, RelationshipRole::Romance)
             && matches!(
                 new,
-                RelationshipRole::Stranger | RelationshipRole::Rival | RelationshipRole::Acquaintance
+                RelationshipRole::Stranger
+                    | RelationshipRole::Rival
+                    | RelationshipRole::Acquaintance
             )
             && (has_tag("betrayal") || has_tag("trust_break") || has_tag("spiral"))
         {
@@ -137,14 +143,13 @@ impl RelationshipMilestoneState {
         None
     }
 
-    fn reason_for_milestone(
-        kind: RelationshipMilestoneKind,
-        _memory_tags: &[String],
-    ) -> String {
+    fn reason_for_milestone(kind: RelationshipMilestoneKind, _memory_tags: &[String]) -> String {
         match kind {
             RelationshipMilestoneKind::FriendToRival => "high resentment + betrayal memory".into(),
             RelationshipMilestoneKind::RivalToAlly => "shared trauma drew them together".into(),
-            RelationshipMilestoneKind::StrangerToRomance => "attraction spike + shared event".into(),
+            RelationshipMilestoneKind::StrangerToRomance => {
+                "attraction spike + shared event".into()
+            }
             RelationshipMilestoneKind::RomanceCollapse => "trust failure spiral".into(),
             RelationshipMilestoneKind::FriendToFamily => {
                 "long-term stability + shared life events".into()

@@ -1,10 +1,4 @@
 pub use syn_director::{
-    StoryletOutcome,
-    StoryletPrerequisites,
-    TimeAndLocationPrereqs,
-    RelationshipPrereq,
-    Storylet,
-    StoryActorRef,
-    StoryletActors,
-    InteractionTone,
+    InteractionTone, RelationshipPrereq, StoryActorRef, Storylet, StoryletActors, StoryletChoice,
+    StoryletLibrary, StoryletOutcome, StoryletPrerequisites, TimeAndLocationPrereqs,
 };

@@ -29,7 +29,9 @@ fn records_band_change_events() {
     );
 
     assert!(!pressure.queue.is_empty());
-    let event = pressure.pop_next_event().expect("expected a band change event");
+    let event = pressure
+        .pop_next_event()
+        .expect("expected a band change event");
 
     assert_eq!(event.actor_id, actor_id);
     assert_eq!(event.target_id, target_id);

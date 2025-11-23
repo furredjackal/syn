@@ -1,5 +1,5 @@
 use syn_core::narrative_heat::NarrativeHeatBand;
-use syn_core::{NpcId, WorldSeed, WorldState, SimTick};
+use syn_core::{NpcId, SimTick, WorldSeed, WorldState};
 use syn_director::{
     EventDirector, Storylet, StoryletHeatCategory, StoryletOutcome, StoryletPrerequisites,
 };
@@ -22,11 +22,14 @@ fn basic_storylet(id: &str, category: StoryletHeatCategory) -> Storylet {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 10.0,
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: Some(category),
     }
 }

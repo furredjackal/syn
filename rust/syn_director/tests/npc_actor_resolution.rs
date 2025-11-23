@@ -1,6 +1,9 @@
-use syn_core::{WorldState, WorldSeed, NpcId, Stats, LifeStage};
-use syn_core::npc::{NpcPrototype, PersonalityVector, NpcRoleTag};
-use syn_director::{Storylet, StoryActorRef, StoryletActors, resolve_actor_ref_to_npc, prepare_storylet_execution, StoryletPrerequisites, StoryletRole};
+use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
+use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
+use syn_director::{
+    prepare_storylet_execution, resolve_actor_ref_to_npc, StoryActorRef, Storylet, StoryletActors,
+    StoryletPrerequisites, StoryletRole,
+};
 use syn_sim::npc_registry::NpcRegistry;
 
 fn make_world_with_known_tag(id: NpcId, tag: NpcRoleTag) -> WorldState {
@@ -10,7 +13,13 @@ fn make_world_with_known_tag(id: NpcId, tag: NpcRoleTag) -> WorldState {
         display_name: "Tagged NPC".to_string(),
         role_label: None,
         role_tags: vec![tag],
-        personality: PersonalityVector { warmth: 0.0, dominance: 0.0, volatility: 0.0, conscientiousness: 0.5, openness: 0.5 },
+        personality: PersonalityVector {
+            warmth: 0.0,
+            dominance: 0.0,
+            volatility: 0.0,
+            conscientiousness: 0.5,
+            openness: 0.5,
+        },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
         schedule: Default::default(),
@@ -26,7 +35,8 @@ fn test_resolve_actor_ref_role_tag() {
     let world = make_world_with_known_tag(id, NpcRoleTag::Peer);
     let registry = NpcRegistry::default();
     let actor_ref = StoryActorRef::RoleTag(NpcRoleTag::Peer);
-    let found = resolve_actor_ref_to_npc(&world, &registry, &actor_ref).expect("should resolve to NPC");
+    let found =
+        resolve_actor_ref_to_npc(&world, &registry, &actor_ref).expect("should resolve to NPC");
     assert_eq!(found, id);
 }
 
@@ -52,18 +62,29 @@ fn test_prepare_storylet_execution_focuses_npc() {
             memory_recency_ticks: None,
             relationship_prereqs: vec![],
             allowed_life_stages: vec![],
+            time_and_location: None,
             digital_legacy_prereq: None,
         },
         heat: 0.0,
         weight: 1.0,
         cooldown_ticks: 0,
-        roles: vec![StoryletRole { name: "primary".into(), npc_id: id }],
+        roles: vec![StoryletRole {
+            name: "primary".into(),
+            npc_id: id,
+        }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
-        actors: Some(StoryletActors { primary: Some(StoryActorRef::RoleTag(NpcRoleTag::Family)), secondary: None }),
+        actors: Some(StoryletActors {
+            primary: Some(StoryActorRef::RoleTag(NpcRoleTag::Family)),
+            secondary: None,
+        }),
     };
 
     prepare_storylet_execution(&mut world, &mut registry, &storylet, 0);
 
-    let inst = registry.get(id).expect("NPC should be instantiated and focused");
+    let inst = registry
+        .get(id)
+        .expect("NPC should be instantiated and focused");
     assert!(matches!(inst.lod, syn_sim::NpcLod::Tier2Active));
 }

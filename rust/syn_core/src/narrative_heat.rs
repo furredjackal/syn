@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::relationship_model::RelationshipVector;
 use crate::life_stage::LifeStageStatProfile;
+use crate::relationship_model::RelationshipVector;
 use crate::Stats;
 
 /// Scalar narrative heat value, typically clamped within [0, 100].
@@ -149,7 +149,8 @@ pub fn compute_heat_delta(inputs: &NarrativeHeatInputs<'_>, config: &NarrativeHe
     let wealth_weight = weight(|p| p.wealth_weight, 1.0);
     let reputation_weight = weight(|p| p.reputation_weight, 1.0);
 
-    delta += config.extreme_stat_weight * ((mood_extreme * mood_weight) + (health_low * health_weight));
+    delta +=
+        config.extreme_stat_weight * ((mood_extreme * mood_weight) + (health_low * health_weight));
     delta += config.economic_stress_weight * (wealth_low * wealth_weight);
 
     let mut avg_resentment = 0.0;

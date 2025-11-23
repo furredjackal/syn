@@ -1,6 +1,6 @@
-use syn_core::npc::{PersonalityVector, NpcPrototype, NpcRoleTag};
-use syn_core::{WorldState, WorldSeed, NpcId, Stats, LifeStage};
 use std::collections::HashMap;
+use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
+use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
 
 #[test]
 fn test_personality_clamp_and_world_prototype_lookup() {

@@ -1,8 +1,10 @@
-use syn_director::{EventDirector, RelationshipPrereq, Storylet, StoryletPrerequisites, StoryletRole};
-use syn_core::relationship_model::RelationshipAxis;
-use syn_core::{NpcId, Relationship, WorldSeed, WorldState, SimTick};
-use syn_memory::MemorySystem;
 use std::collections::HashMap;
+use syn_core::relationship_model::RelationshipAxis;
+use syn_core::{NpcId, Relationship, SimTick, WorldSeed, WorldState};
+use syn_director::{
+    EventDirector, RelationshipPrereq, Storylet, StoryletPrerequisites, StoryletRole,
+};
+use syn_memory::MemorySystem;
 
 #[test]
 fn relationship_prereqs_pass_when_affection_in_range() {
@@ -64,6 +66,7 @@ fn relationship_prereqs_pass_when_affection_in_range() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -72,6 +75,8 @@ fn relationship_prereqs_pass_when_affection_in_range() {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -141,6 +146,7 @@ fn relationship_prereqs_fail_when_affection_below_min() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -149,6 +155,8 @@ fn relationship_prereqs_fail_when_affection_below_min() {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -218,6 +226,7 @@ fn relationship_prereqs_pass_with_band_based_criteria() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -226,6 +235,8 @@ fn relationship_prereqs_pass_with_band_based_criteria() {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -282,6 +293,7 @@ fn relationship_prereqs_fail_when_relationship_missing() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 0.5,
@@ -290,6 +302,8 @@ fn relationship_prereqs_fail_when_relationship_missing() {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -374,11 +388,14 @@ fn relationship_prereqs_with_explicit_actor_id() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 50.0,
         weight: 0.5,
         cooldown_ticks: 100,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 

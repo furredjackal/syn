@@ -87,11 +87,21 @@ impl RelationshipStore for WorldState {
     fn apply_delta(&mut self, delta: &RelationshipDelta) {
         let mut current = self.get_relationship(self.player_id, delta.target_id);
         match delta.axis {
-            RelationshipAxis::Affection => current.affection = (current.affection + delta.delta).clamp(-10.0, 10.0),
-            RelationshipAxis::Trust => current.trust = (current.trust + delta.delta).clamp(-10.0, 10.0),
-            RelationshipAxis::Attraction => current.attraction = (current.attraction + delta.delta).clamp(-10.0, 10.0),
-            RelationshipAxis::Familiarity => current.familiarity = (current.familiarity + delta.delta).clamp(-10.0, 10.0),
-            RelationshipAxis::Resentment => current.resentment = (current.resentment + delta.delta).clamp(-10.0, 10.0),
+            RelationshipAxis::Affection => {
+                current.affection = (current.affection + delta.delta).clamp(-10.0, 10.0)
+            }
+            RelationshipAxis::Trust => {
+                current.trust = (current.trust + delta.delta).clamp(-10.0, 10.0)
+            }
+            RelationshipAxis::Attraction => {
+                current.attraction = (current.attraction + delta.delta).clamp(-10.0, 10.0)
+            }
+            RelationshipAxis::Familiarity => {
+                current.familiarity = (current.familiarity + delta.delta).clamp(-10.0, 10.0)
+            }
+            RelationshipAxis::Resentment => {
+                current.resentment = (current.resentment + delta.delta).clamp(-10.0, 10.0)
+            }
         }
         current.state = current.compute_next_state();
         self.set_relationship(self.player_id, delta.target_id, current);

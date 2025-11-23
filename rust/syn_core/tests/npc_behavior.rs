@@ -1,5 +1,7 @@
 use syn_core::npc::PersonalityVector;
-use syn_core::npc_behavior::{compute_behavior_intents, compute_needs_from_state, choose_best_intent, BehaviorKind};
+use syn_core::npc_behavior::{
+    choose_best_intent, compute_behavior_intents, compute_needs_from_state, BehaviorKind,
+};
 use syn_core::relationship_model::RelationshipVector;
 use syn_core::types::Stats;
 
@@ -27,11 +29,23 @@ fn computes_needs_within_bounds_and_intents_nonempty() {
         openness: 0.7,
     };
 
-    let rel = RelationshipVector { affection: 4.0, trust: 2.0, attraction: 1.0, familiarity: 3.0, resentment: 0.0 };
+    let rel = RelationshipVector {
+        affection: 4.0,
+        trust: 2.0,
+        attraction: 1.0,
+        familiarity: 3.0,
+        resentment: 0.0,
+    };
     let needs = compute_needs_from_state(&stats, &personality, Some(&rel));
 
     // All needs should be within 0.0..=1.5
-    for v in [needs.social, needs.security, needs.recognition, needs.comfort, needs.autonomy] {
+    for v in [
+        needs.social,
+        needs.security,
+        needs.recognition,
+        needs.comfort,
+        needs.autonomy,
+    ] {
         assert!(v >= 0.0 && v <= 1.5, "need out of bounds: {}", v);
     }
 

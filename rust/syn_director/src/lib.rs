@@ -3,39 +3,45 @@
 //! Central narrative brain: evaluates world state, personality vectors, and relationship
 //! pressures to select and fire emergent storylets.
 
+use crate as syn_director; // ensure path for re-exports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use syn_core::npc::NpcActivityKind;
+use syn_core::npc::NpcRoleTag;
+use syn_core::npc_behavior::{BehaviorKind, BehaviorSnapshot};
+use syn_core::time::DayPhase;
 use syn_core::{
-    behavior_action_from_tags, apply_stat_deltas,
+    apply_stat_deltas, behavior_action_from_tags, deterministic_rng_from_world,
     narrative_heat::NarrativeHeatBand,
+    relationship_milestones::RelationshipMilestoneEvent,
     relationship_model::{
-        AttractionBand, AffectionBand, RelationshipAxis, RelationshipDelta, RelationshipVector,
+        AffectionBand, AttractionBand, RelationshipAxis, RelationshipDelta, RelationshipVector,
         ResentmentBand, TrustBand,
     },
     relationship_pressure::{RelationshipEventKind, RelationshipPressureEvent},
-    relationship_milestones::RelationshipMilestoneEvent,
-    LifeStage, NpcId, RelationshipState, SimTick, StatDelta, WorldState,
+    LifeStage, NpcId, RelationshipState, SimTick, StatDelta, StoryletUsageState, WorldState,
 };
-use syn_core::npc::{NpcRoleTag};
-use crate as syn_director; // ensure path for re-exports
 use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;
-use syn_core::npc_behavior::{BehaviorKind, BehaviorSnapshot};
-use syn_sim::npc_registry::NpcRegistry;
-use syn_core::npc::NpcActivityKind;
-use syn_core::time::DayPhase;
+use syn_sim::{npc_registry::NpcRegistry, tick_world, SimState};
 
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Storylet {
     pub id: String,
     pub name: String,
-    pub tags: Vec<String>,                      // e.g., ["romance", "crisis", "career"]
+    pub tags: Vec<String>, // e.g., ["romance", "crisis", "career"]
     pub prerequisites: StoryletPrerequisites,
-    pub heat: f32,                              // narrative intensity (0.0..100.0)
-    pub weight: f32,                            // base probability of firing
-    pub cooldown_ticks: u32,                    // prevent rapid re-firing
-    pub roles: Vec<StoryletRole>,              // required NPC roles
+    pub heat: f32,                // narrative intensity (0.0..100.0)
+    pub weight: f32,              // base probability of firing
+    pub cooldown_ticks: u32,      // prevent rapid re-firing
+    pub roles: Vec<StoryletRole>, // required NPC roles
+    /// Optional cap on how many times this storylet may fire.
+    #[serde(default)]
+    pub max_uses: Option<u32>,
+    /// Player-facing options for this storylet.
+    #[serde(default)]
+    pub choices: Vec<StoryletChoice>,
     /// Optional heat category for pacing alignment.
     #[serde(default)]
     pub heat_category: Option<StoryletHeatCategory>,
@@ -63,6 +69,31 @@ pub enum InteractionTone {
     Attention,
     Withdrawal,
     Stability,
+}
+
+/// A choice within a storylet presented to the player.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoryletChoice {
+    pub id: String,
+    pub label: String,
+    pub outcome: StoryletOutcome,
+}
+
+/// Simple container for storylet content.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StoryletLibrary {
+    pub storylets: Vec<Storylet>,
+}
+
+impl StoryletLibrary {
+    pub fn new(storylets: Vec<Storylet>) -> Self {
+        Self { storylets }
+    }
+
+    /// Placeholder loader; integrates with content pipeline when available.
+    pub fn load_default() -> Result<Self, ()> {
+        Ok(Self::default())
+    }
 }
 
 /// Relationship-based prerequisite (additive, non-breaking).
@@ -128,12 +159,12 @@ pub struct StoryletPrerequisites {
     pub min_relationship_resentment: Option<f32>,
     pub stat_conditions: HashMap<String, (f32, f32)>, // {"mood": (-10.0, -5.0)} means mood in range
     pub life_stages: Vec<String>,                     // ["Teen", "Adult", "Elder"]
-    pub tags: Vec<String>,                           // must have these tags
-    pub relationship_states: Vec<RelationshipState>,  // Only fire if relationship is in one of these states
+    pub tags: Vec<String>,                            // must have these tags
+    pub relationship_states: Vec<RelationshipState>, // Only fire if relationship is in one of these states
     // Memory prerequisites for event echoes
-    pub memory_tags_required: Vec<String>,           // NPC must have memory with at least one of these tags
-    pub memory_tags_forbidden: Vec<String>,          // NPC must NOT have memory with these tags (conflict avoidance)
-    pub memory_recency_ticks: Option<u64>,           // If specified, memory must be within N ticks (default: 7 days = 168 ticks)
+    pub memory_tags_required: Vec<String>, // NPC must have memory with at least one of these tags
+    pub memory_tags_forbidden: Vec<String>, // NPC must NOT have memory with these tags (conflict avoidance)
+    pub memory_recency_ticks: Option<u64>, // If specified, memory must be within N ticks (default: 7 days = 168 ticks)
     /// Optional relationship-based prerequisites (additive).
     #[serde(default)]
     pub relationship_prereqs: Vec<RelationshipPrereq>,
@@ -202,7 +233,11 @@ pub fn resolve_actor_ref_to_npc(
         StoryActorRef::Player => None,
         StoryActorRef::NpcId(id) => {
             let npc_id = NpcId(*id);
-            if npc_is_available_for_player(world, registry, npc_id) { Some(npc_id) } else { None }
+            if npc_is_available_for_player(world, registry, npc_id) {
+                Some(npc_id)
+            } else {
+                None
+            }
         }
         StoryActorRef::RoleTag(tag) => {
             for npc_id in &world.known_npcs {
@@ -222,11 +257,7 @@ pub fn resolve_actor_ref_to_npc(
 
 /// Is this NPC available to share a scene with the player right now?
 /// Simple rule: offscreen / online-only may only work for certain storylets.
-fn npc_is_available_for_player(
-    world: &WorldState,
-    registry: &NpcRegistry,
-    npc_id: NpcId,
-) -> bool {
+fn npc_is_available_for_player(world: &WorldState, registry: &NpcRegistry, npc_id: NpcId) -> bool {
     if let Some(inst) = registry.get(npc_id) {
         match inst.current_activity {
             NpcActivityKind::Offscreen => false,
@@ -248,7 +279,9 @@ fn check_time_and_location_prereqs(
     registry: &NpcRegistry,
     storylet: &Storylet,
 ) -> bool {
-    let Some(pr) = &storylet.prerequisites.time_and_location else { return true; };
+    let Some(pr) = &storylet.prerequisites.time_and_location else {
+        return true;
+    };
 
     // Phase gating
     if !pr.allowed_phases.is_empty() && !pr.allowed_phases.contains(&world.game_time.phase) {
@@ -256,9 +289,13 @@ fn check_time_and_location_prereqs(
     }
 
     // NPC activity gating (if we have an NPC actor)
-    if pr.allowed_npc_activities.is_empty() { return true; }
+    if pr.allowed_npc_activities.is_empty() {
+        return true;
+    }
 
-    let Some(actors) = &storylet.actors else { return true; };
+    let Some(actors) = &storylet.actors else {
+        return true;
+    };
     if let Some(ref primary) = actors.primary {
         if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary) {
             if let Some(inst) = registry.get(npc_id) {
@@ -270,11 +307,7 @@ fn check_time_and_location_prereqs(
 }
 
 /// Internal: access an NPC's current behavior snapshot from the registry.
-fn get_npc_behavior<'a>(
-    registry: &'a NpcRegistry,
-    npc_id: NpcId,
-)
--> Option<&'a BehaviorSnapshot> {
+fn get_npc_behavior<'a>(registry: &'a NpcRegistry, npc_id: NpcId) -> Option<&'a BehaviorSnapshot> {
     registry.get(npc_id)?.behavior.as_ref()
 }
 
@@ -296,15 +329,23 @@ pub fn npc_intent_score_multiplier(
     registry: &NpcRegistry,
     storylet: &Storylet,
 ) -> f32 {
-    let tone = match &storylet.interaction_tone { Some(t) => t, None => return 1.0 };
+    let tone = match &storylet.interaction_tone {
+        Some(t) => t,
+        None => return 1.0,
+    };
 
-    let Some(actors) = &storylet.actors else { return 1.0 };
+    let Some(actors) = &storylet.actors else {
+        return 1.0;
+    };
 
     if let Some(primary_ref) = &actors.primary {
         if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary_ref) {
             if let Some(snapshot) = get_npc_behavior(registry, npc_id) {
-                if tone_matches_behavior(tone, &snapshot.chosen_intent.kind) { return 1.3; }
-                else { return 0.9; }
+                return if tone_matches_behavior(tone, &snapshot.chosen_intent.kind) {
+                    1.3
+                } else {
+                    0.9
+                }
             }
         }
     }
@@ -445,16 +486,16 @@ fn band_rank_for(axis: RelationshipAxis, rel: &RelationshipVector) -> u8 {
 fn band_rank_from_name(axis: RelationshipAxis, name: &str) -> Option<u8> {
     let lowered = name.to_ascii_lowercase();
     match axis {
-        RelationshipAxis::Affection | RelationshipAxis::Familiarity => Some(affection_band_rank(
-            match lowered.as_str() {
+        RelationshipAxis::Affection | RelationshipAxis::Familiarity => {
+            Some(affection_band_rank(match lowered.as_str() {
                 "stranger" => AffectionBand::Stranger,
                 "acquaintance" => AffectionBand::Acquaintance,
                 "friendly" => AffectionBand::Friendly,
                 "close" => AffectionBand::Close,
                 "devoted" => AffectionBand::Devoted,
                 _ => AffectionBand::Stranger,
-            },
-        )),
+            }))
+        }
         RelationshipAxis::Trust => Some(trust_band_rank(match lowered.as_str() {
             "unknown" => TrustBand::Unknown,
             "wary" => TrustBand::Wary,
@@ -543,10 +584,7 @@ fn check_life_stage_prereqs(world: &WorldState, pre: &StoryletPrerequisites) -> 
     pre.allowed_life_stages.contains(&world.player_life_stage)
 }
 
-fn check_digital_legacy_prereq(
-    world: &WorldState,
-    pre: &Option<DigitalLegacyPrereq>,
-) -> bool {
+fn check_digital_legacy_prereq(world: &WorldState, pre: &Option<DigitalLegacyPrereq>) -> bool {
     let Some(pre) = pre else {
         return true;
     };
@@ -580,11 +618,27 @@ fn check_digital_legacy_prereq(
         true
     };
 
-    between(lv.compassion_vs_cruelty, &pre.min_compassion_vs_cruelty, &pre.max_compassion_vs_cruelty)
-        && between(lv.ambition_vs_comfort, &pre.min_ambition_vs_comfort, &pre.max_ambition_vs_comfort)
-        && between(lv.connection_vs_isolation, &pre.min_connection_vs_isolation, &pre.max_connection_vs_isolation)
-        && between(lv.stability_vs_chaos, &pre.min_stability_vs_chaos, &pre.max_stability_vs_chaos)
-        && between(lv.light_vs_shadow, &pre.min_light_vs_shadow, &pre.max_light_vs_shadow)
+    between(
+        lv.compassion_vs_cruelty,
+        &pre.min_compassion_vs_cruelty,
+        &pre.max_compassion_vs_cruelty,
+    ) && between(
+        lv.ambition_vs_comfort,
+        &pre.min_ambition_vs_comfort,
+        &pre.max_ambition_vs_comfort,
+    ) && between(
+        lv.connection_vs_isolation,
+        &pre.min_connection_vs_isolation,
+        &pre.max_connection_vs_isolation,
+    ) && between(
+        lv.stability_vs_chaos,
+        &pre.min_stability_vs_chaos,
+        &pre.max_stability_vs_chaos,
+    ) && between(
+        lv.light_vs_shadow,
+        &pre.min_light_vs_shadow,
+        &pre.max_light_vs_shadow,
+    )
 }
 
 fn memory_tags_for_pair(memory: &MemorySystem, actor_id: u64, target_id: u64) -> Vec<String> {
@@ -721,8 +775,7 @@ fn digital_legacy_score_multiplier(world: &WorldState, pre: &Option<DigitalLegac
 
     // For now: if we have any bound at all, and prereq passes, give a small boost.
     // (We already checked prereqs in find_eligible.)
-    let has_any_bounds =
-        pre.min_compassion_vs_cruelty.is_some()
+    let has_any_bounds = pre.min_compassion_vs_cruelty.is_some()
         || pre.max_compassion_vs_cruelty.is_some()
         || pre.min_ambition_vs_comfort.is_some()
         || pre.max_ambition_vs_comfort.is_some()
@@ -750,7 +803,8 @@ fn score_storylet_full(
     let heat_band = world.narrative_heat.band();
     let heat_mult = heat_score_multiplier(heat_band, storylet);
     let stage_mult = life_stage_score_multiplier(world, &storylet.prerequisites);
-    let legacy_mult = digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
+    let legacy_mult =
+        digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
     let mut score = base * heat_mult * stage_mult * legacy_mult;
     if storylet.heat_category.is_some() && !storylet_heat_band_match(heat_band, storylet) {
         score *= 0.5;
@@ -784,13 +838,19 @@ pub fn select_next_event_with_registry<'a>(
     current_tick: SimTick,
 ) -> Option<&'a Storylet> {
     let eligible = director.find_eligible(world, memory, current_tick);
-    if eligible.is_empty() { return None; }
+    if eligible.is_empty() {
+        return None;
+    }
     let hot_event_opt = world.relationship_pressure.peek_next_event();
     let mut best_storylet: Option<&Storylet> = None;
     let mut best_score = f32::MIN;
     for storylet in eligible {
-        let score = score_storylet_full_with_registry(director, world, registry, storylet, hot_event_opt);
-        if score > best_score { best_score = score; best_storylet = Some(storylet); }
+        let score =
+            score_storylet_full_with_registry(director, world, registry, storylet, hot_event_opt);
+        if score > best_score {
+            best_score = score;
+            best_storylet = Some(storylet);
+        }
     }
     best_storylet
 }
@@ -798,7 +858,7 @@ pub fn select_next_event_with_registry<'a>(
 /// Cooldown tracker to prevent storylet repetition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CooldownTracker {
-    global_cooldowns: HashMap<String, SimTick>,    // storylet_id -> until_tick
+    global_cooldowns: HashMap<String, SimTick>, // storylet_id -> until_tick
     npc_cooldowns: HashMap<(String, NpcId), SimTick>, // (storylet_id, npc_id) -> until_tick
 }
 
@@ -826,10 +886,17 @@ impl CooldownTracker {
         global_ready && npc_ready
     }
 
-    fn mark_cooldown(&mut self, storylet_id: &str, npc_id: NpcId, cooldown_ticks: u32, current_tick: SimTick) {
+    fn mark_cooldown(
+        &mut self,
+        storylet_id: &str,
+        npc_id: NpcId,
+        cooldown_ticks: u32,
+        current_tick: SimTick,
+    ) {
         let until = SimTick::new(current_tick.0 + cooldown_ticks as u64);
         self.global_cooldowns.insert(storylet_id.to_string(), until);
-        self.npc_cooldowns.insert((storylet_id.to_string(), npc_id), until);
+        self.npc_cooldowns
+            .insert((storylet_id.to_string(), npc_id), until);
     }
 }
 
@@ -853,7 +920,12 @@ impl EventDirector {
     }
 
     /// Find eligible storylets based on world state.
-    pub fn find_eligible(&self, world: &WorldState, memory: &MemorySystem, current_tick: SimTick) -> Vec<&Storylet> {
+    pub fn find_eligible(
+        &self,
+        world: &WorldState,
+        memory: &MemorySystem,
+        current_tick: SimTick,
+    ) -> Vec<&Storylet> {
         self.storylets
             .iter()
             .filter(|s| self.is_eligible(s, world, memory, current_tick))
@@ -861,9 +933,18 @@ impl EventDirector {
     }
 
     /// Check if a storylet is eligible to fire.
-    fn is_eligible(&self, storylet: &Storylet, world: &WorldState, memory: &MemorySystem, current_tick: SimTick) -> bool {
+    fn is_eligible(
+        &self,
+        storylet: &Storylet,
+        world: &WorldState,
+        memory: &MemorySystem,
+        current_tick: SimTick,
+    ) -> bool {
         // Check cooldown
-        if !self.cooldowns.is_ready(&storylet.id, world.player_id, current_tick) {
+        if !self
+            .cooldowns
+            .is_ready(&storylet.id, world.player_id, current_tick)
+        {
             return false;
         }
 
@@ -889,7 +970,11 @@ impl EventDirector {
             if let Some(target_role) = storylet.roles.get(0) {
                 let rel = world.get_relationship(world.player_id, target_role.npc_id);
                 // If any relationship states are specified, the current state must match one of them
-                if !storylet.prerequisites.relationship_states.contains(&rel.state) {
+                if !storylet
+                    .prerequisites
+                    .relationship_states
+                    .contains(&rel.state)
+                {
                     return false;
                 }
             }
@@ -900,9 +985,11 @@ impl EventDirector {
             if let Some(target_role) = storylet.roles.get(0) {
                 // NPC must have at least one of the required memory tags
                 if let Some(journal) = memory.journals.get(&target_role.npc_id) {
-                    let has_required_tag = storylet.prerequisites.memory_tags_required.iter().any(|tag| {
-                        !journal.memories_with_tag(tag).is_empty()
-                    });
+                    let has_required_tag = storylet
+                        .prerequisites
+                        .memory_tags_required
+                        .iter()
+                        .any(|tag| !journal.memories_with_tag(tag).is_empty());
                     if !has_required_tag {
                         return false;
                     }
@@ -917,9 +1004,11 @@ impl EventDirector {
             if let Some(target_role) = storylet.roles.get(0) {
                 // NPC must NOT have any of the forbidden memory tags
                 if let Some(journal) = memory.journals.get(&target_role.npc_id) {
-                    let has_forbidden_tag = storylet.prerequisites.memory_tags_forbidden.iter().any(|tag| {
-                        !journal.memories_with_tag(tag).is_empty()
-                    });
+                    let has_forbidden_tag = storylet
+                        .prerequisites
+                        .memory_tags_forbidden
+                        .iter()
+                        .any(|tag| !journal.memories_with_tag(tag).is_empty());
                     if has_forbidden_tag {
                         return false;
                     }
@@ -934,9 +1023,16 @@ impl EventDirector {
                 if !storylet.prerequisites.memory_tags_required.is_empty() {
                     if let Some(journal) = memory.journals.get(&target_role.npc_id) {
                         let since_tick = SimTick::new(current_tick.0.saturating_sub(recency_ticks));
-                        let has_recent_tag = storylet.prerequisites.memory_tags_required.iter().any(|tag| {
-                            journal.memories_since(since_tick).iter().any(|m| m.tags.contains(tag))
-                        });
+                        let has_recent_tag = storylet
+                            .prerequisites
+                            .memory_tags_required
+                            .iter()
+                            .any(|tag| {
+                                journal
+                                    .memories_since(since_tick)
+                                    .iter()
+                                    .any(|m| m.tags.contains(tag))
+                            });
                         if !has_recent_tag {
                             return false;
                         }
@@ -973,7 +1069,8 @@ impl EventDirector {
         // Pressure point bonus: if there's relationship tension, bump "conflict" storylets
         if storylet.tags.contains(&"conflict".to_string()) {
             if let Some(target_role) = storylet.roles.get(0) {
-                if RelationshipQuery::has_pressure_point(world, world.player_id, target_role.npc_id) {
+                if RelationshipQuery::has_pressure_point(world, world.player_id, target_role.npc_id)
+                {
                     score *= 1.5;
                 }
             }
@@ -995,7 +1092,12 @@ impl EventDirector {
     }
 
     /// Select the best eligible storylet(s) to fire this tick.
-    pub fn select_next_event(&self, world: &WorldState, memory: &MemorySystem, current_tick: SimTick) -> Option<&Storylet> {
+    pub fn select_next_event(
+        &self,
+        world: &WorldState,
+        memory: &MemorySystem,
+        current_tick: SimTick,
+    ) -> Option<&Storylet> {
         let eligible = self.find_eligible(world, memory, current_tick);
         if eligible.is_empty() {
             return None;
@@ -1038,7 +1140,7 @@ impl EventDirector {
             }
         }
 
-        apply_storylet_outcome(world, memory, storylet, &outcome, current_tick);
+        apply_storylet_outcome_with_memory(world, memory, storylet, &outcome, current_tick);
         // Mark cooldown
         if let Some(first_role) = storylet.roles.first() {
             self.cooldowns.mark_cooldown(
@@ -1079,10 +1181,7 @@ fn apply_relationship_outcome(
 /// Update relationship pressure flags for pairs that had relationship changes.
 /// For now, this simply tracks which pairs had deltas; future refinement
 /// can track actual band crossings.
-fn update_relationship_pressure_flags(
-    world: &mut WorldState,
-    deltas: &[RelationshipDelta],
-) {
+fn update_relationship_pressure_flags(world: &mut WorldState, deltas: &[RelationshipDelta]) {
     for delta in deltas {
         let pair = (delta.actor_id, delta.target_id);
         // Simple check: if this pair already exists, skip duplicate
@@ -1092,14 +1191,14 @@ fn update_relationship_pressure_flags(
     }
 }
 
-pub fn apply_storylet_outcome(
+pub fn apply_storylet_outcome_with_memory(
     world: &mut WorldState,
     memory: &mut MemorySystem,
     storylet: &Storylet,
     outcome: &StoryletOutcome,
     current_tick: SimTick,
 ) {
-        // Apply stat impacts
+    // Apply stat impacts
     apply_stat_deltas(&mut world.player_stats, &outcome.stat_deltas);
 
     // New additive relationship delta handling using the unified model (non-breaking).
@@ -1226,12 +1325,236 @@ impl Default for EventDirector {
     }
 }
 
+fn storylet_check_stat_prereqs(_world: &WorldState, _pre: &StoryletPrerequisites) -> bool {
+    true
+}
+
+fn storylet_check_heat_prereqs(_world: &WorldState, _pre: &StoryletPrerequisites) -> bool {
+    true
+}
+
+fn storylet_check_relationship_prereqs(world: &WorldState, pre: &StoryletPrerequisites) -> bool {
+    check_relationship_prereqs(world, &pre.relationship_prereqs, world.player_id)
+}
+
+fn storylet_check_time_and_location_prereqs(
+    world: &WorldState,
+    sim: &SimState,
+    storylet: &Storylet,
+) -> bool {
+    check_time_and_location_prereqs(world, &sim.npc_registry, storylet)
+}
+
+fn relationship_pressure_score_multiplier(
+    _world: &WorldState,
+    _sim: &SimState,
+    _storylet: &Storylet,
+) -> f32 {
+    1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectorChoiceView {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectorEventView {
+    pub storylet_id: String,
+    pub title: String,
+    pub choices: Vec<DirectorChoiceView>,
+}
+
+pub struct DirectorContext<'a> {
+    pub library: &'a StoryletLibrary,
+    pub world: &'a WorldState,
+    pub sim: &'a SimState,
+    pub usage: &'a StoryletUsageState,
+}
+
+pub fn storylet_is_eligible(
+    world: &WorldState,
+    sim: &SimState,
+    storylet: &Storylet,
+    usage: &StoryletUsageState,
+) -> bool {
+    let pre = &storylet.prerequisites;
+
+    if let Some(max) = storylet.max_uses {
+        let used = usage.times_fired.get(&storylet.id).copied().unwrap_or(0);
+        if used >= max {
+            return false;
+        }
+    }
+
+    if !storylet_check_stat_prereqs(world, pre) {
+        return false;
+    }
+    if !check_life_stage_prereqs(world, pre) {
+        return false;
+    }
+    if !storylet_check_heat_prereqs(world, pre) {
+        return false;
+    }
+    if !storylet_check_relationship_prereqs(world, pre) {
+        return false;
+    }
+    if !storylet_check_time_and_location_prereqs(world, sim, storylet) {
+        return false;
+    }
+    if !check_digital_legacy_prereq(world, &pre.digital_legacy_prereq) {
+        return false;
+    }
+
+    true
+}
+
+pub fn score_storylet_full(world: &WorldState, sim: &SimState, storylet: &Storylet) -> f32 {
+    let base = if storylet.weight > 0.0 {
+        storylet.weight
+    } else {
+        1.0
+    };
+
+    let heat_band = world.narrative_heat.band();
+    let heat_mult = heat_score_multiplier(heat_band, storylet);
+    let stage_mult = life_stage_score_multiplier(world, &storylet.prerequisites);
+    let legacy_mult =
+        digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
+    let npc_intent_mult = npc_intent_score_multiplier(world, &sim.npc_registry, storylet);
+    let pressure_mult = relationship_pressure_score_multiplier(world, sim, storylet);
+
+    base * heat_mult * stage_mult * legacy_mult * npc_intent_mult * pressure_mult
+}
+
+pub fn select_storylet_weighted<'a>(
+    world: &WorldState,
+    sim: &SimState,
+    library: &'a StoryletLibrary,
+    usage: &StoryletUsageState,
+) -> Option<&'a Storylet> {
+    let mut scored: Vec<(&Storylet, f32)> = library
+        .storylets
+        .iter()
+        .filter(|s| storylet_is_eligible(world, sim, s, usage))
+        .map(|s| {
+            let score = score_storylet_full(world, sim, s).max(0.0);
+            (s, score)
+        })
+        .collect();
+
+    if scored.is_empty() {
+        return None;
+    }
+
+    let total: f32 = scored.iter().map(|(_, w)| *w).sum();
+    if total <= 0.0 {
+        scored.sort_by(|(a, _), (b, _)| a.id.cmp(&b.id));
+        return Some(scored[0].0);
+    }
+
+    let mut rng = deterministic_rng_from_world(world);
+    let roll = rng.gen_f32() * total;
+    let mut acc = 0.0;
+    for (s, w) in scored {
+        acc += w;
+        if roll <= acc {
+            return Some(s);
+        }
+    }
+
+    scored.last().map(|(s, _)| *s)
+}
+
+pub fn apply_storylet_outcome(
+    world: &mut WorldState,
+    _sim: &mut SimState,
+    outcome: &StoryletOutcome,
+) {
+    if !outcome.stat_deltas.is_empty() {
+        apply_stat_deltas(&mut world.player_stats, &outcome.stat_deltas);
+    }
+
+    if !outcome.relationship_deltas.is_empty() {
+        for delta in &outcome.relationship_deltas {
+            let actor = NpcId(delta.actor_id);
+            let target = NpcId(delta.target_id);
+            let mut rel = world.get_relationship(actor, target);
+            rel.apply_delta(delta.axis, delta.delta);
+            rel.state = rel.compute_next_state();
+            world.set_relationship(actor, target, rel);
+        }
+    }
+
+    if let Some(delta) = outcome.karma_delta {
+        world.player_karma.apply_delta(delta);
+    }
+}
+
+pub fn apply_storylet_choice_outcome(
+    world: &mut WorldState,
+    sim: &mut SimState,
+    storylet: &Storylet,
+    choice: &StoryletChoice,
+) {
+    apply_storylet_outcome(world, sim, &choice.outcome);
+
+    let usage = &mut world.storylet_usage;
+    let counter = usage.times_fired.entry(storylet.id.clone()).or_insert(0);
+    *counter += 1;
+}
+
+pub fn select_next_event_view(
+    world: &mut WorldState,
+    sim: &mut SimState,
+    library: &StoryletLibrary,
+) -> Option<DirectorEventView> {
+    let usage = &world.storylet_usage;
+    let storylet = select_storylet_weighted(world, sim, library, usage)?;
+
+    let choices = storylet
+        .choices
+        .iter()
+        .map(|c| DirectorChoiceView {
+            id: c.id.clone(),
+            label: c.label.clone(),
+        })
+        .collect();
+
+    Some(DirectorEventView {
+        storylet_id: storylet.id.clone(),
+        title: storylet.name.clone(),
+        choices,
+    })
+}
+
+pub fn apply_choice_and_advance(
+    world: &mut WorldState,
+    sim: &mut SimState,
+    library: &StoryletLibrary,
+    storylet_id: &str,
+    choice_id: &str,
+    ticks_to_advance: u32,
+) -> Option<DirectorEventView> {
+    let storylet = library.storylets.iter().find(|s| s.id == storylet_id)?;
+    let choice = storylet.choices.iter().find(|c| c.id == choice_id)?;
+
+    apply_storylet_choice_outcome(world, sim, storylet, choice);
+
+    if ticks_to_advance > 0 {
+        tick_world(world, sim, ticks_to_advance);
+    }
+
+    select_next_event_view(world, sim, library)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use syn_core::{
-        relationship_model::RelationshipAxis, NpcId, Relationship, WorldSeed, WorldState, StatDelta,
-        StatKind,
+        relationship_model::RelationshipAxis, NpcId, Relationship, StatDelta, StatKind, WorldSeed,
+        WorldState,
     };
 
     #[test]
@@ -1252,6 +1575,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1260,6 +1584,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1286,11 +1612,14 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.5,
             cooldown_ticks: 100,
             roles: vec![],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1340,15 +1669,21 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 60.0,
             weight: 0.5,
             cooldown_ticks: 100,
             roles: vec![],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
-        let conflict_storylet = Storylet { tags: vec!["conflict".to_string()], ..romance_storylet.clone() };
+        let conflict_storylet = Storylet {
+            tags: vec!["conflict".to_string()],
+            ..romance_storylet.clone()
+        };
 
         let romance_score = director.score_storylet(&romance_storylet, &world);
         let conflict_score = director.score_storylet(&conflict_storylet, &world);
@@ -1376,11 +1711,14 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 75.0,
             weight: 0.8,
             cooldown_ticks: 100,
             roles: vec![],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1410,6 +1748,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1418,6 +1757,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1454,23 +1795,40 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 0.0,
             weight: 1.0,
             cooldown_ticks: 0,
             roles: vec![],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
         let outcome = StoryletOutcome {
             stat_deltas: vec![
-                StatDelta { kind: StatKind::Mood, delta: -5.0, source: Some("test".into()) },
-                StatDelta { kind: StatKind::Reputation, delta: 10.0, source: Some("test".into()) },
+                StatDelta {
+                    kind: StatKind::Mood,
+                    delta: -5.0,
+                    source: Some("test".into()),
+                },
+                StatDelta {
+                    kind: StatKind::Reputation,
+                    delta: 10.0,
+                    source: Some("test".into()),
+                },
             ],
             karma_delta: Some(-20.0),
             ..Default::default()
         };
 
-        apply_storylet_outcome(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
+        apply_storylet_outcome_with_memory(
+            &mut world,
+            &mut memory,
+            &storylet,
+            &outcome,
+            SimTick(0),
+        );
 
         assert!(world.player_stats.get(StatKind::Mood) <= 10.0);
         assert!(world.player_stats.get(StatKind::Mood) >= -10.0);
@@ -1501,6 +1859,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 20.0,
             weight: 1.0,
@@ -1509,6 +1868,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1525,7 +1886,7 @@ mod tests {
 
     #[test]
     fn test_relationship_state_gating_romance_event() {
-        use syn_core::{AbstractNpc, Traits, AttachmentStyle};
+        use syn_core::{AbstractNpc, AttachmentStyle, Traits};
 
         let mut director = EventDirector::new();
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
@@ -1561,6 +1922,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.7,
@@ -1569,18 +1931,24 @@ mod tests {
                 name: "romantic_interest".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
         // Set up a Stranger relationship
-        world.set_relationship(NpcId(1), NpcId(2), Relationship {
-            affection: 0.0,
-            trust: 0.0,
-            attraction: 0.0,
-            familiarity: 0.0,
-            resentment: 0.0,
-            state: RelationshipState::Stranger,
-        });
+        world.set_relationship(
+            NpcId(1),
+            NpcId(2),
+            Relationship {
+                affection: 0.0,
+                trust: 0.0,
+                attraction: 0.0,
+                familiarity: 0.0,
+                resentment: 0.0,
+                state: RelationshipState::Stranger,
+            },
+        );
 
         director.register_storylet(romance_storylet.clone());
 
@@ -1588,14 +1956,18 @@ mod tests {
         assert!(!director.is_eligible(&romance_storylet, &world, &memory, SimTick(0)));
 
         // Now set to Friend state
-        world.set_relationship(NpcId(1), NpcId(2), Relationship {
-            affection: 5.0,
-            trust: 3.0,
-            attraction: 2.0,
-            familiarity: 4.0,
-            resentment: 0.0,
-            state: RelationshipState::Friend,
-        });
+        world.set_relationship(
+            NpcId(1),
+            NpcId(2),
+            Relationship {
+                affection: 5.0,
+                trust: 3.0,
+                attraction: 2.0,
+                familiarity: 4.0,
+                resentment: 0.0,
+                state: RelationshipState::Friend,
+            },
+        );
 
         // Romance event SHOULD fire with Friend state
         assert!(director.is_eligible(&romance_storylet, &world, &memory, SimTick(0)));
@@ -1608,14 +1980,18 @@ mod tests {
         let mut memory = MemorySystem::new();
 
         // Set Friend relationship
-        world.set_relationship(NpcId(1), NpcId(2), Relationship {
-            affection: 5.0,
-            trust: 3.0,
-            attraction: 2.0,
-            familiarity: 4.0,
-            resentment: 0.0,
-            state: RelationshipState::Friend,
-        });
+        world.set_relationship(
+            NpcId(1),
+            NpcId(2),
+            Relationship {
+                affection: 5.0,
+                trust: 3.0,
+                attraction: 2.0,
+                familiarity: 4.0,
+                resentment: 0.0,
+                state: RelationshipState::Friend,
+            },
+        );
 
         let storylet = Storylet {
             id: "deepening_bond".to_string(),
@@ -1633,6 +2009,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.5,
@@ -1641,6 +2018,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1710,6 +2089,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 60.0,
             weight: 0.6,
@@ -1718,18 +2098,24 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
         // Best Friend relationship should NOT allow conflict based on state check
-        world.set_relationship(NpcId(1), NpcId(2), Relationship {
-            affection: 9.0,
-            trust: 9.0,
-            attraction: 0.5,
-            familiarity: 9.0,
-            resentment: 0.0,
-            state: RelationshipState::BestFriend,
-        });
+        world.set_relationship(
+            NpcId(1),
+            NpcId(2),
+            Relationship {
+                affection: 9.0,
+                trust: 9.0,
+                attraction: 0.5,
+                familiarity: 9.0,
+                resentment: 0.0,
+                state: RelationshipState::BestFriend,
+            },
+        );
 
         director.register_storylet(conflict_storylet.clone());
 
@@ -1742,7 +2128,7 @@ mod tests {
 
     #[test]
     fn test_memory_echo_required_tag_gating() {
-        use syn_core::{AbstractNpc, Traits, AttachmentStyle};
+        use syn_core::{AbstractNpc, AttachmentStyle, Traits};
         use syn_memory::MemoryEntry;
 
         let mut director = EventDirector::new();
@@ -1778,6 +2164,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 60.0,
             weight: 0.8,
@@ -1786,6 +2173,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1802,7 +2191,8 @@ mod tests {
             NpcId(2),
             SimTick(95),
             -0.8,
-        ).with_tags(vec!["betrayal"]);
+        )
+        .with_tags(vec!["betrayal"]);
 
         memory.record_memory(memory_entry);
 
@@ -1812,7 +2202,7 @@ mod tests {
 
     #[test]
     fn test_memory_echo_forbidden_tag_blocking() {
-        use syn_core::{AbstractNpc, Traits, AttachmentStyle};
+        use syn_core::{AbstractNpc, AttachmentStyle, Traits};
         use syn_memory::MemoryEntry;
 
         let mut director = EventDirector::new();
@@ -1848,6 +2238,7 @@ mod tests {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 50.0,
             weight: 0.7,
@@ -1856,6 +2247,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1873,7 +2266,8 @@ mod tests {
             NpcId(2),
             SimTick(50),
             -0.9,
-        ).with_tags(vec!["trauma"]);
+        )
+        .with_tags(vec!["trauma"]);
 
         memory.record_memory(trauma_entry);
 
@@ -1883,7 +2277,7 @@ mod tests {
 
     #[test]
     fn test_memory_echo_recency_window() {
-        use syn_core::{AbstractNpc, Traits, AttachmentStyle};
+        use syn_core::{AbstractNpc, AttachmentStyle, Traits};
         use syn_memory::MemoryEntry;
 
         let mut director = EventDirector::new();
@@ -1916,9 +2310,10 @@ mod tests {
                 relationship_states: vec![],
                 memory_tags_required: vec!["confrontation".to_string()],
                 memory_tags_forbidden: vec![],
-                memory_recency_ticks: Some(50),  // Must be within last 50 ticks
+                memory_recency_ticks: Some(50), // Must be within last 50 ticks
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 55.0,
             weight: 0.65,
@@ -1927,6 +2322,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -1942,9 +2339,10 @@ mod tests {
             "mem_confrontation_old".to_string(),
             "event_confrontation".to_string(),
             NpcId(2),
-            SimTick(0),  // 100 ticks ago
+            SimTick(0), // 100 ticks ago
             -0.5,
-        ).with_tags(vec!["confrontation"]);
+        )
+        .with_tags(vec!["confrontation"]);
 
         memory.record_memory(old_confrontation);
 
@@ -1956,9 +2354,10 @@ mod tests {
             "mem_confrontation_recent".to_string(),
             "event_confrontation".to_string(),
             NpcId(2),
-            SimTick(75),  // 25 ticks ago (within 50-tick window)
+            SimTick(75), // 25 ticks ago (within 50-tick window)
             -0.6,
-        ).with_tags(vec!["confrontation"]);
+        )
+        .with_tags(vec!["confrontation"]);
 
         memory.record_memory(recent_confrontation);
 
@@ -1968,7 +2367,7 @@ mod tests {
 
     #[test]
     fn test_memory_echo_multiple_tags() {
-        use syn_core::{AbstractNpc, Traits, AttachmentStyle};
+        use syn_core::{AbstractNpc, AttachmentStyle, Traits};
         use syn_memory::MemoryEntry;
 
         let mut director = EventDirector::new();
@@ -1999,11 +2398,12 @@ mod tests {
                 life_stages: vec![],
                 tags: vec![],
                 relationship_states: vec![],
-                memory_tags_required: vec!["love_confession".to_string(), "jealousy".to_string()],  // Either one
+                memory_tags_required: vec!["love_confession".to_string(), "jealousy".to_string()], // Either one
                 memory_tags_forbidden: vec![],
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
             },
             heat: 80.0,
             weight: 0.9,
@@ -2012,6 +2412,8 @@ mod tests {
                 name: "target".to_string(),
                 npc_id: NpcId(2),
             }],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
         };
 
@@ -2029,21 +2431,23 @@ mod tests {
             NpcId(2),
             SimTick(90),
             -0.4,
-        ).with_tags(vec!["jealousy"]);
+        )
+        .with_tags(vec!["jealousy"]);
 
         memory.record_memory(jealousy_memory);
 
         // Event SHOULD fire now (has one of the required tags)
         assert!(director.is_eligible(&complex_storylet, &world, &memory, SimTick(100)));
 
-        // Add a "love_confession" memory (second required tag) 
+        // Add a "love_confession" memory (second required tag)
         let confession_memory = MemoryEntry::new(
             "mem_love_confession".to_string(),
             "event_confession".to_string(),
             NpcId(2),
             SimTick(95),
             0.8,
-        ).with_tags(vec!["love_confession"]);
+        )
+        .with_tags(vec!["love_confession"]);
 
         memory.record_memory(confession_memory);
 

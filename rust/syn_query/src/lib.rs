@@ -19,7 +19,9 @@ impl NpcQuery {
 
     /// Filter NPCs by age range.
     pub fn with_age_range(mut self, min_age: u32, max_age: u32) -> Self {
-        self.filters.push(Box::new(move |npc| npc.age >= min_age && npc.age <= max_age));
+        self.filters.push(Box::new(move |npc| {
+            npc.age >= min_age && npc.age <= max_age
+        }));
         self
     }
 
@@ -31,7 +33,8 @@ impl NpcQuery {
 
     /// Filter NPCs by district.
     pub fn with_district(mut self, district: String) -> Self {
-        self.filters.push(Box::new(move |npc| npc.district == district));
+        self.filters
+            .push(Box::new(move |npc| npc.district == district));
         self
     }
 
@@ -60,7 +63,11 @@ impl RelationshipQuery {
     }
 
     /// Find all NPCs with high resentment toward a target.
-    pub fn find_resentful_relations(world: &WorldState, npc_id: NpcId, threshold: f32) -> Vec<NpcId> {
+    pub fn find_resentful_relations(
+        world: &WorldState,
+        npc_id: NpcId,
+        threshold: f32,
+    ) -> Vec<NpcId> {
         world
             .relationships
             .iter()

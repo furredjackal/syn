@@ -1,4 +1,4 @@
-use syn_core::npc_actions::{behavior_to_candidate_actions, base_effect_for_action, NpcActionKind};
+use syn_core::npc_actions::{base_effect_for_action, behavior_to_candidate_actions, NpcActionKind};
 use syn_core::npc_behavior::BehaviorKind;
 
 #[test]
@@ -16,7 +16,10 @@ fn mapping_from_behavior_has_expected_candidates() {
     assert!(comfort.contains(&NpcActionKind::WithdrawAlone));
 
     let auto = behavior_to_candidate_actions(BehaviorKind::SeekAutonomy);
-    assert!(auto.contains(&NpcActionKind::ProvokePlayer) || auto.contains(&NpcActionKind::SelfImprovement));
+    assert!(
+        auto.contains(&NpcActionKind::ProvokePlayer)
+            || auto.contains(&NpcActionKind::SelfImprovement)
+    );
 }
 
 #[test]
@@ -30,6 +33,9 @@ fn base_effects_present_where_expected() {
 
     // WorkShift should provide wealth and busy time
     let eff2 = base_effect_for_action(NpcActionKind::WorkShift);
-    assert!(eff2.npc_stat_deltas.iter().any(|d| matches!(d.kind, syn_core::StatKind::Wealth)));
+    assert!(eff2
+        .npc_stat_deltas
+        .iter()
+        .any(|d| matches!(d.kind, syn_core::StatKind::Wealth)));
     assert!(eff2.busy_for_ticks > 0);
 }

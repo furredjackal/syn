@@ -4,20 +4,27 @@
 //! This is the "public interface" of the Rust backend.
 
 use flutter_rust_bridge::frb;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use syn_content::load_storylets_from_db;
 use syn_core::relationship_model::{derive_role_label, RelationshipVector};
+use syn_director::{
+    apply_choice_and_advance, select_next_event_view, DirectorEventView, StoryletLibrary,
+};
+use syn_sim::SimState;
 
 // Re-export core types for Dart
 pub use syn_core::{
     AbstractNpc, AttachmentStyle, Karma, KarmaBand, LifeStage, MoodBand, NpcId, Relationship,
     SimTick, StatKind, Stats, Traits, WorldSeed, WorldState, ALL_STAT_KINDS,
 };
-pub use syn_director::{EventDirector, Storylet, StoryletOutcome, StoryletRole};
+pub use syn_director::{
+    EventDirector, Storylet, StoryletChoice, StoryletLibrary, StoryletOutcome, StoryletRole,
+};
 pub use syn_memory::{Journal, MemoryEntry, MemorySystem};
-pub use syn_sim::{LodTier, Simulator};
 pub use syn_query::{ClusterQuery, NpcQuery, RelationshipQuery, StatQuery};
+pub use syn_sim::{LodTier, Simulator};
 
 /// Global game engine state (wrapped in Mutex for thread safety).
 pub struct GameEngine {
@@ -27,10 +34,29 @@ pub struct GameEngine {
     memory: MemorySystem,
 }
 
+pub struct GameRuntime {
+    pub world: WorldState,
+    pub sim: SimState,
+    pub storylets: StoryletLibrary,
+}
+
 const DEFAULT_STORYLET_DB: &str = "storylets.sqlite";
 
+static RUNTIME: Lazy<Mutex<GameRuntime>> = Lazy::new(|| {
+    let world = WorldState::new(WorldSeed::new(0), NpcId(1));
+    let sim = SimState::new();
+    let storylets = StoryletLibrary::load_default().unwrap_or_default();
+
+    Mutex::new(GameRuntime {
+        world,
+        sim,
+        storylets,
+    })
+});
+
 fn register_storylets_from_db(director: &mut EventDirector) {
-    let db_path = std::env::var("SYN_STORYLET_DB").unwrap_or_else(|_| DEFAULT_STORYLET_DB.to_string());
+    let db_path =
+        std::env::var("SYN_STORYLET_DB").unwrap_or_else(|_| DEFAULT_STORYLET_DB.to_string());
     match load_storylets_from_db(&db_path) {
         Ok(storylets) => {
             for content_storylet in storylets {
@@ -40,13 +66,20 @@ fn register_storylets_from_db(director: &mut EventDirector) {
                     name: content_storylet.name,
                     tags: content_storylet.tags,
                     prerequisites: syn_director::StoryletPrerequisites {
-                        min_relationship_affection: content_storylet.prerequisites.min_relationship_affection,
-                        min_relationship_resentment: content_storylet.prerequisites.min_relationship_resentment,
+                        min_relationship_affection: content_storylet
+                            .prerequisites
+                            .min_relationship_affection,
+                        min_relationship_resentment: content_storylet
+                            .prerequisites
+                            .min_relationship_resentment,
                         stat_conditions: content_storylet.prerequisites.stat_conditions,
                         life_stages: content_storylet.prerequisites.life_stages,
                         tags: content_storylet.prerequisites.tags,
-                        digital_legacy_prereq: content_storylet.prerequisites.digital_legacy_prereq.as_ref().map(|p| {
-                            syn_director::DigitalLegacyPrereq {
+                        digital_legacy_prereq: content_storylet
+                            .prerequisites
+                            .digital_legacy_prereq
+                            .as_ref()
+                            .map(|p| syn_director::DigitalLegacyPrereq {
                                 require_post_life: p.require_post_life,
                                 min_compassion_vs_cruelty: p.min_compassion_vs_cruelty,
                                 max_compassion_vs_cruelty: p.max_compassion_vs_cruelty,
@@ -58,44 +91,53 @@ fn register_storylets_from_db(director: &mut EventDirector) {
                                 max_stability_vs_chaos: p.max_stability_vs_chaos,
                                 min_light_vs_shadow: p.min_light_vs_shadow,
                                 max_light_vs_shadow: p.max_light_vs_shadow,
-                            }
-                        }),
-                relationship_states: content_storylet.prerequisites.relationship_states,
-                memory_tags_required: content_storylet.prerequisites.memory_tags_required,
-                memory_tags_forbidden: content_storylet.prerequisites.memory_tags_forbidden,
-                memory_recency_ticks: content_storylet.prerequisites.memory_recency_ticks,
-                relationship_prereqs: content_storylet.prerequisites.relationship_prereqs
-                    .into_iter()
-                    .map(|r| syn_director::RelationshipPrereq {
-                        actor_id: r.actor_id,
-                        target_id: r.target_id,
-                        axis: r.axis,
-                        min_value: r.min_value,
-                        max_value: r.max_value,
-                        min_band: r.min_band,
-                        max_band: r.max_band,
-                    })
-                    .collect(),
-                allowed_life_stages: content_storylet.prerequisites.allowed_life_stages,
-            },
+                            }),
+                        relationship_states: content_storylet.prerequisites.relationship_states,
+                        memory_tags_required: content_storylet.prerequisites.memory_tags_required,
+                        memory_tags_forbidden: content_storylet.prerequisites.memory_tags_forbidden,
+                        memory_recency_ticks: content_storylet.prerequisites.memory_recency_ticks,
+                        relationship_prereqs: content_storylet
+                            .prerequisites
+                            .relationship_prereqs
+                            .into_iter()
+                            .map(|r| syn_director::RelationshipPrereq {
+                                actor_id: r.actor_id,
+                                target_id: r.target_id,
+                                axis: r.axis,
+                                min_value: r.min_value,
+                                max_value: r.max_value,
+                                min_band: r.min_band,
+                                max_band: r.max_band,
+                            })
+                            .collect(),
+                        allowed_life_stages: content_storylet.prerequisites.allowed_life_stages,
+                        time_and_location: None,
+                    },
                     heat: content_storylet.heat,
                     weight: content_storylet.weight,
                     cooldown_ticks: content_storylet.cooldown_ticks,
-                    heat_category: content_storylet.heat_category,
-                    roles: content_storylet.roles
+                    roles: content_storylet
+                        .roles
                         .into_iter()
                         .map(|r| syn_director::StoryletRole {
                             name: r.name,
                             npc_id: r.npc_id,
                         })
                         .collect(),
+                    max_uses: None,
+                    choices: vec![],
+                    heat_category: content_storylet.heat_category,
+                    actors: None,
                     interaction_tone: None,
                 };
                 director.register_storylet(director_storylet);
             }
         }
         Err(err) => {
-            eprintln!("Warning: failed to load storylets from {}: {}", db_path, err);
+            eprintln!(
+                "Warning: failed to load storylets from {}: {}",
+                db_path, err
+            );
         }
     }
 }
@@ -263,7 +305,8 @@ impl GameEngine {
 
         // Auto-create digital imprint if we just entered Digital stage
         if previous_stage != self.world.player_life_stage
-            && matches!(self.world.player_life_stage, LifeStage::Digital) {
+            && matches!(self.world.player_life_stage, LifeStage::Digital)
+        {
             self.ensure_digital_imprint();
         }
 
@@ -346,7 +389,9 @@ impl GameEngine {
 
     /// Get a relationship between two NPCs.
     pub fn get_relationship(&self, from_npc_id: u64, to_npc_id: u64) -> RelationshipDto {
-        let rel = self.world.get_relationship(NpcId(from_npc_id), NpcId(to_npc_id));
+        let rel = self
+            .world
+            .get_relationship(NpcId(from_npc_id), NpcId(to_npc_id));
         RelationshipDto {
             affection: rel.affection,
             trust: rel.trust,
@@ -356,7 +401,6 @@ impl GameEngine {
             heat: rel.heat(),
         }
     }
-
 
     // ==================== Memory ====================
 
@@ -403,7 +447,8 @@ impl GameEngine {
     /// Ensure digital imprint is created when entering PostLife/Digital stage.
     pub fn ensure_digital_imprint(&mut self) {
         // Collect all memory entries for the builder
-        let all_memories: Vec<MemoryEntry> = self.memory
+        let all_memories: Vec<MemoryEntry> = self
+            .memory
             .journals
             .values()
             .flat_map(|journal| journal.entries.clone())
@@ -472,12 +517,18 @@ impl GameEngine {
                 memory_recency_ticks: None,
                 relationship_prereqs: vec![],
                 allowed_life_stages: vec![],
+                time_and_location: None,
+                time_and_location: None,
             },
             heat,
             weight,
             cooldown_ticks: 100,
             roles: vec![],
+            max_uses: None,
+            choices: vec![],
             heat_category: None,
+            actors: None,
+            interaction_tone: None,
         };
         self.director.register_storylet(storylet);
     }
@@ -582,6 +633,36 @@ pub struct EventDto {
     pub heat: f32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiDirectorChoiceView {
+    pub id: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiDirectorEventView {
+    pub storylet_id: String,
+    pub title: String,
+    pub choices: Vec<ApiDirectorChoiceView>,
+}
+
+impl From<DirectorEventView> for ApiDirectorEventView {
+    fn from(view: DirectorEventView) -> Self {
+        ApiDirectorEventView {
+            storylet_id: view.storylet_id,
+            title: view.title,
+            choices: view
+                .choices
+                .into_iter()
+                .map(|c| ApiDirectorChoiceView {
+                    id: c.id,
+                    label: c.label,
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Digital legacy vector DTO for serialization to Dart.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiLegacyVector {
@@ -614,6 +695,48 @@ pub struct ApiDigitalImprint {
 pub struct ApiDigitalLegacySnapshot {
     pub has_imprint: bool,
     pub imprint: Option<ApiDigitalImprint>,
+}
+
+// ==================== Director Loop API ====================
+
+/// Replace the shared runtime (primarily for tests).
+pub fn api_reset_runtime(world: WorldState, sim: SimState, storylets: StoryletLibrary) {
+    let mut guard = RUNTIME.lock().expect("GameRuntime poisoned");
+    *guard = GameRuntime {
+        world,
+        sim,
+        storylets,
+    };
+}
+
+#[frb(sync)]
+pub fn api_get_current_event() -> Option<ApiDirectorEventView> {
+    let mut guard = RUNTIME.lock().expect("GameRuntime poisoned");
+    let runtime = &mut *guard;
+
+    let view = select_next_event_view(&mut runtime.world, &mut runtime.sim, &runtime.storylets)?;
+    Some(ApiDirectorEventView::from(view))
+}
+
+#[frb(sync)]
+pub fn api_choose_option(
+    storylet_id: String,
+    choice_id: String,
+    ticks_to_advance: u32,
+) -> Option<ApiDirectorEventView> {
+    let mut guard = RUNTIME.lock().expect("GameRuntime poisoned");
+    let runtime = &mut *guard;
+
+    let view = apply_choice_and_advance(
+        &mut runtime.world,
+        &mut runtime.sim,
+        &runtime.storylets,
+        &storylet_id,
+        &choice_id,
+        ticks_to_advance,
+    )?;
+
+    Some(ApiDirectorEventView::from(view))
 }
 
 // ==================== Frb Wrapper (Async Support) ====================
@@ -660,7 +783,9 @@ pub fn engine_player_relationships() -> ApiRelationshipSnapshot {
     engine
         .as_ref()
         .map(|e| e.player_relationships())
-        .unwrap_or(ApiRelationshipSnapshot { relationships: vec![] })
+        .unwrap_or(ApiRelationshipSnapshot {
+            relationships: vec![],
+        })
 }
 
 /// Get current narrative heat value.

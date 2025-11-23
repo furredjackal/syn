@@ -6,29 +6,29 @@
 //! - SQLite persistence layer
 //! - Utility types for serialization and querying
 
-pub mod types;
-pub mod rng;
-pub mod persistence;
+pub mod digital_legacy;
 pub mod errors;
-pub mod stats;
-pub mod relationships;
+pub mod life_stage;
+pub mod narrative_heat;
+pub mod npc;
+pub mod npc_actions;
+pub mod npc_behavior;
+pub mod persistence;
+pub mod relationship_milestones;
 pub mod relationship_model;
 pub mod relationship_pressure;
-pub mod relationship_milestones;
-pub mod narrative_heat;
-pub mod life_stage;
-pub mod digital_legacy;
-pub mod npc;
-pub mod npc_behavior;
-pub mod npc_actions;
+pub mod relationships;
+pub mod rng;
+pub mod stats;
 pub mod time;
+pub mod types;
 
-pub use types::*;
-pub use rng::*;
-pub use persistence::*;
 pub use errors::*;
-pub use stats::*;
+pub use persistence::*;
 pub use relationships::*;
+pub use rng::*;
+pub use stats::*;
+pub use types::*;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

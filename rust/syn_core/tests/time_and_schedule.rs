@@ -1,5 +1,5 @@
-use syn_core::time::{GameTime, DayPhase};
-use syn_core::npc::{NpcSchedule, NpcScheduleSlot, NpcActivityKind};
+use syn_core::npc::{NpcActivityKind, NpcSchedule, NpcScheduleSlot};
+use syn_core::time::{DayPhase, GameTime};
 
 #[test]
 fn game_time_advances_phases_every_6_ticks() {
@@ -20,11 +20,25 @@ fn game_time_advances_phases_every_6_ticks() {
 
 #[test]
 fn schedule_activity_lookup_defaults_and_overrides() {
-    let mut sched = NpcSchedule { daily_slots: vec![] };
-    assert_eq!(sched.activity_for_phase(DayPhase::Morning), NpcActivityKind::Home);
+    let mut sched = NpcSchedule {
+        daily_slots: vec![],
+    };
+    assert_eq!(
+        sched.activity_for_phase(DayPhase::Morning),
+        NpcActivityKind::Home
+    );
     // Add specific slot
-    sched.daily_slots.push(NpcScheduleSlot{ phase: DayPhase::Morning, activity: NpcActivityKind::Work });
-    assert_eq!(sched.activity_for_phase(DayPhase::Morning), NpcActivityKind::Work);
+    sched.daily_slots.push(NpcScheduleSlot {
+        phase: DayPhase::Morning,
+        activity: NpcActivityKind::Work,
+    });
+    assert_eq!(
+        sched.activity_for_phase(DayPhase::Morning),
+        NpcActivityKind::Work
+    );
     // Other phases fall back to Home
-    assert_eq!(sched.activity_for_phase(DayPhase::Evening), NpcActivityKind::Home);
+    assert_eq!(
+        sched.activity_for_phase(DayPhase::Evening),
+        NpcActivityKind::Home
+    );
 }

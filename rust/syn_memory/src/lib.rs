@@ -5,24 +5,24 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use syn_core::{NpcId, SimTick, StatDelta};
-pub use syn_core::relationships::RelationshipDelta;
 use syn_core::npc_behavior::BehaviorKind;
+pub use syn_core::relationships::RelationshipDelta;
+pub use syn_core::{NpcId, SimTick, StatDelta};
 
 /// A single memory entry recording an event and its impact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
-    pub id: String,                              // Unique memory ID
-    pub event_id: String,                        // Which storylet fired
-    pub npc_id: NpcId,                           // Who holds this memory
-    pub sim_tick: SimTick,                       // When it happened
-    pub emotional_intensity: f32,                // -1.0 (negative) to +1.0 (positive)
+    pub id: String,               // Unique memory ID
+    pub event_id: String,         // Which storylet fired
+    pub npc_id: NpcId,            // Who holds this memory
+    pub sim_tick: SimTick,        // When it happened
+    pub emotional_intensity: f32, // -1.0 (negative) to +1.0 (positive)
     #[serde(default)]
-    pub stat_deltas: Vec<StatDelta>,             // e.g., [{"kind": Mood, "delta": -2.0}]
+    pub stat_deltas: Vec<StatDelta>, // e.g., [{"kind": Mood, "delta": -2.0}]
     #[serde(default)]
     pub relationship_deltas: Vec<RelationshipDelta>,
     #[serde(default)]
-    pub tags: Vec<String>,                      // e.g., ["betrayal", "trauma", "relationship"]
+    pub tags: Vec<String>, // e.g., ["betrayal", "trauma", "relationship"]
     /// Optional list of participant IDs involved in this memory.
     #[serde(default)]
     pub participants: Vec<u64>,
@@ -92,12 +92,18 @@ impl Journal {
 
     /// Retrieve memories with a specific tag.
     pub fn memories_with_tag(&self, tag: &str) -> Vec<&MemoryEntry> {
-        self.entries.iter().filter(|e| e.tags.contains(&tag.to_string())).collect()
+        self.entries
+            .iter()
+            .filter(|e| e.tags.contains(&tag.to_string()))
+            .collect()
     }
 
     /// Retrieve memories within a time window (in ticks).
     pub fn memories_since(&self, since_tick: SimTick) -> Vec<&MemoryEntry> {
-        self.entries.iter().filter(|e| e.sim_tick.0 >= since_tick.0).collect()
+        self.entries
+            .iter()
+            .filter(|e| e.sim_tick.0 >= since_tick.0)
+            .collect()
     }
 
     /// Find the most recent memory with a given tag.
@@ -113,7 +119,7 @@ impl Journal {
         let tick_window = days as u64 * 24; // 24 ticks per day
         let since_tick = SimTick::new(current_tick.0.saturating_sub(tick_window));
         let recent = self.memories_since(since_tick);
-        
+
         if recent.is_empty() {
             0.0
         } else {
@@ -152,7 +158,9 @@ impl MemorySystem {
 
     /// Get or create a journal for an NPC.
     pub fn get_or_create_journal(&mut self, npc_id: NpcId) -> &mut Journal {
-        self.journals.entry(npc_id).or_insert_with(|| Journal::new(npc_id))
+        self.journals
+            .entry(npc_id)
+            .or_insert_with(|| Journal::new(npc_id))
     }
 
     /// Record a memory for an NPC.
@@ -258,13 +266,7 @@ pub fn add_npc_behavior_memory(
     }
 
     let id = format!("behav:{}:{}:{}", npc_id, player_id, tick.0);
-    let mut entry = MemoryEntry::new(
-        id,
-        "npc_behavior".to_string(),
-        NpcId(npc_id),
-        tick,
-        0.0,
-    );
+    let mut entry = MemoryEntry::new(id, "npc_behavior".to_string(), NpcId(npc_id), tick, 0.0);
     entry.tags = tags;
     entry.participants = vec![npc_id, player_id];
     memory.record_memory(entry);
@@ -278,7 +280,7 @@ pub fn add_npc_behavior_memory_with_tags(
     player_id: u64,
     tags: Vec<String>,
     tick: SimTick,
-){
+) {
     let id = format!("behav_tags:{}:{}:{}", npc_id, player_id, tick.0);
     let mut entry = MemoryEntry::new(
         id,

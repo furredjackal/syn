@@ -1,4 +1,4 @@
-use syn_core::{LifeStage, NpcId, WorldSeed, WorldState, SimTick};
+use syn_core::{LifeStage, NpcId, SimTick, WorldSeed, WorldState};
 use syn_director::{EventDirector, Storylet, StoryletPrerequisites};
 use syn_memory::MemorySystem;
 
@@ -24,6 +24,8 @@ fn storylet_with_stage(id: &str, allowed: Vec<LifeStage>) -> Storylet {
         weight: 1.0,
         cooldown_ticks: 0,
         roles: vec![],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     }
 }

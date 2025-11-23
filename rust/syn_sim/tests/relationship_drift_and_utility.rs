@@ -1,8 +1,8 @@
 use syn_core::relationship_model::RelationshipVector;
 use syn_core::{NpcId, WorldSeed, WorldState};
 use syn_sim::relationship_drift::{
-    conflict_action_utility_modifier, RelationshipDriftConfig, RelationshipDriftSystem,
-    social_action_utility_modifier,
+    conflict_action_utility_modifier, social_action_utility_modifier, RelationshipDriftConfig,
+    RelationshipDriftSystem,
 };
 
 #[test]
@@ -111,7 +111,9 @@ fn drift_crossing_band_produces_pressure_event() {
         familiarity: 0.0,
         resentment: 0.0,
     };
-    world.relationship_pressure.update_for_pair(actor_id.0, target_id.0, &initial_vec, None, None);
+    world
+        .relationship_pressure
+        .update_for_pair(actor_id.0, target_id.0, &initial_vec, None, None);
 
     let system = RelationshipDriftSystem::new(RelationshipDriftConfig {
         affection_decay_per_tick: 2.5,

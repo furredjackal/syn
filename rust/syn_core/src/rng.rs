@@ -1,8 +1,9 @@
 //! Deterministic RNG using seeded ChaCha8 for reproducible simulation.
 
+use crate::WorldState;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Wrapper around ChaCha8Rng for deterministic randomness.
 /// All randomness in SYN derives from seeded instances of this generator.
@@ -80,6 +81,15 @@ impl DeterministicRng {
     pub fn derive_seed(&mut self) -> u64 {
         self.gen_u64()
     }
+}
+
+/// Build a deterministic RNG seeded from world seed + time so selection is reproducible.
+pub fn deterministic_rng_from_world(world: &WorldState) -> DeterministicRng {
+    let mix = world
+        .game_time
+        .tick_index
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    DeterministicRng::new(world.seed.0 ^ mix)
 }
 
 #[cfg(test)]

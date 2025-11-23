@@ -3,10 +3,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::npc::NpcId;
 use crate::npc_behavior::{BehaviorKind, BehaviorSnapshot};
 use crate::relationships::{RelationshipAxis, RelationshipDelta};
 use crate::stats::{StatDelta, StatKind};
+use crate::NpcId;
 
 /// Discrete action an NPC can perform at the simulation level.
 /// These are still abstract, but a level more concrete than BehaviorKind.
@@ -76,10 +76,9 @@ pub fn behavior_to_candidate_actions(kind: BehaviorKind) -> Vec<NpcActionKind> {
         BehaviorKind::SeekSecurity => vec![NpcActionKind::WorkShift],
         BehaviorKind::SeekRecognition => vec![NpcActionKind::SocialVisitPlayer],
         BehaviorKind::SeekComfort => vec![NpcActionKind::WithdrawAlone],
-        BehaviorKind::SeekAutonomy => vec![
-            NpcActionKind::ProvokePlayer,
-            NpcActionKind::SelfImprovement,
-        ],
+        BehaviorKind::SeekAutonomy => {
+            vec![NpcActionKind::ProvokePlayer, NpcActionKind::SelfImprovement]
+        }
         BehaviorKind::Idle => vec![NpcActionKind::Idle],
     }
 }
@@ -90,81 +89,139 @@ pub fn base_effect_for_action(kind: NpcActionKind) -> NpcActionEffect {
 
     match kind {
         NpcActionKind::SocialVisitPlayer => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: 1.0, source: Some("npc_action".into()) });
-            effect
-                .player_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: 0.5, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: 1.0,
+                source: Some("npc_action".into()),
+            });
+            effect.player_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: 0.5,
+                source: Some("npc_action".into()),
+            });
             // Relationship: mild affection increase, mild trust bump (target resolved at apply-time)
-            effect.relationship_deltas.push(RelationshipDelta { target_id: NpcId(0), axis: RelationshipAxis::Affection, delta: 0.5, source: Some("npc_action".into()) });
-            effect.relationship_deltas.push(RelationshipDelta { target_id: NpcId(0), axis: RelationshipAxis::Trust, delta: 0.3, source: Some("npc_action".into()) });
-            effect.memory_tags_for_player = vec!["npc_behavior".into(), "npc_social_visit".into(), "support".into()];
+            effect.relationship_deltas.push(RelationshipDelta {
+                target_id: NpcId(0),
+                axis: RelationshipAxis::Affection,
+                delta: 0.5,
+                source: Some("npc_action".into()),
+            });
+            effect.relationship_deltas.push(RelationshipDelta {
+                target_id: NpcId(0),
+                axis: RelationshipAxis::Trust,
+                delta: 0.3,
+                source: Some("npc_action".into()),
+            });
+            effect.memory_tags_for_player = vec![
+                "npc_behavior".into(),
+                "npc_social_visit".into(),
+                "support".into(),
+            ];
             effect.label = Some("NPC social visit with player".into());
         }
         NpcActionKind::SocializeWithNpc => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: 0.7, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Energy, delta: -0.3, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: 0.7,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Energy,
+                delta: -0.3,
+                source: Some("npc_action".into()),
+            });
             effect.busy_for_ticks = 5;
             effect.label = Some("NPC socializes with another NPC".into());
         }
         NpcActionKind::WorkShift => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Wealth, delta: 1.0, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: -0.3, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Energy, delta: -0.5, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Wealth,
+                delta: 1.0,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: -0.3,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Energy,
+                delta: -0.5,
+                source: Some("npc_action".into()),
+            });
             effect.busy_for_ticks = 8;
             effect.label = Some("NPC works extra shift".into());
         }
         NpcActionKind::WithdrawAlone => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: 0.2, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Energy, delta: 0.5, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: 0.2,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Energy,
+                delta: 0.5,
+                source: Some("npc_action".into()),
+            });
             effect.memory_tags_for_player = vec!["npc_behavior".into(), "withdrawal".into()];
             effect.busy_for_ticks = 4;
             effect.label = Some("NPC withdraws to be alone".into());
         }
         NpcActionKind::ProvokePlayer => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: 0.2, source: Some("npc_action".into()) });
-            effect
-                .player_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: -0.8, source: Some("npc_action".into()) });
-            effect.relationship_deltas.push(RelationshipDelta { target_id: NpcId(0), axis: RelationshipAxis::Affection, delta: -0.7, source: Some("npc_action".into()) });
-            effect.relationship_deltas.push(RelationshipDelta { target_id: NpcId(0), axis: RelationshipAxis::Resentment, delta: 0.8, source: Some("npc_action".into()) });
-            effect.memory_tags_for_player = vec!["npc_behavior".into(), "conflict".into(), "npc_provoked".into()];
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: 0.2,
+                source: Some("npc_action".into()),
+            });
+            effect.player_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: -0.8,
+                source: Some("npc_action".into()),
+            });
+            effect.relationship_deltas.push(RelationshipDelta {
+                target_id: NpcId(0),
+                axis: RelationshipAxis::Affection,
+                delta: -0.7,
+                source: Some("npc_action".into()),
+            });
+            effect.relationship_deltas.push(RelationshipDelta {
+                target_id: NpcId(0),
+                axis: RelationshipAxis::Resentment,
+                delta: 0.8,
+                source: Some("npc_action".into()),
+            });
+            effect.memory_tags_for_player = vec![
+                "npc_behavior".into(),
+                "conflict".into(),
+                "npc_provoked".into(),
+            ];
             effect.label = Some("NPC provokes player".into());
         }
         NpcActionKind::SelfImprovement => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Wisdom, delta: 0.3, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: -0.1, source: Some("npc_action".into()) });
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Energy, delta: -0.4, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Wisdom,
+                delta: 0.3,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: -0.1,
+                source: Some("npc_action".into()),
+            });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Energy,
+                delta: -0.4,
+                source: Some("npc_action".into()),
+            });
             effect.busy_for_ticks = 6;
             effect.label = Some("NPC self-improvement effort".into());
         }
         NpcActionKind::Idle => {
-            effect
-                .npc_stat_deltas
-                .push(StatDelta { kind: StatKind::Mood, delta: -0.1, source: Some("npc_action".into()) });
+            effect.npc_stat_deltas.push(StatDelta {
+                kind: StatKind::Mood,
+                delta: -0.1,
+                source: Some("npc_action".into()),
+            });
             effect.label = Some("NPC idle / background life".into());
         }
     }

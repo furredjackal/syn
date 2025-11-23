@@ -1,23 +1,23 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use syn_core::LifeStage;
+use syn_core::NpcId;
 use syn_core::{
     relationship_model::{RelationshipAxis, RelationshipDelta},
     RelationshipState, StatDelta,
 };
-use syn_core::NpcId;
-use syn_core::LifeStage;
 
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Storylet {
     pub id: String,
     pub name: String,
-    pub tags: Vec<String>,                      // e.g., ["romance", "crisis", "career"]
+    pub tags: Vec<String>, // e.g., ["romance", "crisis", "career"]
     pub prerequisites: StoryletPrerequisites,
-    pub heat: f32,                              // narrative intensity (0.0..100.0)
-    pub weight: f32,                            // base probability of firing
-    pub cooldown_ticks: u32,                    // prevent rapid re-firing
-    pub roles: Vec<StoryletRole>,              // required NPC roles
+    pub heat: f32,                // narrative intensity (0.0..100.0)
+    pub weight: f32,              // base probability of firing
+    pub cooldown_ticks: u32,      // prevent rapid re-firing
+    pub roles: Vec<StoryletRole>, // required NPC roles
     #[serde(default)]
     pub heat_category: Option<StoryletHeatCategory>,
 }
@@ -87,12 +87,12 @@ pub struct StoryletPrerequisites {
     pub min_relationship_resentment: Option<f32>,
     pub stat_conditions: HashMap<String, (f32, f32)>, // {"mood": (-10.0, -5.0)} means mood in range
     pub life_stages: Vec<String>,                     // ["Teen", "Adult", "Elder"]
-    pub tags: Vec<String>,                           // must have these tags
-    pub relationship_states: Vec<RelationshipState>,  // Only fire if relationship is in one of these states
+    pub tags: Vec<String>,                            // must have these tags
+    pub relationship_states: Vec<RelationshipState>, // Only fire if relationship is in one of these states
     // Memory prerequisites for event echoes
-    pub memory_tags_required: Vec<String>,           // NPC must have memory with at least one of these tags
-    pub memory_tags_forbidden: Vec<String>,          // NPC must NOT have memory with these tags (conflict avoidance)
-    pub memory_recency_ticks: Option<u64>,           // If specified, memory must be within N ticks (default: 7 days = 168 ticks)
+    pub memory_tags_required: Vec<String>, // NPC must have memory with at least one of these tags
+    pub memory_tags_forbidden: Vec<String>, // NPC must NOT have memory with these tags (conflict avoidance)
+    pub memory_recency_ticks: Option<u64>, // If specified, memory must be within N ticks (default: 7 days = 168 ticks)
     /// Optional relationship-based prerequisites (additive).
     #[serde(default)]
     pub relationship_prereqs: Vec<RelationshipPrereq>,

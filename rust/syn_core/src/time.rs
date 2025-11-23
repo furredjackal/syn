@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Coarse-grained day phase, used for schedules and narrative pacing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -11,7 +11,12 @@ pub enum DayPhase {
 
 impl DayPhase {
     pub fn all() -> [DayPhase; 4] {
-        [DayPhase::Morning, DayPhase::Afternoon, DayPhase::Evening, DayPhase::Night]
+        [
+            DayPhase::Morning,
+            DayPhase::Afternoon,
+            DayPhase::Evening,
+            DayPhase::Night,
+        ]
     }
 }
 
@@ -31,13 +36,20 @@ pub struct GameTime {
 
 impl Default for GameTime {
     fn default() -> Self {
-        Self { tick: 0, tick_index: 0, day: 0, phase: DayPhase::Morning }
+        Self {
+            tick: 0,
+            tick_index: 0,
+            day: 0,
+            phase: DayPhase::Morning,
+        }
     }
 }
 
 impl GameTime {
     /// Construct a new GameTime starting at tick 0.
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// New API: advance by a number of ticks assuming 24 ticks per day (1 tick = 1 in-game hour).
     /// Keeps legacy fields in sync for backward compatibility.
@@ -63,8 +75,12 @@ impl GameTime {
     }
 
     /// Number of full days elapsed since start.
-    pub fn day(&self) -> u64 { self.tick_index / 24 }
+    pub fn day(&self) -> u64 {
+        self.tick_index / 24
+    }
 
     /// Current hour within the day (0..=23).
-    pub fn hour_in_day(&self) -> u8 { (self.tick_index % 24) as u8 }
+    pub fn hour_in_day(&self) -> u8 {
+        (self.tick_index % 24) as u8
+    }
 }

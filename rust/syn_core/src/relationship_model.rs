@@ -276,10 +276,8 @@ pub struct RelationshipDelta {
     pub source: Option<String>,
 }
 
-pub fn apply_relationship_deltas<'a, V>(
-    get_rel: &mut V,
-    deltas: &[RelationshipDelta],
-) where
+pub fn apply_relationship_deltas<'a, V>(get_rel: &mut V, deltas: &[RelationshipDelta])
+where
     V: FnMut(u64, u64) -> &'a mut RelationshipVector,
 {
     for d in deltas {

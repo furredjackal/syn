@@ -1,14 +1,14 @@
 //! Core types: Stats, Traits, Relationships, NPCs, World state.
 
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use crate::{KarmaBand, MoodBand, StatKind, clamp_for};
+use crate::digital_legacy::DigitalLegacyState;
 use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
+use crate::npc::NpcPrototype;
 use crate::relationship_milestones::RelationshipMilestoneState;
 use crate::relationship_pressure::RelationshipPressureState;
-use crate::digital_legacy::DigitalLegacyState;
-use crate::npc::{NpcPrototype};
 use crate::time::GameTime;
+use crate::{clamp_for, KarmaBand, MoodBand, StatKind};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Unique identifier for a world seed (ensures determinism).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -137,13 +137,13 @@ impl Stats {
 /// Permanent personality trait dimensions (set at NPC generation, rarely change).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Traits {
-    pub stability: f32,         // calm ↔ volatile
-    pub confidence: f32,        // insecure ↔ self-assured
-    pub sociability: f32,       // introverted ↔ extroverted
-    pub empathy: f32,           // detached ↔ sensitive
-    pub impulsivity: f32,       // cautious ↔ reckless
-    pub ambition: f32,          // apathetic ↔ driven
-    pub charm: f32,             // awkward ↔ charismatic
+    pub stability: f32,   // calm ↔ volatile
+    pub confidence: f32,  // insecure ↔ self-assured
+    pub sociability: f32, // introverted ↔ extroverted
+    pub empathy: f32,     // detached ↔ sensitive
+    pub impulsivity: f32, // cautious ↔ reckless
+    pub ambition: f32,    // apathetic ↔ driven
+    pub charm: f32,       // awkward ↔ charismatic
 }
 
 impl Default for Traits {
@@ -217,16 +217,13 @@ impl BehaviorNeed {
             }
             BehaviorNeed::Stimulation => normalized(traits.impulsivity) * 1.0,
             BehaviorNeed::Security => {
-                normalized(100.0 - traits.stability)
-                    * (if stats.health < 40.0 { 1.2 } else { 1.0 })
+                normalized(100.0 - traits.stability) * (if stats.health < 40.0 { 1.2 } else { 1.0 })
             }
             BehaviorNeed::Recognition => {
-                normalized(traits.ambition)
-                    * (1.0 + (stats.reputation.max(-50.0) / 200.0).abs())
+                normalized(traits.ambition) * (1.0 + (stats.reputation.max(-50.0) / 200.0).abs())
             }
             BehaviorNeed::Comfort => {
-                normalized(100.0 - traits.stability)
-                    * (1.0 + ((0.0 - stats.mood).abs() / 20.0))
+                normalized(100.0 - traits.stability) * (1.0 + ((0.0 - stats.mood).abs() / 20.0))
             }
         }
     }
@@ -295,7 +292,9 @@ impl BehaviorAction {
             BehaviorAction::Socialize => normalize(traits.sociability + traits.empathy / 2.0),
             BehaviorAction::Withdraw => normalize(100.0 - traits.sociability),
             BehaviorAction::Romance => normalize((traits.charm + traits.empathy) / 2.0),
-            BehaviorAction::Conflict => normalize(100.0 - traits.empathy + traits.impulsivity / 2.0),
+            BehaviorAction::Conflict => {
+                normalize(100.0 - traits.empathy + traits.impulsivity / 2.0)
+            }
             BehaviorAction::SelfImprove => normalize(traits.confidence + traits.ambition / 2.0),
             BehaviorAction::Risk => normalize(traits.impulsivity),
             BehaviorAction::Relax => normalize(100.0 - traits.ambition),
@@ -323,7 +322,7 @@ impl BehaviorAction {
             BehaviorAction::Relax | BehaviorAction::Withdraw => {
                 (1.2 - (heat / 200.0)).clamp(0.4, 1.2)
             }
-            _ => 1.0
+            _ => 1.0,
         }
     }
 
@@ -343,7 +342,9 @@ impl BehaviorAction {
 
     pub fn matches_tag(&self, tag: &str) -> bool {
         let tag_lower = tag.to_lowercase();
-        self.tags().iter().any(|candidate| tag_lower.contains(candidate))
+        self.tags()
+            .iter()
+            .any(|candidate| tag_lower.contains(candidate))
     }
 
     pub fn estimated_need_multiplier(&self, traits: &Traits, stats: &Stats) -> f32 {
@@ -352,7 +353,11 @@ impl BehaviorAction {
             .secondary_need()
             .map(|need| need.estimate_from_stats(traits, stats))
             .unwrap_or(1.0);
-        let divisor = if self.secondary_need().is_some() { 2.0 } else { 1.0 };
+        let divisor = if self.secondary_need().is_some() {
+            2.0
+        } else {
+            1.0
+        };
         ((primary + secondary) / divisor).clamp(0.4, 2.0)
     }
 
@@ -387,10 +392,7 @@ pub fn behavior_action_from_tags(tags: &[String]) -> Option<BehaviorAction> {
         BehaviorAction::Explore,
         BehaviorAction::Withdraw,
     ] {
-        if lowercased
-            .iter()
-            .any(|tag| action.matches_tag(tag))
-        {
+        if lowercased.iter().any(|tag| action.matches_tag(tag)) {
             return Some(action);
         }
     }
@@ -400,17 +402,17 @@ pub fn behavior_action_from_tags(tags: &[String]) -> Option<BehaviorAction> {
 /// Relationship state machine: tracks type of relationship (friend, rival, partner, etc.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RelationshipState {
-    Stranger,          // No meaningful relationship yet
-    Acquaintance,      // Know of each other, minimal affection
-    Friend,            // Stable positive relationship
-    CloseFriend,       // Very close, high trust and affection
-    BestFriend,        // Deepest platonic bond
-    RomanticInterest,  // Attracted, considering romance
-    Partner,           // In a romantic relationship
-    Spouse,            // Married or deeply committed
-    Rival,             // Conflicted, high resentment
-    Estranged,         // Former close relationship broken
-    BrokenHeart,       // Recent breakup/betrayal recovery
+    Stranger,         // No meaningful relationship yet
+    Acquaintance,     // Know of each other, minimal affection
+    Friend,           // Stable positive relationship
+    CloseFriend,      // Very close, high trust and affection
+    BestFriend,       // Deepest platonic bond
+    RomanticInterest, // Attracted, considering romance
+    Partner,          // In a romantic relationship
+    Spouse,           // Married or deeply committed
+    Rival,            // Conflicted, high resentment
+    Estranged,        // Former close relationship broken
+    BrokenHeart,      // Recent breakup/betrayal recovery
 }
 
 impl Default for RelationshipState {
@@ -457,12 +459,12 @@ impl RelationshipState {
 /// 5-axis relationship vector between two NPCs.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Relationship {
-    pub affection: f32,     // -10..+10 (warmth, emotional closeness)
-    pub trust: f32,         // -10..+10 (reliability, safety, openness)
-    pub attraction: f32,    // -10..+10 (romantic/sexual pull)
-    pub familiarity: f32,   // -10..+10 (shared time, history, routine)
-    pub resentment: f32,    // -10..+10 (hostility, grudges)
-    pub state: RelationshipState,  // Current state of the relationship
+    pub affection: f32,           // -10..+10 (warmth, emotional closeness)
+    pub trust: f32,               // -10..+10 (reliability, safety, openness)
+    pub attraction: f32,          // -10..+10 (romantic/sexual pull)
+    pub familiarity: f32,         // -10..+10 (shared time, history, routine)
+    pub resentment: f32,          // -10..+10 (hostility, grudges)
+    pub state: RelationshipState, // Current state of the relationship
 }
 
 impl Default for Relationship {
@@ -490,11 +492,19 @@ impl Relationship {
 
     pub fn apply_delta(&mut self, axis: crate::RelationshipAxis, delta: f32) {
         match axis {
-            crate::RelationshipAxis::Affection => self.affection = (self.affection + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Affection => {
+                self.affection = (self.affection + delta).clamp(-10.0, 10.0)
+            }
             crate::RelationshipAxis::Trust => self.trust = (self.trust + delta).clamp(-10.0, 10.0),
-            crate::RelationshipAxis::Attraction => self.attraction = (self.attraction + delta).clamp(-10.0, 10.0),
-            crate::RelationshipAxis::Familiarity => self.familiarity = (self.familiarity + delta).clamp(-10.0, 10.0),
-            crate::RelationshipAxis::Resentment => self.resentment = (self.resentment + delta).clamp(-10.0, 10.0),
+            crate::RelationshipAxis::Attraction => {
+                self.attraction = (self.attraction + delta).clamp(-10.0, 10.0)
+            }
+            crate::RelationshipAxis::Familiarity => {
+                self.familiarity = (self.familiarity + delta).clamp(-10.0, 10.0)
+            }
+            crate::RelationshipAxis::Resentment => {
+                self.resentment = (self.resentment + delta).clamp(-10.0, 10.0)
+            }
         }
     }
 
@@ -572,13 +582,13 @@ impl Relationship {
 /// Life stage of a character (affects visible stats and event eligibility).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LifeStage {
-    PreSim,      // 0-5 (not playable; used for generation)
-    Child,       // 6-12
-    Teen,        // 13-18
-    YoungAdult,  // 19-29
-    Adult,       // 30-59
-    Elder,       // 60-89
-    Digital,     // 90+
+    PreSim,     // 0-5 (not playable; used for generation)
+    Child,      // 6-12
+    Teen,       // 13-18
+    YoungAdult, // 19-29
+    Adult,      // 30-59
+    Elder,      // 60-89
+    Digital,    // 90+
 }
 
 impl LifeStage {
@@ -697,6 +707,14 @@ impl Default for Karma {
     }
 }
 
+/// Tracks how many times each storylet has been fired.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StoryletUsageState {
+    /// storylet_id -> times fired
+    #[serde(default)]
+    pub times_fired: HashMap<String, u32>,
+}
+
 /// Legacy alias for compatibility; the new state lives in `relationship_pressure`.
 pub type RelationshipPressureFlags = crate::relationship_pressure::RelationshipPressureState;
 
@@ -741,6 +759,9 @@ pub struct WorldState {
     /// Current in-world time (ticks/day/phase).
     #[serde(default)]
     pub game_time: GameTime,
+    /// Tracks usage counts for storylets for pacing.
+    #[serde(default)]
+    pub storylet_usage: StoryletUsageState,
 }
 
 impl WorldState {
@@ -764,6 +785,7 @@ impl WorldState {
             npc_prototypes: HashMap::new(),
             known_npcs: Vec::new(),
             game_time: GameTime::default(),
+            storylet_usage: StoryletUsageState::default(),
         }
     }
 
@@ -1027,7 +1049,7 @@ mod tests {
             affection: 7.0,
             trust: 6.0,
             familiarity: 7.0,
-            attraction: 2.5,  // < 3.0 for CloseFriend
+            attraction: 2.5, // < 3.0 for CloseFriend
             ..Default::default()
         };
         let next_state = rel.compute_next_state();
@@ -1099,7 +1121,7 @@ mod tests {
     fn test_relationship_state_close_to_estranged() {
         let rel = Relationship {
             affection: -3.0,
-            trust: 0.0,  // Must be >= -2.0 to NOT trigger Rival (Rival needs trust < -2.0)
+            trust: 0.0, // Must be >= -2.0 to NOT trigger Rival (Rival needs trust < -2.0)
             resentment: 7.0,
             familiarity: 7.0,
             ..Default::default()
@@ -1112,7 +1134,7 @@ mod tests {
     fn test_relationship_state_allows_romance() {
         let friend_state = RelationshipState::Friend;
         let rival_state = RelationshipState::Rival;
-        
+
         assert!(friend_state.allows_romance());
         assert!(!rival_state.allows_romance());
     }
@@ -1121,7 +1143,7 @@ mod tests {
     fn test_relationship_state_allows_friendship() {
         let friend_state = RelationshipState::Friend;
         let partner_state = RelationshipState::Partner;
-        
+
         assert!(friend_state.allows_friendship());
         assert!(!partner_state.allows_friendship());
     }
@@ -1130,7 +1152,7 @@ mod tests {
     fn test_relationship_state_allows_conflict() {
         let acquaintance_state = RelationshipState::Acquaintance;
         let spouse_state = RelationshipState::Spouse;
-        
+
         assert!(acquaintance_state.allows_conflict());
         assert!(!spouse_state.allows_conflict());
     }
@@ -1139,7 +1161,7 @@ mod tests {
     fn test_relationship_state_is_recovering() {
         let broken_heart = RelationshipState::BrokenHeart;
         let friend = RelationshipState::Friend;
-        
+
         assert!(broken_heart.is_recovering());
         assert!(!friend.is_recovering());
     }

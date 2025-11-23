@@ -1,6 +1,6 @@
 use syn_core::{
-    apply_relationship_deltas, RelationshipAxis, RelationshipDelta, RelationshipStore,
-    RelationshipVector, NpcId,
+    apply_relationship_deltas, NpcId, RelationshipAxis, RelationshipDelta, RelationshipStore,
+    RelationshipVector,
 };
 
 #[test]

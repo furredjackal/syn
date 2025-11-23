@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use syn_core::{Persistence, StoryletRecord};
 
 pub mod schemas;
+pub mod storylet;
 pub use schemas::*;
 
 /// Load all storylets stored inside the SQLite database at `db_path`.
@@ -126,7 +127,11 @@ mod tests {
 
         let storylet = sample_storylet();
         let storylet_path = json_dir.join("test_storylet.json");
-        fs::write(&storylet_path, serde_json::to_string_pretty(&storylet).unwrap()).unwrap();
+        fs::write(
+            &storylet_path,
+            serde_json::to_string_pretty(&storylet).unwrap(),
+        )
+        .unwrap();
 
         let imported = import_storylets_from_dir(db_path.to_str().unwrap(), &json_dir).unwrap();
         assert_eq!(imported, 1);

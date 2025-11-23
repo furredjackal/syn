@@ -1,6 +1,6 @@
-use syn_core::{WorldState, WorldSeed, NpcId, Stats, LifeStage};
-use syn_core::npc::{NpcPrototype, PersonalityVector, NpcRoleTag};
-use syn_sim::{SimState, NpcLodTier, tick_world};
+use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
+use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
+use syn_sim::{tick_world, NpcLodTier, SimState};
 
 fn make_world_with_proto(id: NpcId) -> WorldState {
     let mut world = WorldState::new(WorldSeed(1234), NpcId(1));
@@ -9,7 +9,13 @@ fn make_world_with_proto(id: NpcId) -> WorldState {
         display_name: "Test NPC".to_string(),
         role_label: None,
         role_tags: vec![NpcRoleTag::Peer],
-        personality: PersonalityVector { warmth: 0.5, dominance: 0.3, volatility: 0.2, conscientiousness: 0.6, openness: 0.4 },
+        personality: PersonalityVector {
+            warmth: 0.5,
+            dominance: 0.3,
+            volatility: 0.2,
+            conscientiousness: 0.6,
+            openness: 0.4,
+        },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
     };
@@ -23,19 +29,27 @@ fn tick_world_advances_time_and_ticks_tiers() {
     let mut sim = SimState::new();
 
     // Ensure instances via registry
-    sim.npc_registry.ensure_npc_instance(&world, NpcId(2), syn_sim::NpcLod::Tier2Active, 0);
+    sim.npc_registry
+        .ensure_npc_instance(&world, NpcId(2), syn_sim::NpcLod::Tier2Active, 0);
     // Add another NPC prototype
     let proto2 = NpcPrototype {
         id: NpcId(3),
         display_name: "Test NPC 2".to_string(),
         role_label: None,
         role_tags: vec![NpcRoleTag::Peer],
-        personality: PersonalityVector { warmth: 0.5, dominance: 0.3, volatility: 0.2, conscientiousness: 0.6, openness: 0.4 },
+        personality: PersonalityVector {
+            warmth: 0.5,
+            dominance: 0.3,
+            volatility: 0.2,
+            conscientiousness: 0.6,
+            openness: 0.4,
+        },
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
     };
     world.npc_prototypes.insert(NpcId(3), proto2);
-    sim.npc_registry.ensure_npc_instance(&world, NpcId(3), syn_sim::NpcLod::Tier2Active, 0);
+    sim.npc_registry
+        .ensure_npc_instance(&world, NpcId(3), syn_sim::NpcLod::Tier2Active, 0);
 
     // Assign canonical tiers
     {

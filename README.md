@@ -24,18 +24,18 @@ A life simulation game built with Rust and Flutter.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-2. Install Flutter Rust Bridge:
+1. Install Flutter Rust Bridge:
 ```bash
 cargo install flutter_rust_bridge_codegen
 ```
 
-3. Build Rust library:
+1. Build Rust library:
 ```bash
 cd rust/syn_api
 cargo build --release
 ```
 
-4. Run Flutter app:
+1. Run Flutter app:
 ```bash
 cd flutter
 flutter run

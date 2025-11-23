@@ -25,13 +25,19 @@ fn storylet_outcome_deserializes_relationship_impacts_into_relationship_deltas()
     }
     "#;
 
-    let outcome: StoryletOutcome = serde_json::from_str(json)
-        .expect("Failed to deserialize StoryletOutcome");
+    let outcome: StoryletOutcome =
+        serde_json::from_str(json).expect("Failed to deserialize StoryletOutcome");
 
     assert_eq!(outcome.relationship_deltas.len(), 2);
     assert_eq!(outcome.relationship_deltas[0].actor_id, 1);
     assert_eq!(outcome.relationship_deltas[0].target_id, 42);
-    assert_eq!(outcome.relationship_deltas[0].axis, RelationshipAxis::Affection);
+    assert_eq!(
+        outcome.relationship_deltas[0].axis,
+        RelationshipAxis::Affection
+    );
     assert!((outcome.relationship_deltas[0].delta - 3.5).abs() < f32::EPSILON);
-    assert_eq!(outcome.relationship_deltas[1].axis, RelationshipAxis::Resentment);
+    assert_eq!(
+        outcome.relationship_deltas[1].axis,
+        RelationshipAxis::Resentment
+    );
 }

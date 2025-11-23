@@ -29,8 +29,8 @@ fn can_deserialize_relationship_prereqs_from_json() {
     }
     "#;
 
-    let pre: StoryletPrerequisites = serde_json::from_str(json)
-        .expect("Failed to deserialize StoryletPrerequisites");
+    let pre: StoryletPrerequisites =
+        serde_json::from_str(json).expect("Failed to deserialize StoryletPrerequisites");
 
     assert_eq!(pre.relationship_prereqs.len(), 1);
     let r = &pre.relationship_prereqs[0];

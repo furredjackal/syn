@@ -1,8 +1,8 @@
-use syn_core::{WorldSeed, WorldState, NpcId, LifeStage};
 use syn_core::npc::{NpcPrototype, PersonalityVector};
 use syn_core::types::Stats;
-use syn_sim::{npc_registry::NpcRegistry, NpcLod};
+use syn_core::{LifeStage, NpcId, WorldSeed, WorldState};
 use syn_sim::evaluate_npc_behavior;
+use syn_sim::{npc_registry::NpcRegistry, NpcLod};
 
 #[test]
 fn evaluate_behavior_sets_snapshot_for_active_npc() {
@@ -25,7 +25,12 @@ fn evaluate_behavior_sets_snapshot_for_active_npc() {
             conscientiousness: 0.4,
             openness: 0.5,
         },
-        base_stats: Stats { mood: -8.0, wealth: 20.0, health: 40.0, ..Stats::default() },
+        base_stats: Stats {
+            mood: -8.0,
+            wealth: 20.0,
+            health: 40.0,
+            ..Stats::default()
+        },
         active_stages: vec![LifeStage::Teen, LifeStage::Adult],
     };
     world.npc_prototypes.insert(npc_id, proto.clone());

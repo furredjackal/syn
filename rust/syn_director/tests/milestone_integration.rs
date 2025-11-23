@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
-use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::relationship_milestones::RelationshipMilestoneKind;
+use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::{NpcId, Relationship, RelationshipState, SimTick, WorldSeed, WorldState};
-use syn_director::{apply_storylet_outcome, Storylet, StoryletOutcome, StoryletPrerequisites, StoryletRole};
+use syn_director::{
+    apply_storylet_outcome_with_memory, Storylet, StoryletOutcome, StoryletPrerequisites,
+    StoryletRole,
+};
 use syn_memory::{MemoryEntry, MemorySystem};
 
 #[test]
@@ -20,9 +23,11 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
             state: RelationshipState::Stranger,
         },
     );
-    world
-        .relationship_milestones
-        .record_role_for_pair(1, 2, syn_core::relationship_model::RelationshipRole::Friend);
+    world.relationship_milestones.record_role_for_pair(
+        1,
+        2,
+        syn_core::relationship_model::RelationshipRole::Friend,
+    );
 
     let mut memory = MemorySystem::new();
     let mut mem_entry = MemoryEntry::new(
@@ -60,6 +65,7 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
                 max_band: None,
             }],
             allowed_life_stages: vec![],
+            time_and_location: None,
         },
         heat: 1.0,
         weight: 1.0,
@@ -68,6 +74,8 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
             name: "target".into(),
             npc_id: NpcId(2),
         }],
+        max_uses: None,
+        choices: vec![],
         heat_category: None,
     };
 
@@ -82,7 +90,7 @@ fn storylet_outcome_records_friend_to_rival_milestone() {
         ..Default::default()
     };
 
-    apply_storylet_outcome(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
+    apply_storylet_outcome_with_memory(&mut world, &mut memory, &storylet, &outcome, SimTick(0));
 
     let event = world
         .relationship_milestones

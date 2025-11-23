@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::npc::PersonalityVector;
 use crate::relationship_model::RelationshipVector;
-use crate::stats::Stats;
+use crate::{NpcId, Stats};
 
 /// High-level needs used by NPC utility logic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -93,7 +93,7 @@ pub struct BehaviorSnapshot {
     #[serde(default)]
     pub target_player: bool,
     #[serde(default)]
-    pub target_npc_id: Option<crate::npc::NpcId>,
+    pub target_npc_id: Option<NpcId>,
 }
 
 /// Pure function: derive a NeedVector for an NPC based on:
@@ -209,8 +209,7 @@ pub fn compute_behavior_intents(
     });
 
     // SeekAutonomy: autonomy need boosted by dominance + volatility.
-    let auto_u =
-        needs.autonomy * (1.0 + dominance.max(0.0) * 0.5 + volatility.max(0.0) * 0.5);
+    let auto_u = needs.autonomy * (1.0 + dominance.max(0.0) * 0.5 + volatility.max(0.0) * 0.5);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekAutonomy,
         utility: auto_u,
