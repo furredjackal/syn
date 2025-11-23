@@ -805,7 +805,7 @@ impl WorldState {
     pub fn tick(&mut self) {
         self.current_tick.0 += 1;
         // Advance coarse-grained game time with 24 ticks per day (4 phases x 6 ticks each)
-        self.game_time.advance_ticks(1, 24);
+        self.game_time.advance_ticks_with_tpd(1, 24);
         // Age player every 24 ticks (1 simulated day)
         if self.current_tick.0 % 24 == 0 {
             self.player_age += 1;

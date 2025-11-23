@@ -7,13 +7,13 @@ fn game_time_advances_phases_every_6_ticks() {
     // 24 ticks per day configured in WorldState::tick, but here we test primitive
     let tpd = 24u64;
     assert_eq!(gt.phase, DayPhase::Morning);
-    gt.advance_ticks(6, tpd);
+    gt.advance_ticks_with_tpd(6, tpd);
     assert_eq!(gt.phase, DayPhase::Afternoon);
-    gt.advance_ticks(6, tpd);
+    gt.advance_ticks_with_tpd(6, tpd);
     assert_eq!(gt.phase, DayPhase::Evening);
-    gt.advance_ticks(6, tpd);
+    gt.advance_ticks_with_tpd(6, tpd);
     assert_eq!(gt.phase, DayPhase::Night);
-    gt.advance_ticks(6, tpd);
+    gt.advance_ticks_with_tpd(6, tpd);
     assert_eq!(gt.phase, DayPhase::Morning);
     assert_eq!(gt.day, 1);
 }
