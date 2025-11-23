@@ -202,6 +202,10 @@ impl Simulator {
 pub struct NpcInstance {
     pub id: NpcId,
     pub lod: NpcLod,
+    /// Canonical LOD tier for the new world tick loop. Defaults to Tier2Background.
+    /// This exists alongside the legacy `lod` for backward compatibility.
+    #[allow(dead_code)]
+    pub tier: NpcLodTier,
     pub sim: SimulatedNpc,
     /// Last sim tick index this NPC was updated (for LOD throttling).
     pub last_tick: u64,
@@ -713,5 +717,153 @@ pub fn build_action_instance_from_behavior_and_schedule(
         targets_player: behavior.target_player,
         target_npc_id: behavior.target_npc_id,
         effect,
+    }
+}
+use syn_core::time::GameTime;
+
+/// New canonical LOD tiers for world ticking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcLodTier {
+    /// Full AI, behavior, relationships, storylets.
+    Tier1Active,
+    /// Reduced-frequency sim (drift, coarse needs).
+    Tier2Background,
+    /// Dormant population; only macro updates.
+    Tier3Dormant,
+}
+
+/// Minimal dormant record for macro simulation.
+#[derive(Debug)]
+pub struct DormantNpcData {
+    pub id: NpcId,
+    pub age_years: u16,
+    pub life_stage: syn_core::LifeStage,
+    pub key_stats: syn_core::stats::Stats,
+}
+
+#[derive(Debug, Default)]
+pub struct PopulationStore {
+    pub dormant: std::collections::HashMap<NpcId, DormantNpcData>,
+}
+
+/// Top-level simulation container for the canonical tick loop.
+#[derive(Debug)]
+pub struct SimState {
+    /// Active NPCs in Tier1 / Tier2.
+    pub npc_registry: crate::npc_registry::NpcRegistry,
+    /// Dormant Tier3 population.
+    pub population: PopulationStore,
+}
+
+impl SimState {
+    pub fn new() -> Self {
+        Self {
+            npc_registry: crate::npc_registry::NpcRegistry::default(),
+            population: PopulationStore::default(),
+        }
+    }
+}
+
+// -------- Tick cadence helpers --------
+fn is_mid_frequency_tick(time: &GameTime) -> bool {
+    time.tick_index % 6 == 0
+}
+
+fn is_low_frequency_tick(time: &GameTime) -> bool {
+    time.tick_index % 24 == 0
+}
+
+// -------- System wrappers (thin stubs for now) --------
+/// Relationship drift per-NPC placeholder.
+pub fn tick_relationship_drift_for_npc(_world: &mut WorldState, _npc: &mut NpcInstance) {
+    // You can wire in RelationshipDriftSystem per-actor later; keep minimal for now.
+}
+
+/// Mood/needs decay placeholder.
+pub fn tick_mood_for_npc(_world: &mut WorldState, npc: &mut NpcInstance) {
+    // Apply a basic decay and tick cooldowns to keep motion.
+    npc.sim.apply_mood_decay();
+    npc.sim.tick_cooldowns();
+}
+
+/// Global memory decay / pruning low-frequency pass.
+pub fn tick_memory_decay(_world: &mut WorldState) {
+    // Integrate with syn_memory when ready.
+}
+
+/// Macro tick for dormant population entries.
+pub fn tick_dormant_npc_macro(_world: &mut WorldState, _npc: &mut DormantNpcData) {
+    // Placeholder: age, coarse stat drift, etc.
+}
+
+fn tick_lod_transitions(_world: &mut WorldState, _sim: &mut SimState) {
+    // Placeholder policy hook.
+}
+
+fn tick_npc_tier1(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
+    // Keep current activity up to date for schedule-aware actions.
+    update_npc_activity_state(world, npc, tick);
+    // 1) Behavior
+    evaluate_npc_behavior(world, npc);
+    // 2) Action
+    maybe_run_npc_action(world, npc, tick);
+    // 3) Relationship drift
+    tick_relationship_drift_for_npc(world, npc);
+    // 4) Mood decay
+    tick_mood_for_npc(world, npc);
+    npc.last_tick = tick;
+}
+
+fn tick_npc_tier2(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
+    update_npc_activity_state(world, npc, tick);
+    evaluate_npc_behavior(world, npc);
+    tick_relationship_drift_for_npc(world, npc);
+    tick_mood_for_npc(world, npc);
+    npc.last_tick = tick;
+}
+
+use syn_core::WorldState;
+use syn_core::time::GameTime as _; // ensure module imported above; alias to avoid warn if shadowed
+use crate::{NpcInstance as _, NpcLodTier as _}; // bring types into scope to satisfy lints
+
+/// Advance the simulation by `ticks` ticks (hours).
+/// Each tick advances GameTime and ticks NPCs in tier-specific cadences.
+pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
+    for _ in 0..ticks {
+        // 1) Advance time by one hour.
+        world.game_time.advance_ticks(1);
+        let time = world.game_time;
+        let mid_freq = is_mid_frequency_tick(&time);
+        let low_freq = is_low_frequency_tick(&time);
+
+        // 2) Tick Tier1 and Tier2 NPCs.
+        for (_id, npc) in sim.npc_registry.iter_mut() {
+            match npc.tier {
+                NpcLodTier::Tier1Active => {
+                    tick_npc_tier1(world, npc, time.tick_index);
+                }
+                NpcLodTier::Tier2Background => {
+                    if mid_freq {
+                        tick_npc_tier2(world, npc, time.tick_index);
+                    }
+                }
+                NpcLodTier::Tier3Dormant => {
+                    // Active registry shouldn't keep Tier3; ignore.
+                }
+            }
+        }
+
+        // 3) Tick dormant population daily.
+        if low_freq {
+            for (_id, dormant) in sim.population.dormant.iter_mut() {
+                tick_dormant_npc_macro(world, dormant);
+            }
+        }
+
+        // 4) Global low-frequency systems
+        if low_freq { tick_memory_decay(world); }
+
+        // 5) LOD transitions
+        tick_lod_transitions(world, sim);
     }
 }

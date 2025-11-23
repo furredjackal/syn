@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use syn_core::WorldState;
 use syn_core::NpcId;
 use syn_core::npc::NpcPrototype;
-use crate::{NpcInstance, NpcLod, instantiate_simulated_npc_from_prototype};
+use crate::{NpcInstance, NpcLod, NpcLodTier, instantiate_simulated_npc_from_prototype};
 
 #[derive(Debug, Default)]
 pub struct NpcRegistry {
@@ -51,6 +51,7 @@ impl NpcRegistry {
             let instance = NpcInstance {
                 id,
                 lod: requested_lod,
+                tier: NpcLodTier::Tier2Background,
                 sim,
                 last_tick: tick,
                 behavior: None,
