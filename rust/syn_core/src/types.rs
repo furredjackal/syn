@@ -956,6 +956,63 @@ impl WorldState {
     }
 }
 
+/// Lightweight, serializable snapshot of WorldState for persistence tests.
+/// Excludes volatile runtime-only data (ECS handles, caches).
+#[derive(Debug, Clone, PartialEq)]
+pub struct WorldStateSnapshot {
+    pub seed: WorldSeed,
+    pub current_tick: SimTick,
+    pub player_id: NpcId,
+    pub player_stats: Stats,
+    pub player_age_years: u32,
+    pub player_days_since_birth: u32,
+    pub player_life_stage: LifeStage,
+    pub player_karma: Karma,
+    pub narrative_heat: NarrativeHeat,
+    pub heat_momentum: f32,
+    pub relationships: HashMap<(NpcId, NpcId), Relationship>,
+    pub npcs: HashMap<NpcId, AbstractNpc>,
+    pub relationship_pressure: RelationshipPressureState,
+    pub relationship_milestones: RelationshipMilestoneState,
+    pub digital_legacy: DigitalLegacyState,
+    pub npc_prototypes: HashMap<NpcId, NpcPrototype>,
+    pub known_npcs: Vec<NpcId>,
+    pub game_time_tick: u64,
+    pub storylet_usage: StoryletUsageState,
+    pub memory_entries: Vec<MemoryEntryRecord>,
+    pub district_state: HashMap<String, String>,
+    pub world_flags: HashMap<String, bool>,
+}
+
+impl WorldStateSnapshot {
+    pub fn from_world(world: &WorldState) -> Self {
+        WorldStateSnapshot {
+            seed: world.seed,
+            current_tick: world.current_tick,
+            player_id: world.player_id,
+            player_stats: world.player_stats.clone(),
+            player_age_years: world.player_age_years,
+            player_days_since_birth: world.player_days_since_birth,
+            player_life_stage: world.player_life_stage,
+            player_karma: world.player_karma,
+            narrative_heat: world.narrative_heat,
+            heat_momentum: world.heat_momentum,
+            relationships: world.relationships.clone(),
+            npcs: world.npcs.clone(),
+            relationship_pressure: world.relationship_pressure.clone(),
+            relationship_milestones: world.relationship_milestones.clone(),
+            digital_legacy: world.digital_legacy.clone(),
+            npc_prototypes: world.npc_prototypes.clone(),
+            known_npcs: world.known_npcs.clone(),
+            game_time_tick: world.game_time.tick_index,
+            storylet_usage: world.storylet_usage.clone(),
+            memory_entries: world.memory_entries.clone(),
+            district_state: world.district_state.clone(),
+            world_flags: world.world_flags.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

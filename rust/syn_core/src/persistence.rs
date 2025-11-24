@@ -476,7 +476,11 @@ mod tests {
     use super::*;
     use crate::digital_legacy::{DigitalImprint, LegacyVector};
     use crate::npc::{NpcPrototype, NpcSchedule, PersonalityVector};
+    use crate::relationship_milestones::RelationshipMilestoneKind;
+    use crate::relationship_pressure::RelationshipEventKind;
+    use crate::time::TickContext;
     use std::fs;
+    use serde_json::Value;
 
     #[test]
     fn test_persistence_save_load() {
@@ -587,6 +591,141 @@ mod tests {
         assert_eq!(loaded.memory_entries.len(), 1);
         assert_eq!(loaded.district_state.get("Downtown"), Some(&"ok".to_string()));
         assert_eq!(loaded.world_flags.get("met_childhood_friend"), Some(&true));
+
+        let _ = fs::remove_file(db_path);
+    }
+
+    fn snapshot_json(world: &WorldState) -> Value {
+        serde_json::to_value(world).expect("world should serialize to json value")
+    }
+
+    #[test]
+    fn test_persistence_round_trip_snapshot() {
+        let db_path = "test_persistence_round_trip.db";
+        let _ = fs::remove_file(db_path);
+
+        let mut db = Persistence::new(db_path).expect("Failed to create persistence");
+        let mut world = WorldState::new(WorldSeed(99), NpcId(1));
+
+        // Populate core fields
+        world.player_age = 20;
+        world.player_age_years = 20;
+        world.player_days_since_birth = 20 * 365;
+        world.player_stats.mood = 5.0;
+        world.narrative_heat = crate::narrative_heat::NarrativeHeat::new(30.0);
+        world.heat_momentum = 3.0;
+
+        // Advance time to verify tick consistency
+        let mut ctx = TickContext::default();
+        for _ in 0..48 {
+            world.tick(&mut ctx);
+        }
+
+        // Relationships & NPCs
+        let mut rel = Relationship::default();
+        rel.affection = 2.0;
+        world.set_relationship(NpcId(1), NpcId(2), rel);
+        let npc = AbstractNpc {
+            id: NpcId(2),
+            age: 22,
+            job: "Engineer".into(),
+            district: "Downtown".into(),
+            household_id: 10,
+            traits: Traits::default(),
+            seed: 7,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(npc.id, npc.clone());
+
+        // Prototypes
+        let proto = NpcPrototype {
+            id: NpcId(2),
+            display_name: "Tester Proto".into(),
+            role_label: None,
+            role_tags: Vec::new(),
+            personality: PersonalityVector {
+                warmth: 0.3,
+                dominance: 0.2,
+                volatility: 0.1,
+                conscientiousness: 0.6,
+                openness: 0.5,
+            },
+            base_stats: Stats::default(),
+            active_stages: vec![LifeStage::YoungAdult],
+            schedule: NpcSchedule::default(),
+        };
+        world.npc_prototypes.insert(proto.id, proto);
+
+        // Relationship pressure & milestones (including queues)
+        world.relationship_pressure.changed_pairs.push((1, 2));
+        world.relationship_pressure.queue.push_back(RelationshipPressureEvent {
+            actor_id: 1,
+            target_id: 2,
+            kind: RelationshipEventKind::AffectionBandChanged,
+            old_band: "Stranger".into(),
+            new_band: "Acquaintance".into(),
+            source: Some("test_pressure".into()),
+            tick: Some(5),
+        });
+        world
+            .relationship_milestones
+            .last_role
+            .insert((1, 2), crate::relationship_model::RelationshipRole::Friend);
+        world.relationship_milestones.queue.push_back(RelationshipMilestoneEvent {
+            actor_id: 1,
+            target_id: 2,
+            kind: RelationshipMilestoneKind::FriendToRival,
+            from_role: "Friend".into(),
+            to_role: "Rival".into(),
+            reason: "reason".into(),
+            source: Some("test_milestone".into()),
+            tick: Some(6),
+        });
+
+        // Storylet usage
+        world.storylet_usage.times_fired.insert("story_1".into(), 2);
+
+        // Memory entries
+        world.memory_entries.push(crate::types::MemoryEntryRecord {
+            id: "mem_1".into(),
+            event_id: "evt".into(),
+            npc_id: NpcId(1),
+            sim_tick: SimTick(10),
+            emotional_intensity: 0.7,
+            stat_deltas: Vec::new(),
+            relationship_deltas: Vec::new(),
+            tags: vec!["support".into()],
+            participants: vec![1, 2],
+        });
+
+        // District/world state
+        world.district_state.insert("Downtown".into(), "ok".into());
+        world.world_flags.insert("flag_test".into(), true);
+        world.known_npcs.push(NpcId(2));
+
+        // Digital legacy sample
+        world.digital_legacy.primary_imprint = Some(DigitalImprint {
+            id: 5,
+            created_at_stage: LifeStage::Adult,
+            created_at_age_years: 35,
+            final_stats: Stats::default(),
+            final_karma: Karma(10.0),
+            legacy_vector: LegacyVector::default(),
+            relationship_roles: HashMap::new(),
+            relationship_milestones: Vec::new(),
+            memory_tag_counts: HashMap::new(),
+        });
+
+        let snapshot_before = snapshot_json(&world);
+
+        db.save_world(&world).expect("Failed to save world");
+        let loaded = db.load_world(WorldSeed(99)).expect("Failed to load world");
+
+        // Tick consistency
+        assert_eq!(loaded.current_tick.0, loaded.game_time.tick_index);
+
+        let snapshot_after = snapshot_json(&loaded);
+        assert_eq!(snapshot_before, snapshot_after);
 
         let _ = fs::remove_file(db_path);
     }
