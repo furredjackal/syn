@@ -23,32 +23,108 @@ use syn_memory::{MemoryEntry, MemorySystem};
 use syn_query::RelationshipQuery;
 use syn_sim::{tick_world, NpcRegistry, SimState};
 
+pub mod storylet_library;
+pub mod storylet_roles;
+pub mod storylet_outcome;
+pub mod event_director;
+pub mod tag_bitset;
+pub mod storylet_loader;
+pub use storylet_library::{EventContext, StoryletId, StoryletLibrary, tags_to_bitset};
+pub use tag_bitset::TagBitset;
+pub use storylet_outcome::{MemoryEntryTemplate, StoryletOutcomeSet, WorldFlagUpdate};
+pub use storylet_roles::{RoleAssignment, RoleScoring, RoleSlot, StoryletRoles};
+
+pub type StoryletPrereqs = StoryletPrerequisites;
+
+/// Trigger metadata for a storylet (placeholder, GDD 3.16.1).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StoryletTrigger {
+    #[serde(default)]
+    pub kind: Option<String>,
+}
+
+/// Cooldown wrapper for storylets.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub struct StoryletCooldown {
+    #[serde(default)]
+    pub ticks: u32,
+}
+
+/// Outcome set for a storylet (choices + metadata).
 /// A storylet: condition-driven narrative fragment with roles, outcomes, and cooldowns.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Storylet {
-    pub id: String,
+    pub id: StoryletId,
+    #[serde(default)]
     pub name: String,
-    pub tags: Vec<String>, // e.g., ["romance", "crisis", "career"]
-    pub prerequisites: StoryletPrerequisites,
-    pub heat: f32,                // narrative intensity (0.0..100.0)
-    pub weight: f32,              // base probability of firing
-    pub cooldown_ticks: u32,      // prevent rapid re-firing
-    pub roles: Vec<StoryletRole>, // required NPC roles
-    /// Optional cap on how many times this storylet may fire.
+    pub tags: TagBitset,
+    pub prerequisites: StoryletPrereqs,
+    pub roles: StoryletRoles,
+    pub heat: i32,
     #[serde(default)]
-    pub max_uses: Option<u32>,
-    /// Player-facing options for this storylet.
+    pub triggers: StoryletTrigger,
     #[serde(default)]
-    pub choices: Vec<StoryletChoice>,
-    /// Optional heat category for pacing alignment.
+    pub outcomes: StoryletOutcomeSet,
     #[serde(default)]
-    pub heat_category: Option<StoryletHeatCategory>,
-    /// Optional actor hints for focusing NPCs.
-    #[serde(default)]
-    pub actors: Option<StoryletActors>,
-    /// Optional interaction tone hint used for NPC intent biasing.
-    #[serde(default)]
-    pub interaction_tone: Option<InteractionTone>,
+    pub cooldown: StoryletCooldown,
+    pub weight: f32,
+}
+
+impl Storylet {
+    pub fn new(
+        id: StoryletId,
+        tags: TagBitset,
+        prerequisites: StoryletPrereqs,
+        roles: StoryletRoles,
+        heat: i32,
+        triggers: StoryletTrigger,
+        outcomes: StoryletOutcomeSet,
+        cooldown: StoryletCooldown,
+        weight: f32,
+    ) -> Self {
+        Storylet {
+            id,
+            name: String::new(),
+            tags,
+            prerequisites,
+            roles,
+            heat,
+            triggers,
+            outcomes,
+            cooldown,
+            weight,
+        }
+    }
+
+    pub fn matches(&self, ctx: &EventContext) -> bool {
+        ctx.required_tags.is_empty() || (self.tags & ctx.required_tags) == ctx.required_tags
+    }
+}
+
+impl Default for Storylet {
+    fn default() -> Self {
+        Storylet::new(
+            String::new(),
+            TagBitset::default(),
+            StoryletPrereqs::default(),
+            StoryletRoles::default(),
+            0,
+            StoryletTrigger::default(),
+            StoryletOutcomeSet::default(),
+            StoryletCooldown::default(),
+            1.0,
+        )
+    }
+}
+
+impl<'de> Deserialize<'de> for Storylet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let helper = storylet_loader::StoryletSerde::deserialize(deserializer)?;
+        Ok(helper.into())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -75,23 +151,6 @@ pub struct StoryletChoice {
     pub id: String,
     pub label: String,
     pub outcome: StoryletOutcome,
-}
-
-/// Simple container for storylet content.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct StoryletLibrary {
-    pub storylets: Vec<Storylet>,
-}
-
-impl StoryletLibrary {
-    pub fn new(storylets: Vec<Storylet>) -> Self {
-        Self { storylets }
-    }
-
-    /// Placeholder loader; integrates with content pipeline when available.
-    pub fn load_default() -> Result<Self, ()> {
-        Ok(Self::default())
-    }
 }
 
 /// Relationship-based prerequisite (additive, non-breaking).
@@ -151,11 +210,27 @@ pub struct DigitalLegacyPrereq {
 }
 
 /// Conditions that must be met for a storylet to be eligible.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StoryletPrerequisites {
+    #[serde(default)]
+    pub stat_conditions: Vec<StatCondition>,
+    #[serde(default)]
+    pub personality_conditions: Vec<PersonalityCondition>,
+    #[serde(default)]
+    pub relationship_conditions: Vec<RelationshipThreshold>,
+    #[serde(default)]
+    pub district_conditions: Vec<DistrictCondition>,
+    #[serde(default)]
+    pub memory_echo_conditions: Vec<MemoryEchoFlag>,
+    #[serde(default)]
+    pub global_conditions: Vec<GlobalWorldStateFlag>,
+    #[serde(default)]
+    pub life_stage: Option<LifeStage>,
+
     pub min_relationship_affection: Option<f32>,
     pub min_relationship_resentment: Option<f32>,
-    pub stat_conditions: HashMap<String, (f32, f32)>, // {"mood": (-10.0, -5.0)} means mood in range
+    #[serde(default)]
+    pub stat_ranges: HashMap<String, (f32, f32)>, // legacy range-based checks
     pub life_stages: Vec<String>,                     // ["Teen", "Adult", "Elder"]
     pub tags: Vec<String>,                            // must have these tags
     pub relationship_states: Vec<RelationshipState>, // Only fire if relationship is in one of these states
@@ -176,6 +251,62 @@ pub struct StoryletPrerequisites {
     /// Optional time/location gating aligned with NPC schedule.
     #[serde(default)]
     pub time_and_location: Option<TimeAndLocationPrereqs>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StatCondition {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub min: f32,
+    #[serde(default)]
+    pub max: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PersonalityCondition {
+    #[serde(default)]
+    pub trait_name: String,
+    #[serde(default)]
+    pub min: f32,
+    #[serde(default)]
+    pub max: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RelationshipThreshold {
+    #[serde(default)]
+    pub axis: String,
+    #[serde(default)]
+    pub min: f32,
+    #[serde(default)]
+    pub max: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DistrictCondition {
+    #[serde(default)]
+    pub district: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MemoryEchoFlag {
+    #[serde(default)]
+    pub tag: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GlobalWorldStateFlag {
+    #[serde(default)]
+    pub flag: String,
+    #[serde(default)]
+    pub value: bool,
+}
+
+impl StoryletPrerequisites {
+    pub fn passes(&self, _ctx: &EventContext) -> bool {
+        true
+    }
 }
 
 /// Optional time/location prerequisites for storylets.
@@ -291,7 +422,7 @@ fn check_time_and_location_prereqs(
         return true;
     }
 
-    let Some(actors) = &storylet.actors else {
+    let Some(actors) = &storylet.outcomes.actors else {
         return true;
     };
     if let Some(ref primary) = actors.primary {
@@ -327,12 +458,12 @@ pub fn npc_intent_score_multiplier(
     registry: &NpcRegistry,
     storylet: &Storylet,
 ) -> f32 {
-    let tone = match &storylet.interaction_tone {
+    let tone = match &storylet.outcomes.interaction_tone {
         Some(t) => t,
         None => return 1.0,
     };
 
-    let Some(actors) = &storylet.actors else {
+    let Some(actors) = &storylet.outcomes.actors else {
         return 1.0;
     };
 
@@ -358,7 +489,7 @@ pub fn prepare_storylet_execution(
     storylet: &Storylet,
     tick: u64,
 ) {
-    if let Some(actors) = &storylet.actors {
+    if let Some(actors) = &storylet.outcomes.actors {
         if let Some(ref primary) = actors.primary {
             if let Some(npc_id) = resolve_actor_ref_to_npc(world, registry, primary) {
                 registry.focus_npc_for_scene(world, npc_id, tick);
@@ -710,7 +841,7 @@ fn score_storylet_with_pressure(
 }
 
 fn storylet_heat_band_match(heat_band: NarrativeHeatBand, storylet: &Storylet) -> bool {
-    let Some(category) = &storylet.heat_category else {
+    let Some(category) = &storylet.outcomes.heat_category else {
         return true;
     };
 
@@ -727,7 +858,7 @@ fn storylet_heat_band_match(heat_band: NarrativeHeatBand, storylet: &Storylet) -
 }
 
 fn heat_score_multiplier(heat_band: NarrativeHeatBand, storylet: &Storylet) -> f32 {
-    let Some(category) = &storylet.heat_category else {
+    let Some(category) = &storylet.outcomes.heat_category else {
         return 1.0;
     };
 
@@ -804,7 +935,7 @@ fn score_storylet_full(
     let legacy_mult =
         digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
     let mut score = base * heat_mult * stage_mult * legacy_mult;
-    if storylet.heat_category.is_some() && !storylet_heat_band_match(heat_band, storylet) {
+    if storylet.outcomes.heat_category.is_some() && !storylet_heat_band_match(heat_band, storylet) {
         score *= 0.5;
     }
     score
@@ -1065,7 +1196,12 @@ impl EventDirector {
         let mut score = storylet.weight;
 
         // Pressure point bonus: if there's relationship tension, bump "conflict" storylets
-        if storylet.tags.contains(&"conflict".to_string()) {
+        if storylet
+            .prerequisites
+            .tags
+            .iter()
+            .any(|t| t == "conflict")
+        {
             if let Some(target_role) = storylet.roles.get(0) {
                 if RelationshipQuery::has_pressure_point(world, world.player_id, target_role.npc_id)
                 {
@@ -1075,13 +1211,13 @@ impl EventDirector {
         }
 
         // Narrative heat: higher heat = higher priority in emergent moments
-        score *= storylet.heat / 50.0; // Normalize heat intensity
+        score *= (storylet.heat as f32) / 50.0; // Normalize heat intensity
 
         // Apply narrative heat multiplier (0.5..2.0 based on current heat level)
         score *= world.heat_multiplier();
 
         // Behavior intent: prioritize storylets that match current player drive
-        if let Some(action) = behavior_action_from_tags(&storylet.tags) {
+        if let Some(action) = behavior_action_from_tags(&storylet.prerequisites.tags) {
             let intent = world.player_behavior_bias(action);
             score *= intent;
         }
@@ -1144,13 +1280,13 @@ impl EventDirector {
             self.cooldowns.mark_cooldown(
                 &storylet.id,
                 first_role.npc_id,
-                storylet.cooldown_ticks,
+                storylet.cooldown.ticks,
                 current_tick,
             );
         }
 
         if matches!(world.narrative_heat.band(), NarrativeHeatBand::Critical) {
-            if let Some(cat) = &storylet.heat_category {
+            if let Some(cat) = &storylet.outcomes.heat_category {
                 if matches!(cat, StoryletHeatCategory::CriticalArc) {
                     world.narrative_heat.add(-20.0);
                 }
@@ -1267,7 +1403,7 @@ pub fn apply_storylet_outcome_with_memory(
     }
 
     // Global heat reactions: base storylet heat plus optional spikes/damps.
-    world.add_heat(storylet.heat);
+    world.add_heat(storylet.heat as f32);
     if outcome.heat_spike > 0.0 {
         world.add_heat(outcome.heat_spike);
     } else if outcome.heat_spike < 0.0 {
@@ -1379,7 +1515,7 @@ pub fn storylet_is_eligible(
 ) -> bool {
     let pre = &storylet.prerequisites;
 
-    if let Some(max) = storylet.max_uses {
+    if let Some(max) = storylet.outcomes.max_uses {
         let used = usage.times_fired.get(&storylet.id).copied().unwrap_or(0);
         if used >= max {
             return false;
@@ -1523,6 +1659,7 @@ pub fn select_next_event_view(
     let storylet = select_storylet_weighted(world, sim, library, usage)?;
 
     let choices = storylet
+        .outcomes
         .choices
         .iter()
         .map(|c| DirectorChoiceView {
@@ -1547,7 +1684,11 @@ pub fn apply_choice_and_advance(
     ticks_to_advance: u32,
 ) -> Option<DirectorEventView> {
     let storylet = library.storylets.iter().find(|s| s.id == storylet_id)?;
-    let choice = storylet.choices.iter().find(|c| c.id == choice_id)?;
+    let choice = storylet
+        .outcomes
+        .choices
+        .iter()
+        .find(|c| c.id == choice_id)?;
 
     apply_storylet_choice_outcome(world, sim, storylet, choice);
 

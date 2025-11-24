@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use syn_core::WorldState;
 use syn_core::NpcId;
-use syn_core::npc::NpcPrototype;
 use crate::{NpcInstance, NpcLod, NpcLodTier, instantiate_simulated_npc_from_prototype};
 
 #[derive(Debug, Default)]

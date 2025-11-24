@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use syn_api::{
-    api_choose_option, api_get_current_event, api_reset_runtime, Storylet, StoryletChoice, StoryletOutcome, WorldSeed, WorldState,
+    api_choose_option, api_get_current_event, api_reset_runtime, tags_to_bitset, Storylet,
+    StoryletChoice, StoryletCooldown, StoryletOutcome, StoryletOutcomeSet, WorldSeed, WorldState,
 };
 use syn_director::StoryletLibrary;
 use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
@@ -30,35 +31,35 @@ fn sample_storylet() -> Storylet {
     Storylet {
         id: "story-api".to_string(),
         name: "API Story".to_string(),
-        tags: vec![],
+        tags: tags_to_bitset(&[]),
         prerequisites: basic_prereqs(),
-        heat: 1.0,
+        heat: 1,
         weight: 1.0,
-        cooldown_ticks: 0,
         roles: vec![],
-        max_uses: None,
-        choices: vec![StoryletChoice {
-            id: "choice-api".to_string(),
-            label: "Take it".to_string(),
-            outcome: StoryletOutcome {
-                stat_deltas: vec![StatDelta {
-                    kind: StatKind::Mood,
-                    delta: 1.0,
-                    source: None,
-                }],
-                relationship_deltas: vec![RelationshipDelta {
-                    actor_id: 1,
-                    target_id: 1,
-                    axis: RelationshipAxis::Affection,
-                    delta: 0.5,
-                    source: None,
-                }],
-                ..Default::default()
-            },
-        }],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
+        outcomes: StoryletOutcomeSet {
+            choices: vec![StoryletChoice {
+                id: "choice-api".to_string(),
+                label: "Take it".to_string(),
+                outcome: StoryletOutcome {
+                    stat_deltas: vec![StatDelta {
+                        kind: StatKind::Mood,
+                        delta: 1.0,
+                        source: None,
+                    }],
+                    relationship_deltas: vec![RelationshipDelta {
+                        actor_id: 1,
+                        target_id: 1,
+                        axis: RelationshipAxis::Affection,
+                        delta: 0.5,
+                        source: None,
+                    }],
+                    ..Default::default()
+                },
+            }],
+            ..Default::default()
+        },
+        cooldown: StoryletCooldown { ticks: 0 },
+        ..Default::default()
     }
 }
 
@@ -66,9 +67,7 @@ fn sample_storylet() -> Storylet {
 fn api_flow_returns_events() {
     let world = WorldState::new(WorldSeed(5), NpcId(1));
     let sim = SimState::new();
-    let library = StoryletLibrary {
-        storylets: vec![sample_storylet()],
-    };
+    let library = StoryletLibrary::from_storylets(vec![sample_storylet()]);
 
     api_reset_runtime(world, sim, library);
 

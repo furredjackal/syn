@@ -4,6 +4,8 @@ pub mod post_life;
 pub use npc_registry::NpcRegistry;
 
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 use syn_core::life_stage::LifeStageConfig;
 use syn_core::narrative_heat::{compute_heat_delta, NarrativeHeatConfig, NarrativeHeatInputs};
@@ -20,6 +22,9 @@ use syn_core::{AbstractNpc, DeterministicRng, LifeStage, NpcId, RelationshipDelt
 use syn_core::apply_stat_deltas;
 use syn_core::time::GameTime;
 use syn_memory::MemorySystem;
+use syn_storage::models::AbstractNpc as StorageNpc;
+use syn_storage::{HybridStorage};
+use syn_storage::storage_error::StorageError;
 
 /// Simulation engine: advances world state by one tick.
 pub struct Simulator {
@@ -828,14 +833,118 @@ pub struct SimState {
     pub npc_registry: crate::npc_registry::NpcRegistry,
     /// Dormant Tier3 population.
     pub population: PopulationStore,
+    /// Unified hot/cold storage backend.
+    pub storage: HybridStorage,
 }
 
 impl SimState {
     pub fn new() -> Self {
+        let storage = init_default_storage().expect("failed to initialize hybrid storage");
         Self {
             npc_registry: crate::npc_registry::NpcRegistry::default(),
             population: PopulationStore::default(),
+            storage,
         }
+    }
+
+    pub fn save_active_npc(&self, npc: &StorageNpc) -> Result<(), StorageError> {
+        self.storage.save_active(npc)
+    }
+
+    pub fn save_dormant_npc(&self, npc: &StorageNpc) -> Result<(), StorageError> {
+        self.storage.save_dormant(npc)
+    }
+
+    pub fn promote_npc(&mut self, world: &mut WorldState, id: NpcId) -> Result<(), StorageError> {
+        self.storage.promote(id.0)?;
+        if let Some(stored) = self.storage.load_active(id.0)? {
+            let core_npc = storage_to_core_npc(&stored);
+            world.npcs.insert(id, core_npc.clone());
+            self.population.dormant.remove(&id);
+            let mut sim = SimulatedNpc::new(core_npc);
+            sim.stats.set(StatKind::Health, stored.health);
+            sim.stats.set(StatKind::Wealth, stored.wealth as f32);
+            self.npc_registry.instances.insert(
+                id,
+                NpcInstance {
+                    id,
+                    lod: NpcLod::Tier2Active,
+                    tier: NpcLodTier::Tier1Active,
+                    sim,
+                    last_tick: world.current_tick.0,
+                    behavior: None,
+                    busy_until_tick: 0,
+                    last_action: None,
+                    current_activity: syn_core::npc::NpcActivityKind::Home,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    pub fn demote_npc(&mut self, world: &mut WorldState, id: NpcId) -> Result<(), StorageError> {
+        if let Some(instance) = self.npc_registry.instances.remove(&id) {
+            let storage_npc = core_to_storage_npc(&instance.sim.abstract_npc, Some(instance.sim.current_stats()));
+            self.storage.save_active(&storage_npc)?;
+            self.storage.demote(id.0)?;
+            self.population.dormant.insert(
+                id,
+                DormantNpcData {
+                    id,
+                    age_years: instance.sim.abstract_npc.age as u16,
+                    life_stage: world.player_life_stage,
+                    key_stats: instance.sim.stats.clone(),
+                },
+            );
+        }
+        Ok(())
+    }
+}
+
+fn init_default_storage() -> Result<HybridStorage, StorageError> {
+    let data_dir = Path::new("data");
+    let _ = fs::create_dir_all(data_dir);
+    let hot_path = data_dir.join("hot.redb");
+    let cold_path = data_dir.join("world.duckdb");
+    HybridStorage::new(
+        hot_path.to_string_lossy().as_ref(),
+        cold_path.to_string_lossy().as_ref(),
+    )
+}
+
+fn district_to_code(district: &str) -> u16 {
+    district
+        .bytes()
+        .fold(0u16, |acc, b| acc.wrapping_add(b as u16))
+}
+
+fn core_to_storage_npc(core: &AbstractNpc, stats: Option<&Stats>) -> StorageNpc {
+    let wealth = stats
+        .map(|s| s.get(StatKind::Wealth) as i32)
+        .unwrap_or_default();
+    let health = stats
+        .map(|s| s.get(StatKind::Health))
+        .unwrap_or_default();
+    StorageNpc {
+        id: core.id.0,
+        age: core.age.min(u8::MAX as u32) as u8,
+        district: district_to_code(&core.district),
+        wealth,
+        health,
+        seed: core.seed,
+    }
+}
+
+fn storage_to_core_npc(stored: &StorageNpc) -> AbstractNpc {
+    AbstractNpc {
+        id: NpcId(stored.id),
+        age: stored.age as u32,
+        job: String::new(),
+        district: format!("District{}", stored.district),
+        household_id: 0,
+        traits: Default::default(),
+        seed: stored.seed,
+        attachment_style: Default::default(),
     }
 }
 
@@ -871,8 +980,18 @@ pub fn tick_dormant_npc_macro(_world: &mut WorldState, _npc: &mut DormantNpcData
     // Placeholder: age, coarse stat drift, etc.
 }
 
-fn tick_lod_transitions(_world: &mut WorldState, _sim: &mut SimState) {
-    // Placeholder policy hook.
+fn tick_lod_transitions(world: &mut WorldState, sim: &mut SimState) {
+    let to_demote: Vec<NpcId> = sim
+        .npc_registry
+        .iter()
+        .filter_map(|(id, npc)| (npc.lod == NpcLod::Tier0Dormant).then_some(*id))
+        .collect();
+
+    for id in to_demote {
+        if let Err(err) = sim.demote_npc(world, id) {
+            eprintln!("Failed to demote NPC {id:?}: {err}");
+        }
+    }
 }
 
 fn tick_npc_tier1(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {

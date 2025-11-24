@@ -18,7 +18,8 @@ pub use syn_core::{
     SimTick, StatKind, Stats, Traits, WorldSeed, WorldState, ALL_STAT_KINDS,
 };
 pub use syn_director::{
-    EventDirector, Storylet, StoryletChoice, StoryletLibrary, StoryletOutcome, StoryletRole,
+    tags_to_bitset, EventDirector, Storylet, StoryletChoice, StoryletCooldown, StoryletLibrary,
+    StoryletOutcome, StoryletOutcomeSet, StoryletRole,
 };
 pub use syn_memory::{Journal, MemoryEntry, MemorySystem};
 pub use syn_query::{ClusterQuery, NpcQuery, RelationshipQuery, StatQuery};
@@ -58,62 +59,66 @@ fn register_storylets_from_db(director: &mut EventDirector) {
     match load_storylets_from_db(&db_path) {
         Ok(storylets) => {
             for content_storylet in storylets {
+                let tag_list = content_storylet.prerequisites.tags.clone();
                 // Convert syn_content::Storylet to syn_director::Storylet
+                let mut prereqs = syn_director::StoryletPrerequisites::default();
+                prereqs.min_relationship_affection = content_storylet
+                    .prerequisites
+                    .min_relationship_affection;
+                prereqs.min_relationship_resentment = content_storylet
+                    .prerequisites
+                    .min_relationship_resentment;
+                prereqs.stat_ranges = content_storylet.prerequisites.stat_conditions;
+                prereqs.life_stages = content_storylet.prerequisites.life_stages;
+                prereqs.tags = tag_list.clone();
+                prereqs.digital_legacy_prereq = content_storylet
+                    .prerequisites
+                    .digital_legacy_prereq
+                    .as_ref()
+                    .map(|p| syn_director::DigitalLegacyPrereq {
+                        require_post_life: p.require_post_life,
+                        min_compassion_vs_cruelty: p.min_compassion_vs_cruelty,
+                        max_compassion_vs_cruelty: p.max_compassion_vs_cruelty,
+                        min_ambition_vs_comfort: p.min_ambition_vs_comfort,
+                        max_ambition_vs_comfort: p.max_ambition_vs_comfort,
+                        min_connection_vs_isolation: p.min_connection_vs_isolation,
+                        max_connection_vs_isolation: p.max_connection_vs_isolation,
+                        min_stability_vs_chaos: p.min_stability_vs_chaos,
+                        max_stability_vs_chaos: p.max_stability_vs_chaos,
+                        min_light_vs_shadow: p.min_light_vs_shadow,
+                        max_light_vs_shadow: p.max_light_vs_shadow,
+                    });
+                prereqs.relationship_states = content_storylet.prerequisites.relationship_states;
+                prereqs.memory_tags_required = content_storylet.prerequisites.memory_tags_required;
+                prereqs.memory_tags_forbidden =
+                    content_storylet.prerequisites.memory_tags_forbidden;
+                prereqs.memory_recency_ticks = content_storylet.prerequisites.memory_recency_ticks;
+                prereqs.relationship_prereqs = content_storylet
+                    .prerequisites
+                    .relationship_prereqs
+                    .into_iter()
+                    .map(|r| syn_director::RelationshipPrereq {
+                        actor_id: r.actor_id,
+                        target_id: r.target_id,
+                        axis: r.axis,
+                        min_value: r.min_value,
+                        max_value: r.max_value,
+                        min_band: r.min_band,
+                        max_band: r.max_band,
+                    })
+                    .collect();
+                prereqs.allowed_life_stages = content_storylet.prerequisites.allowed_life_stages;
+                prereqs.time_and_location = None;
+
                 let director_storylet = Storylet {
                     id: content_storylet.id,
                     name: content_storylet.name,
-                    tags: content_storylet.tags,
-                    prerequisites: syn_director::StoryletPrerequisites {
-                        min_relationship_affection: content_storylet
-                            .prerequisites
-                            .min_relationship_affection,
-                        min_relationship_resentment: content_storylet
-                            .prerequisites
-                            .min_relationship_resentment,
-                        stat_conditions: content_storylet.prerequisites.stat_conditions,
-                        life_stages: content_storylet.prerequisites.life_stages,
-                        tags: content_storylet.prerequisites.tags,
-                        digital_legacy_prereq: content_storylet
-                            .prerequisites
-                            .digital_legacy_prereq
-                            .as_ref()
-                            .map(|p| syn_director::DigitalLegacyPrereq {
-                                require_post_life: p.require_post_life,
-                                min_compassion_vs_cruelty: p.min_compassion_vs_cruelty,
-                                max_compassion_vs_cruelty: p.max_compassion_vs_cruelty,
-                                min_ambition_vs_comfort: p.min_ambition_vs_comfort,
-                                max_ambition_vs_comfort: p.max_ambition_vs_comfort,
-                                min_connection_vs_isolation: p.min_connection_vs_isolation,
-                                max_connection_vs_isolation: p.max_connection_vs_isolation,
-                                min_stability_vs_chaos: p.min_stability_vs_chaos,
-                                max_stability_vs_chaos: p.max_stability_vs_chaos,
-                                min_light_vs_shadow: p.min_light_vs_shadow,
-                                max_light_vs_shadow: p.max_light_vs_shadow,
-                            }),
-                        relationship_states: content_storylet.prerequisites.relationship_states,
-                        memory_tags_required: content_storylet.prerequisites.memory_tags_required,
-                        memory_tags_forbidden: content_storylet.prerequisites.memory_tags_forbidden,
-                        memory_recency_ticks: content_storylet.prerequisites.memory_recency_ticks,
-                        relationship_prereqs: content_storylet
-                            .prerequisites
-                            .relationship_prereqs
-                            .into_iter()
-                            .map(|r| syn_director::RelationshipPrereq {
-                                actor_id: r.actor_id,
-                                target_id: r.target_id,
-                                axis: r.axis,
-                                min_value: r.min_value,
-                                max_value: r.max_value,
-                                min_band: r.min_band,
-                                max_band: r.max_band,
-                            })
-                            .collect(),
-                        allowed_life_stages: content_storylet.prerequisites.allowed_life_stages,
-                        time_and_location: None,
-                    },
-                    heat: content_storylet.heat,
+                    prerequisites: prereqs,
+                    heat: content_storylet.heat as i32,
                     weight: content_storylet.weight,
-                    cooldown_ticks: content_storylet.cooldown_ticks,
+                    cooldown: syn_director::StoryletCooldown {
+                        ticks: content_storylet.cooldown_ticks,
+                    },
                     roles: content_storylet
                         .roles
                         .into_iter()
@@ -121,12 +126,17 @@ fn register_storylets_from_db(director: &mut EventDirector) {
                             name: r.name,
                             npc_id: r.npc_id,
                         })
-                        .collect(),
-                    max_uses: None,
-                    choices: vec![],
-                    heat_category: content_storylet.heat_category,
-                    actors: None,
-                    interaction_tone: None,
+                        .collect::<syn_director::StoryletRoles>(),
+                    tags: syn_director::tags_to_bitset(&tag_list),
+                    outcomes: syn_director::StoryletOutcomeSet {
+                        max_uses: None,
+                        choices: vec![],
+                        heat_category: content_storylet.heat_category,
+                        actors: None,
+                        interaction_tone: None,
+                        ..Default::default()
+                    },
+                    ..Default::default()
                 };
                 director.register_storylet(director_storylet);
             }
@@ -498,34 +508,19 @@ impl GameEngine {
 
     /// Register a storylet with the Event Director.
     pub fn register_storylet(&mut self, storylet_id: String, name: String, heat: f32, weight: f32) {
+        let mut prereqs = syn_director::StoryletPrerequisites::default();
+        prereqs.tags = vec![];
         let storylet = Storylet {
             id: storylet_id,
             name,
-            tags: vec![],
-            prerequisites: syn_director::StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: std::collections::HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                digital_legacy_prereq: None,
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-            },
-            heat,
+            tags: tags_to_bitset(&[]),
+            prerequisites: prereqs,
+            heat: heat as i32,
             weight,
-            cooldown_ticks: 100,
-            roles: vec![],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+            roles: syn_director::StoryletRoles::default(),
+            outcomes: syn_director::StoryletOutcomeSet::default(),
+            cooldown: syn_director::StoryletCooldown { ticks: 100 },
+            ..Default::default()
         };
         self.director.register_storylet(storylet);
     }
@@ -537,7 +532,7 @@ impl GameEngine {
             .map(|s| EventDto {
                 id: s.id.clone(),
                 name: s.name.clone(),
-                heat: s.heat,
+                heat: s.heat as f32,
             })
     }
 }

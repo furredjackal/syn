@@ -29,6 +29,7 @@ fn test_personality_clamp_and_world_prototype_lookup() {
         personality: p,
         base_stats: Stats::default(),
         active_stages: vec![LifeStage::Child, LifeStage::Teen],
+        schedule: Default::default(),
     };
 
     let mut world = WorldState::new(WorldSeed(42), NpcId(1));

@@ -5,8 +5,8 @@ use syn_core::{
     NpcId, SimTick, StatDelta, StatKind, WorldSeed, WorldState,
 };
 use syn_director::{
-    apply_choice_and_advance, Storylet, StoryletChoice, StoryletLibrary, StoryletOutcome,
-    StoryletPrerequisites,
+    apply_choice_and_advance, tags_to_bitset, Storylet, StoryletChoice, StoryletCooldown,
+    StoryletLibrary, StoryletOutcome, StoryletOutcomeSet, StoryletPrerequisites,
 };
 use syn_sim::SimState;
 
@@ -36,41 +36,39 @@ fn apply_choice_advances_time_and_applies_outcome() {
     let storylet = Storylet {
         id: "s1".to_string(),
         name: "Test Story".to_string(),
-        tags: vec![],
+        tags: tags_to_bitset(&[]),
         prerequisites: basic_prereqs(),
-        heat: 1.0,
+        heat: 1,
         weight: 1.0,
-        cooldown_ticks: 0,
         roles: vec![],
-        max_uses: None,
-        choices: vec![StoryletChoice {
-            id: "c1".to_string(),
-            label: "Proceed".to_string(),
-            outcome: StoryletOutcome {
-                stat_deltas: vec![StatDelta {
-                    kind: StatKind::Mood,
-                    delta: 3.0,
-                    source: None,
-                }],
-                relationship_deltas: vec![RelationshipDelta {
-                    actor_id: 1,
-                    target_id: 1,
-                    axis: RelationshipAxis::Trust,
-                    delta: 1.0,
-                    source: None,
-                }],
-                karma_delta: Some(2.5),
-                ..Default::default()
-            },
-        }],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
+        outcomes: StoryletOutcomeSet {
+            choices: vec![StoryletChoice {
+                id: "c1".to_string(),
+                label: "Proceed".to_string(),
+                outcome: StoryletOutcome {
+                    stat_deltas: vec![StatDelta {
+                        kind: StatKind::Mood,
+                        delta: 3.0,
+                        source: None,
+                    }],
+                    relationship_deltas: vec![RelationshipDelta {
+                        actor_id: 1,
+                        target_id: 1,
+                        axis: RelationshipAxis::Trust,
+                        delta: 1.0,
+                        source: None,
+                    }],
+                    karma_delta: Some(2.5),
+                    ..Default::default()
+                },
+            }],
+            ..Default::default()
+        },
+        cooldown: StoryletCooldown { ticks: 0 },
+        ..Default::default()
     };
 
-    let library = StoryletLibrary {
-        storylets: vec![storylet],
-    };
+    let library = StoryletLibrary::from_storylets(vec![storylet]);
 
     let next_event = apply_choice_and_advance(&mut world, &mut sim, &library, "s1", "c1", 4)
         .expect("expected next event");

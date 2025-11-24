@@ -7,5 +7,10 @@ members = [
     "syn_director",
     "syn_api",
     "syn_content",
+    "syn_storage",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+chrono = { version = "=0.4.34", default-features = false, features = ["clock", "serde"] }
+time = { version = "0.3.36", features = ["macros", "serde"] }
