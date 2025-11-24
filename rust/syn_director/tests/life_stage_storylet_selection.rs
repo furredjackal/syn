@@ -1,36 +1,25 @@
 use syn_core::{LifeStage, NpcId, SimTick, WorldSeed, WorldState};
-use syn_director::{EventDirector, Storylet, StoryletPrerequisites};
+use syn_director::{
+    EventDirector, Storylet, StoryletCooldown, StoryletOutcomeSet, StoryletPrerequisites,
+    StoryletRoles, TagBitset,
+};
 use syn_memory::MemorySystem;
 
 fn storylet_with_stage(id: &str, allowed: Vec<LifeStage>) -> Storylet {
     Storylet {
         id: id.to_string(),
         name: id.to_string(),
-        tags: vec![],
+        tags: TagBitset::default(),
         prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: Default::default(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![],
             allowed_life_stages: allowed,
-            time_and_location: None,
-            digital_legacy_prereq: None,
+            ..Default::default()
         },
-        heat: 10.0,
+        roles: StoryletRoles::default(),
+        heat: 10,
+        triggers: Default::default(),
+        outcomes: StoryletOutcomeSet::default(),
+        cooldown: StoryletCooldown { ticks: 0 },
         weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
     }
 }
 

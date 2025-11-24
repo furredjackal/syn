@@ -1,39 +1,25 @@
 use syn_core::narrative_heat::NarrativeHeatBand;
 use syn_core::{NpcId, SimTick, WorldSeed, WorldState};
 use syn_director::{
-    EventDirector, Storylet, StoryletHeatCategory, StoryletOutcome, StoryletPrerequisites,
+    EventDirector, Storylet, StoryletCooldown, StoryletHeatCategory, StoryletOutcome,
+    StoryletOutcomeSet, StoryletPrerequisites, StoryletRoles, TagBitset,
 };
 use syn_memory::MemorySystem;
 
 fn basic_storylet(id: &str, category: StoryletHeatCategory) -> Storylet {
+    let mut outcomes = StoryletOutcomeSet::default();
+    outcomes.heat_category = Some(category);
     Storylet {
         id: id.to_string(),
         name: id.to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: Default::default(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 10.0,
+        tags: TagBitset::default(),
+        prerequisites: StoryletPrerequisites::default(),
+        roles: StoryletRoles::default(),
+        heat: 10,
+        triggers: Default::default(),
+        outcomes,
+        cooldown: StoryletCooldown { ticks: 0 },
         weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: Some(category),
-        actors: None,
-        interaction_tone: None,
     }
 }
 

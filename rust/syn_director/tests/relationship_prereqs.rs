@@ -1,10 +1,36 @@
-use std::collections::HashMap;
 use syn_core::relationship_model::RelationshipAxis;
 use syn_core::{NpcId, Relationship, SimTick, WorldSeed, WorldState};
 use syn_director::{
-    EventDirector, RelationshipPrereq, Storylet, StoryletPrerequisites, StoryletRole,
+    EventDirector, RelationshipPrereq, Storylet, StoryletCooldown, StoryletOutcomeSet,
+    StoryletPrerequisites, StoryletRole, StoryletRoles, TagBitset,
 };
 use syn_memory::MemorySystem;
+
+fn base_prereqs() -> StoryletPrerequisites {
+    StoryletPrerequisites {
+        relationship_prereqs: Vec::new(),
+        ..Default::default()
+    }
+}
+
+fn build_storylet(
+    id: &str,
+    prereqs: StoryletPrerequisites,
+    roles: Vec<StoryletRole>,
+) -> Storylet {
+    Storylet {
+        id: id.to_string(),
+        name: "Storylet".to_string(),
+        tags: TagBitset::default(),
+        prerequisites: prereqs,
+        roles: StoryletRoles::from(roles),
+        heat: 50,
+        triggers: Default::default(),
+        outcomes: StoryletOutcomeSet::default(),
+        cooldown: StoryletCooldown { ticks: 100 },
+        weight: 0.5,
+    }
+}
 
 #[test]
 fn relationship_prereqs_pass_when_affection_in_range() {
@@ -42,46 +68,26 @@ fn relationship_prereqs_pass_when_affection_in_range() {
     );
 
     // Create storylet that requires affection between 2.5 and 10.0
-    let storylet = Storylet {
-        id: "affectionate_event".to_string(),
-        name: "Friendly interaction".to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: None, // defaults to player
-                target_id: 2,
-                axis: RelationshipAxis::Affection,
-                min_value: Some(2.5),
-                max_value: Some(10.0),
-                min_band: None,
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 0.5,
-        cooldown_ticks: 100,
-        roles: vec![StoryletRole {
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: None, // defaults to player
+            target_id: 2,
+            axis: RelationshipAxis::Affection,
+            min_value: Some(2.5),
+            max_value: Some(10.0),
+            min_band: None,
+            max_band: None,
+        }],
+        ..base_prereqs()
+    };
+    let storylet = build_storylet(
+        "affectionate_event",
+        prereqs,
+        vec![StoryletRole {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
-    };
+    );
 
     // Register the storylet and check eligibility via find_eligible
     director.register_storylet(storylet.clone());
@@ -125,46 +131,26 @@ fn relationship_prereqs_fail_when_affection_below_min() {
     );
 
     // Create storylet that requires affection >= 2.5
-    let storylet = Storylet {
-        id: "affectionate_event".to_string(),
-        name: "Friendly interaction".to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: None,
-                target_id: 2,
-                axis: RelationshipAxis::Affection,
-                min_value: Some(2.5),
-                max_value: None,
-                min_band: None,
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 0.5,
-        cooldown_ticks: 100,
-        roles: vec![StoryletRole {
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: None,
+            target_id: 2,
+            axis: RelationshipAxis::Affection,
+            min_value: Some(2.5),
+            max_value: None,
+            min_band: None,
+            max_band: None,
+        }],
+        ..base_prereqs()
+    };
+    let storylet = build_storylet(
+        "affectionate_event",
+        prereqs,
+        vec![StoryletRole {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
-    };
+    );
 
     // Register the storylet and check it's not eligible
     director.register_storylet(storylet.clone());
@@ -208,46 +194,26 @@ fn relationship_prereqs_pass_with_band_based_criteria() {
     );
 
     // Create storylet that requires at least "Friendly" band
-    let storylet = Storylet {
-        id: "close_event".to_string(),
-        name: "Close interaction".to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: None,
-                target_id: 2,
-                axis: RelationshipAxis::Affection,
-                min_value: None,
-                max_value: None,
-                min_band: Some("Friendly".to_string()),
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 0.5,
-        cooldown_ticks: 100,
-        roles: vec![StoryletRole {
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: None,
+            target_id: 2,
+            axis: RelationshipAxis::Affection,
+            min_value: None,
+            max_value: None,
+            min_band: Some("Friendly".to_string()),
+            max_band: None,
+        }],
+        ..base_prereqs()
+    };
+    let storylet = build_storylet(
+        "close_event",
+        prereqs,
+        vec![StoryletRole {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
-    };
+    );
 
     // Register the storylet and check eligibility
     director.register_storylet(storylet.clone());
@@ -278,46 +244,26 @@ fn relationship_prereqs_fail_when_relationship_missing() {
     );
 
     // Create storylet that requires a relationship
-    let storylet = Storylet {
-        id: "missing_rel_event".to_string(),
-        name: "Requires relationship".to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: None,
-                target_id: 2,
-                axis: RelationshipAxis::Affection,
-                min_value: Some(0.0),
-                max_value: None,
-                min_band: None,
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 0.5,
-        cooldown_ticks: 100,
-        roles: vec![StoryletRole {
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: None,
+            target_id: 2,
+            axis: RelationshipAxis::Affection,
+            min_value: Some(0.0),
+            max_value: None,
+            min_band: None,
+            max_band: None,
+        }],
+        ..base_prereqs()
+    };
+    let storylet = build_storylet(
+        "missing_rel_event",
+        prereqs,
+        vec![StoryletRole {
             name: "target".to_string(),
             npc_id: NpcId(2),
         }],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
-    };
+    );
 
     // Register the storylet and check it's not eligible
     director.register_storylet(storylet.clone());
@@ -376,43 +322,19 @@ fn relationship_prereqs_with_explicit_actor_id() {
     );
 
     // Create storylet that checks relationship between NPC 2 and NPC 3
-    let storylet = Storylet {
-        id: "npc_to_npc_event".to_string(),
-        name: "NPC relationship event".to_string(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: Some(2), // Explicitly check NPC 2's relationship
-                target_id: 3,
-                axis: RelationshipAxis::Affection,
-                min_value: Some(5.0),
-                max_value: None,
-                min_band: None,
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 0.5,
-        cooldown_ticks: 100,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: Some(2), // Explicitly check NPC 2's relationship
+            target_id: 3,
+            axis: RelationshipAxis::Affection,
+            min_value: Some(5.0),
+            max_value: None,
+            min_band: None,
+            max_band: None,
+        }],
+        ..base_prereqs()
     };
+    let storylet = build_storylet("npc_to_npc_event", prereqs, Vec::new());
 
     // Register the storylet and check eligibility
     director.register_storylet(storylet.clone());

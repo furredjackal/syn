@@ -2,7 +2,8 @@ use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
 use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
 use syn_director::{
     prepare_storylet_execution, resolve_actor_ref_to_npc, StoryActorRef, Storylet, StoryletActors,
-    StoryletPrerequisites, StoryletRole,
+    StoryletCooldown, StoryletOutcomeSet, StoryletPrerequisites, StoryletRole, StoryletRoles,
+    TagBitset,
 };
 use syn_sim::NpcRegistry;
 
@@ -46,40 +47,25 @@ fn test_prepare_storylet_execution_focuses_npc() {
     let mut world = make_world_with_known_tag(id, NpcRoleTag::Family);
     let mut registry = NpcRegistry::default();
 
+    let mut outcomes = StoryletOutcomeSet::default();
+    outcomes.actors = Some(StoryletActors {
+        primary: Some(StoryActorRef::RoleTag(NpcRoleTag::Family)),
+        secondary: None,
+    });
     let storylet = Storylet {
         id: "test".into(),
         name: "Test Story".into(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: Default::default(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 0.0,
-        weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![StoryletRole {
+        tags: TagBitset::default(),
+        prerequisites: StoryletPrerequisites::default(),
+        roles: StoryletRoles::from(vec![StoryletRole {
             name: "primary".into(),
             npc_id: id,
-        }],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: Some(StoryletActors {
-            primary: Some(StoryActorRef::RoleTag(NpcRoleTag::Family)),
-            secondary: None,
-        }),
-        interaction_tone: None,
+        }]),
+        heat: 0,
+        triggers: Default::default(),
+        outcomes: outcomes,
+        cooldown: StoryletCooldown { ticks: 0 },
+        weight: 1.0,
     };
 
     prepare_storylet_execution(&mut world, &mut registry, &storylet, 0);

@@ -2,7 +2,10 @@ use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::stats::{StatDelta, StatKind};
 use syn_core::{NpcId, SimTick, WorldSeed, WorldState};
 use syn_director::apply_storylet_outcome_with_memory;
-use syn_director::{Storylet, StoryletOutcome, StoryletPrerequisites};
+use syn_director::{
+    Storylet, StoryletCooldown, StoryletOutcome, StoryletOutcomeSet, StoryletPrerequisites,
+    StoryletRoles, TagBitset,
+};
 use syn_memory::MemorySystem;
 
 #[test]
@@ -27,31 +30,14 @@ fn apply_storylet_outcome_with_memory_applies_relationship_deltas() {
     let storylet = Storylet {
         id: "test".into(),
         name: "test".into(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: Default::default(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 0.0,
+        tags: TagBitset::default(),
+        prerequisites: StoryletPrerequisites::default(),
+        roles: StoryletRoles::default(),
+        heat: 0,
+        triggers: Default::default(),
+        outcomes: StoryletOutcomeSet::default(),
+        cooldown: StoryletCooldown { ticks: 0 },
         weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
     };
 
     apply_storylet_outcome_with_memory(

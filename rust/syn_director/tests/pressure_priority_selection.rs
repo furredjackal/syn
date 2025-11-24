@@ -1,12 +1,26 @@
-use std::collections::HashMap;
-
 use syn_core::relationship_model::RelationshipAxis;
 use syn_core::relationship_pressure::{RelationshipEventKind, RelationshipPressureEvent};
 use syn_core::{NpcId, Relationship, RelationshipState, SimTick, WorldSeed, WorldState};
 use syn_director::{
-    EventDirector, RelationshipPrereq, Storylet, StoryletOutcome, StoryletPrerequisites,
+    EventDirector, RelationshipPrereq, Storylet, StoryletCooldown, StoryletOutcome,
+    StoryletOutcomeSet, StoryletPrerequisites, StoryletRoles, TagBitset,
 };
 use syn_memory::MemorySystem;
+
+fn build_storylet(id: &str, prereqs: StoryletPrerequisites) -> Storylet {
+    Storylet {
+        id: id.to_string(),
+        name: id.to_string(),
+        tags: TagBitset::default(),
+        prerequisites: prereqs,
+        roles: StoryletRoles::default(),
+        heat: 50,
+        triggers: Default::default(),
+        outcomes: StoryletOutcomeSet::default(),
+        cooldown: StoryletCooldown { ticks: 0 },
+        weight: 1.0,
+    }
+}
 
 #[test]
 fn storylets_targeting_hot_pair_get_higher_priority() {
@@ -36,73 +50,21 @@ fn storylets_targeting_hot_pair_get_higher_priority() {
             tick: Some(1),
         });
 
-    let storylet_a = Storylet {
-        id: "generic".into(),
-        name: "Generic".into(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
-    };
+    let storylet_a = build_storylet("generic", StoryletPrerequisites::default());
 
-    let storylet_b = Storylet {
-        id: "targeted".into(),
-        name: "Targeted".into(),
-        tags: vec![],
-        prerequisites: StoryletPrerequisites {
-            min_relationship_affection: None,
-            min_relationship_resentment: None,
-            stat_conditions: HashMap::new(),
-            life_stages: vec![],
-            tags: vec![],
-            relationship_states: vec![],
-            memory_tags_required: vec![],
-            memory_tags_forbidden: vec![],
-            memory_recency_ticks: None,
-            relationship_prereqs: vec![RelationshipPrereq {
-                actor_id: Some(1),
-                target_id: 2,
-                axis: RelationshipAxis::Affection,
-                min_value: None,
-                max_value: None,
-                min_band: None,
-                max_band: None,
-            }],
-            allowed_life_stages: vec![],
-            time_and_location: None,
-            digital_legacy_prereq: None,
-        },
-        heat: 50.0,
-        weight: 1.0,
-        cooldown_ticks: 0,
-        roles: vec![],
-        max_uses: None,
-        choices: vec![],
-        heat_category: None,
-        actors: None,
-        interaction_tone: None,
+    let prereqs = StoryletPrerequisites {
+        relationship_prereqs: vec![RelationshipPrereq {
+            actor_id: Some(1),
+            target_id: 2,
+            axis: RelationshipAxis::Affection,
+            min_value: None,
+            max_value: None,
+            min_band: None,
+            max_band: None,
+        }],
+        ..Default::default()
     };
+    let storylet_b = build_storylet("targeted", prereqs);
 
     let mut director = EventDirector::new();
     director.register_storylet(storylet_a);
