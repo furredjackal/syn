@@ -83,4 +83,18 @@ impl GameTime {
     pub fn hour_in_day(&self) -> u8 {
         (self.tick_index % 24) as u8
     }
+
+    /// Construct a GameTime aligned to a given tick index (24 ticks per day).
+    pub fn from_tick(tick_index: u64) -> Self {
+        let mut gt = GameTime::default();
+        gt.advance_ticks_with_tpd(tick_index, 24);
+        gt
+    }
+}
+
+/// Canonical tick context passed through the simulation loop.
+/// Carries the current tick index so systems share a single source of truth.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TickContext {
+    pub tick_index: u64,
 }

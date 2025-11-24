@@ -18,9 +18,11 @@ use syn_core::npc_behavior::{
     choose_best_intent, compute_behavior_intents, compute_needs_from_state, BehaviorSnapshot,
 };
 use syn_core::relationship_model::RelationshipVector as CoreRelationshipVector;
-use syn_core::{AbstractNpc, DeterministicRng, LifeStage, NpcId, RelationshipDelta, StatKind, Stats, WorldState};
+use syn_core::{
+    AbstractNpc, DeterministicRng, NpcId, RelationshipDelta, StatKind, Stats, WorldState,
+};
 use syn_core::apply_stat_deltas;
-use syn_core::time::GameTime;
+use syn_core::time::{GameTime, TickContext};
 use syn_memory::MemorySystem;
 use syn_storage::models::AbstractNpc as StorageNpc;
 use syn_storage::{HybridStorage};
@@ -147,13 +149,6 @@ fn update_narrative_heat(
         .decay_toward(config.base_decay_toward, config.decay_per_tick);
 }
 
-fn update_life_stage_from_age(world: &mut WorldState) {
-    let new_stage = LifeStage::stage_for_age(world.player_age_years);
-    if new_stage != world.player_life_stage {
-        world.player_life_stage = new_stage;
-    }
-}
-
 impl Simulator {
     pub fn new(seed: u64) -> Self {
         Simulator {
@@ -228,10 +223,8 @@ impl Simulator {
     /// Main simulation loop: advance world state by one tick.
     pub fn tick(&mut self, world: &mut WorldState) {
         // Advance world clock
-        world.tick();
-
-        // Keep stage in sync with age.
-        update_life_stage_from_age(world);
+        let mut tick_ctx = TickContext::default();
+        world.tick(&mut tick_ctx);
 
         // Update LOD assignments
         self.update_lod_tiers(world, world.player_id);
@@ -892,7 +885,7 @@ impl SimState {
                 DormantNpcData {
                     id,
                     age_years: instance.sim.abstract_npc.age as u16,
-                    life_stage: world.player_life_stage,
+                    life_stage: life_stage_from_age(instance.sim.abstract_npc.age as u8),
                     key_stats: instance.sim.stats.clone(),
                 },
             );
@@ -939,6 +932,7 @@ fn storage_to_core_npc(stored: &StorageNpc) -> AbstractNpc {
     AbstractNpc {
         id: NpcId(stored.id),
         age: stored.age as u32,
+        // Keep life stage derivable from age; do not copy player state.
         job: String::new(),
         district: format!("District{}", stored.district),
         household_id: 0,
@@ -946,6 +940,10 @@ fn storage_to_core_npc(stored: &StorageNpc) -> AbstractNpc {
         seed: stored.seed,
         attachment_style: Default::default(),
     }
+}
+
+fn life_stage_from_age(age: u8) -> syn_core::LifeStage {
+    syn_core::LifeStage::from_age(age as u32)
 }
 
 // -------- Tick cadence helpers --------
@@ -1019,10 +1017,12 @@ fn tick_npc_tier2(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
 /// Advance the simulation by `ticks` ticks (hours).
 /// Each tick advances GameTime and ticks NPCs in tier-specific cadences.
 pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
+    let mut tick_ctx = TickContext::default();
     for _ in 0..ticks {
-        // 1) Advance time by one hour.
-        world.game_time.advance_ticks(1);
+        // 1) Advance time by one hour through the canonical world tick.
+        world.tick(&mut tick_ctx);
         let time = world.game_time;
+        let tick_index = tick_ctx.tick_index;
         let mid_freq = is_mid_frequency_tick(&time);
         let low_freq = is_low_frequency_tick(&time);
 
@@ -1030,11 +1030,11 @@ pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
         for (_id, npc) in sim.npc_registry.iter_mut() {
             match npc.tier {
                 NpcLodTier::Tier1Active => {
-                    tick_npc_tier1(world, npc, time.tick_index);
+                    tick_npc_tier1(world, npc, tick_index);
                 }
                 NpcLodTier::Tier2Background => {
                     if mid_freq {
-                        tick_npc_tier2(world, npc, time.tick_index);
+                        tick_npc_tier2(world, npc, tick_index);
                     }
                 }
                 NpcLodTier::Tier3Dormant => {

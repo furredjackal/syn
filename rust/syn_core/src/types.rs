@@ -5,7 +5,7 @@ use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
 use crate::npc::NpcPrototype;
 use crate::relationship_milestones::RelationshipMilestoneState;
 use crate::relationship_pressure::RelationshipPressureState;
-use crate::time::GameTime;
+use crate::time::{GameTime, TickContext};
 use crate::{clamp_for, KarmaBand, MoodBand, StatKind};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -824,12 +824,14 @@ impl WorldState {
     }
 
     /// Advance world by one tick.
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, ctx: &mut TickContext) {
         self.current_tick.0 += 1;
         // Advance coarse-grained game time with 24 ticks per day (4 phases x 6 ticks each)
         self.game_time.advance_ticks_with_tpd(1, 24);
-        // Age player every 24 ticks (1 simulated day)
-        if self.current_tick.0 % 24 == 0 {
+        ctx.tick_index = self.game_time.tick_index;
+        // Age player once per in-game year (365 days * 24 ticks per day)
+        const TICKS_PER_YEAR: u64 = 24 * 365;
+        if self.current_tick.0 % TICKS_PER_YEAR == 0 {
             self.player_age += 1;
             self.player_age_years = self.player_age;
             self.player_life_stage = LifeStage::from_age(self.player_age_years);
@@ -937,9 +939,11 @@ mod tests {
     #[test]
     fn test_world_state_tick() {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
+        let mut ctx = TickContext::default();
         assert_eq!(world.player_age, 6);
-        for _ in 0..24 {
-            world.tick();
+        // Simulate one year worth of ticks (365 days * 24 ticks per day) + 1 to cross boundary
+        for _ in 0..(24 * 365 + 1) {
+            world.tick(&mut ctx);
         }
         assert_eq!(world.player_age, 7);
     }
@@ -947,12 +951,13 @@ mod tests {
     #[test]
     fn test_heat_decay_and_momentum() {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
+        let mut ctx = TickContext::default();
         world.add_heat(40.0);
         assert!(world.narrative_heat.value() > 0.0);
         assert!(world.heat_momentum > 0.0);
 
         for _ in 0..10 {
-            world.tick();
+            world.tick(&mut ctx);
         }
 
         assert!(world.narrative_heat.value() < 40.0);

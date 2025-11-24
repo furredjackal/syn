@@ -1,31 +1,15 @@
-use std::collections::HashMap;
-
 use syn_core::{
     relationship_model::{RelationshipAxis, RelationshipDelta},
     NpcId, SimTick, StatDelta, StatKind, WorldSeed, WorldState,
 };
 use syn_director::{
     apply_choice_and_advance, tags_to_bitset, Storylet, StoryletChoice, StoryletCooldown,
-    StoryletLibrary, StoryletOutcome, StoryletOutcomeSet, StoryletPrerequisites,
+    StoryletLibrary, StoryletOutcome, StoryletOutcomeSet, StoryletPrerequisites, StoryletRoles,
 };
 use syn_sim::SimState;
 
 fn basic_prereqs() -> StoryletPrerequisites {
-    StoryletPrerequisites {
-        min_relationship_affection: None,
-        min_relationship_resentment: None,
-        stat_conditions: HashMap::new(),
-        life_stages: vec![],
-        tags: vec![],
-        relationship_states: vec![],
-        memory_tags_required: vec![],
-        memory_tags_forbidden: vec![],
-        memory_recency_ticks: None,
-        relationship_prereqs: vec![],
-        allowed_life_stages: vec![],
-        digital_legacy_prereq: None,
-        time_and_location: None,
-    }
+    StoryletPrerequisites::default()
 }
 
 #[test]
@@ -40,7 +24,7 @@ fn apply_choice_advances_time_and_applies_outcome() {
         prerequisites: basic_prereqs(),
         heat: 1,
         weight: 1.0,
-        roles: vec![],
+        roles: StoryletRoles::default(),
         outcomes: StoryletOutcomeSet {
             choices: vec![StoryletChoice {
                 id: "c1".to_string(),

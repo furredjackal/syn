@@ -5,6 +5,7 @@
 use crate::types::*;
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde_json;
+use std::collections::HashMap;
 
 /// Persistence layer for SYN world state.
 pub struct Persistence {
@@ -35,6 +36,13 @@ impl Persistence {
                 player_karma REAL NOT NULL,
                 narrative_heat REAL NOT NULL DEFAULT 0.0,
                 heat_momentum REAL NOT NULL DEFAULT 0.0,
+                game_time_tick INTEGER NOT NULL DEFAULT 0,
+                known_npcs TEXT NOT NULL DEFAULT '[]',
+                npc_prototypes TEXT NOT NULL DEFAULT '{}',
+                relationship_pressure TEXT NOT NULL DEFAULT '{}',
+                relationship_milestones TEXT NOT NULL DEFAULT '{}',
+                digital_legacy TEXT NOT NULL DEFAULT '{}',
+                storylet_usage TEXT NOT NULL DEFAULT '{}',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -90,6 +98,34 @@ impl Persistence {
             "ALTER TABLE world_state ADD COLUMN heat_momentum REAL NOT NULL DEFAULT 0.0",
             params![],
         );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN game_time_tick INTEGER NOT NULL DEFAULT 0",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN known_npcs TEXT NOT NULL DEFAULT '[]'",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN npc_prototypes TEXT NOT NULL DEFAULT '{}'",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN relationship_pressure TEXT NOT NULL DEFAULT '{}'",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN relationship_milestones TEXT NOT NULL DEFAULT '{}'",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN digital_legacy TEXT NOT NULL DEFAULT '{}'",
+            params![],
+        );
+        let _ = self.conn.execute(
+            "ALTER TABLE world_state ADD COLUMN storylet_usage TEXT NOT NULL DEFAULT '{}'",
+            params![],
+        );
         Ok(())
     }
 
@@ -99,10 +135,23 @@ impl Persistence {
             .map_err(|_| rusqlite::Error::InvalidQuery)?;
         let player_karma_json = world.player_karma.0;
 
+        let known_npcs_json = serde_json::to_string(&world.known_npcs)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let npc_prototypes_json = serde_json::to_string(&world.npc_prototypes)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let relationship_pressure_json = serde_json::to_string(&world.relationship_pressure)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let relationship_milestones_json = serde_json::to_string(&world.relationship_milestones)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let digital_legacy_json = serde_json::to_string(&world.digital_legacy)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let storylet_usage_json = serde_json::to_string(&world.storylet_usage)
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+
         self.conn.execute(
             "INSERT OR REPLACE INTO world_state 
-             (seed, player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
+             (seed, player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum, game_time_tick, known_npcs, npc_prototypes, relationship_pressure, relationship_milestones, digital_legacy, storylet_usage, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
             params![
                 world.seed.0,
                 world.player_id.0,
@@ -113,6 +162,13 @@ impl Persistence {
                 player_karma_json,
                 world.narrative_heat.value(),
                 world.heat_momentum,
+                world.game_time.tick_index as i64,
+                known_npcs_json,
+                npc_prototypes_json,
+                relationship_pressure_json,
+                relationship_milestones_json,
+                digital_legacy_json,
+                storylet_usage_json,
             ],
         )?;
 
@@ -141,7 +197,7 @@ impl Persistence {
     /// Load world state from database.
     pub fn load_world(&mut self, seed: WorldSeed) -> SqlResult<WorldState> {
         let mut stmt = self.conn.prepare(
-            "SELECT player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum
+            "SELECT player_id, current_tick, player_stats, player_age, player_life_stage, player_karma, narrative_heat, heat_momentum, game_time_tick, known_npcs, npc_prototypes, relationship_pressure, relationship_milestones, digital_legacy, storylet_usage
              FROM world_state WHERE seed = ?",
         )?;
 
@@ -154,8 +210,29 @@ impl Persistence {
             let karma_value: f32 = row.get(5)?;
             let heat_value: f32 = row.get(6).unwrap_or(0.0);
             let heat_momentum: f32 = row.get(7).unwrap_or(0.0);
+            let game_time_tick: i64 = row.get(8).unwrap_or(0);
+            let known_npcs_json: String = row.get(9).unwrap_or_else(|_| "[]".to_string());
+            let npc_prototypes_json: String = row.get(10).unwrap_or_else(|_| "{}".to_string());
+            let relationship_pressure_json: String =
+                row.get(11).unwrap_or_else(|_| "{}".to_string());
+            let relationship_milestones_json: String =
+                row.get(12).unwrap_or_else(|_| "{}".to_string());
+            let digital_legacy_json: String = row.get(13).unwrap_or_else(|_| "{}".to_string());
+            let storylet_usage_json: String = row.get(14).unwrap_or_else(|_| "{}".to_string());
 
             let player_stats: Stats = serde_json::from_str(&stats_json).unwrap_or_default();
+            let known_npcs: Vec<NpcId> =
+                serde_json::from_str(&known_npcs_json).unwrap_or_default();
+            let npc_prototypes: HashMap<NpcId, crate::NpcPrototype> =
+                serde_json::from_str(&npc_prototypes_json).unwrap_or_default();
+            let relationship_pressure: crate::relationship_pressure::RelationshipPressureState =
+                serde_json::from_str(&relationship_pressure_json).unwrap_or_default();
+            let relationship_milestones: crate::relationship_milestones::RelationshipMilestoneState =
+                serde_json::from_str(&relationship_milestones_json).unwrap_or_default();
+            let digital_legacy: crate::digital_legacy::DigitalLegacyState =
+                serde_json::from_str(&digital_legacy_json).unwrap_or_default();
+            let storylet_usage: crate::types::StoryletUsageState =
+                serde_json::from_str(&storylet_usage_json).unwrap_or_default();
             let player_life_stage = match life_stage_str.as_str() {
                 "Child" => LifeStage::Child,
                 "Teen" => LifeStage::Teen,
@@ -179,13 +256,13 @@ impl Persistence {
                 heat_momentum,
                 relationships: Default::default(),
                 npcs: Default::default(),
-                relationship_pressure: Default::default(),
-                relationship_milestones: Default::default(),
-                digital_legacy: Default::default(),
-                npc_prototypes: Default::default(),
-                known_npcs: Default::default(),
-                game_time: Default::default(),
-                storylet_usage: Default::default(),
+                relationship_pressure,
+                relationship_milestones,
+                digital_legacy,
+                npc_prototypes,
+                known_npcs,
+                game_time: crate::time::GameTime::from_tick(game_time_tick as u64),
+                storylet_usage,
             };
 
             Ok(world)
@@ -315,6 +392,8 @@ pub struct StoryletRecord {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::digital_legacy::{DigitalImprint, LegacyVector};
+    use crate::npc::{NpcPrototype, NpcSchedule, PersonalityVector};
     use std::fs;
 
     #[test]
@@ -327,6 +406,42 @@ mod tests {
         world.player_age = 25;
         world.narrative_heat = crate::narrative_heat::NarrativeHeat::new(40.0);
         world.heat_momentum = 5.0;
+        world.known_npcs.push(NpcId(99));
+        world.storylet_usage.times_fired.insert("s1".into(), 3);
+        world.relationship_pressure.changed_pairs.push((1, 2));
+        world
+            .relationship_milestones
+            .last_role
+            .insert((1, 2), crate::relationship_model::RelationshipRole::Friend);
+        world.game_time.advance_ticks(12);
+        let proto = NpcPrototype {
+            id: NpcId(2),
+            display_name: "Tester".to_string(),
+            role_label: None,
+            role_tags: Vec::new(),
+            personality: PersonalityVector {
+                warmth: 0.2,
+                dominance: 0.1,
+                volatility: 0.0,
+                conscientiousness: 0.5,
+                openness: 0.7,
+            },
+            base_stats: Stats::default(),
+            active_stages: vec![LifeStage::YoungAdult],
+            schedule: NpcSchedule::default(),
+        };
+        world.npc_prototypes.insert(proto.id, proto.clone());
+        world.digital_legacy.primary_imprint = Some(DigitalImprint {
+            id: 7,
+            created_at_stage: LifeStage::Adult,
+            created_at_age_years: 40,
+            final_stats: Stats::default(),
+            final_karma: Karma(5.0),
+            legacy_vector: LegacyVector::default(),
+            relationship_roles: HashMap::new(),
+            relationship_milestones: Vec::new(),
+            memory_tag_counts: HashMap::new(),
+        });
 
         db.save_world(&world).expect("Failed to save world");
         let loaded = db.load_world(WorldSeed(42)).expect("Failed to load world");
@@ -335,6 +450,22 @@ mod tests {
         assert_eq!(loaded.seed, WorldSeed(42));
         assert_eq!(loaded.narrative_heat.value(), 40.0);
         assert_eq!(loaded.heat_momentum, 5.0);
+        assert_eq!(loaded.known_npcs, world.known_npcs);
+        assert_eq!(loaded.storylet_usage.times_fired.get("s1"), Some(&3));
+        assert_eq!(
+            loaded
+                .relationship_milestones
+                .last_role
+                .get(&(1, 2))
+                .copied(),
+            Some(crate::relationship_model::RelationshipRole::Friend)
+        );
+        assert_eq!(loaded.game_time.tick_index, world.game_time.tick_index);
+        assert_eq!(
+            loaded.npc_prototypes.get(&NpcId(2)).map(|p| p.display_name.clone()),
+            Some("Tester".to_string())
+        );
+        assert!(loaded.digital_legacy.primary_imprint.is_some());
 
         let _ = fs::remove_file(db_path);
     }

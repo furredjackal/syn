@@ -1707,77 +1707,48 @@ mod tests {
         StatDelta, StatKind, WorldSeed, WorldState,
     };
 
+    fn base_storylet(id: &str) -> Storylet {
+        Storylet {
+            id: id.to_string(),
+            name: id.to_string(),
+            ..Storylet::default()
+        }
+    }
+
+    fn tags(list: &[&str]) -> TagBitset {
+        TagBitset::from_tags(list.iter().map(|t| t.to_string()).collect())
+    }
+
     #[test]
     fn test_storylet_creation() {
-        let storylet = Storylet {
-            id: "event_001".to_string(),
-            name: "First Meeting".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec!["Adult".to_string()],
-                tags: vec![],
-                relationship_states: vec![RelationshipState::Friend],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.5,
-            cooldown_ticks: 100,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut storylet = base_storylet("event_001");
+        storylet.name = "First Meeting".to_string();
+        storylet.tags = tags(&["romance"]);
+        storylet.prerequisites = StoryletPrerequisites {
+            life_stages: vec!["Adult".to_string()],
+            relationship_states: vec![RelationshipState::Friend],
+            ..Default::default()
         };
+        storylet.heat = 50;
+        storylet.weight = 0.5;
+        storylet.cooldown = StoryletCooldown { ticks: 100 };
+        storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         assert_eq!(storylet.id, "event_001");
-        assert_eq!(storylet.heat, 50.0);
+        assert_eq!(storylet.heat, 50);
     }
 
     #[test]
     fn test_event_director_register() {
         let mut director = EventDirector::new();
-        let storylet = Storylet {
-            id: "event_001".to_string(),
-            name: "Test Event".to_string(),
-            tags: vec![],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.5,
-            cooldown_ticks: 100,
-            roles: vec![],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut storylet = base_storylet("event_001");
+        storylet.name = "Test Event".to_string();
+        storylet.heat = 50;
+        storylet.weight = 0.5;
+        storylet.cooldown = StoryletCooldown { ticks: 100 };
 
         director.register_storylet(storylet);
         assert_eq!(director.all_storylets().len(), 1);
@@ -1809,40 +1780,15 @@ mod tests {
         };
         world.npcs.insert(NpcId(1), player);
 
-        let romance_storylet = Storylet {
-            id: "romantic_arc".to_string(),
-            name: "Romantic Turning Point".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 60.0,
-            weight: 0.5,
-            cooldown_ticks: 100,
-            roles: vec![],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut romance_storylet = base_storylet("romantic_arc");
+        romance_storylet.name = "Romantic Turning Point".to_string();
+        romance_storylet.tags = tags(&["romance"]);
+        romance_storylet.heat = 60;
+        romance_storylet.weight = 0.5;
+        romance_storylet.cooldown = StoryletCooldown { ticks: 100 };
 
-        let conflict_storylet = Storylet {
-            tags: vec!["conflict".to_string()],
-            ..romance_storylet.clone()
-        };
+        let mut conflict_storylet = romance_storylet.clone();
+        conflict_storylet.tags = tags(&["conflict"]);
 
         let romance_score = director.score_storylet(&romance_storylet, &world);
         let conflict_score = director.score_storylet(&conflict_storylet, &world);
@@ -1854,35 +1800,12 @@ mod tests {
         let mut director = EventDirector::new();
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
 
-        let storylet = Storylet {
-            id: "event_001".to_string(),
-            name: "Test Event".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 75.0,
-            weight: 0.8,
-            cooldown_ticks: 100,
-            roles: vec![],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut storylet = base_storylet("event_001");
+        storylet.name = "Test Event".to_string();
+        storylet.tags = tags(&["romance"]);
+        storylet.heat = 75;
+        storylet.weight = 0.8;
+        storylet.cooldown = StoryletCooldown { ticks: 100 };
 
         let score = director.score_storylet(&storylet, &world);
         assert!(score > 0.0);
@@ -1894,38 +1817,15 @@ mod tests {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
         let mut memory = MemorySystem::new();
 
-        let storylet = Storylet {
-            id: "event_001".to_string(),
-            name: "Test Event".to_string(),
-            tags: vec![],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.5,
-            cooldown_ticks: 100,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut storylet = base_storylet("event_001");
+        storylet.name = "Test Event".to_string();
+        storylet.heat = 50;
+        storylet.weight = 0.5;
+        storylet.cooldown = StoryletCooldown { ticks: 100 };
+        storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         let mut outcome = StoryletOutcome::default();
         outcome.stat_deltas.push(StatDelta {
@@ -1944,35 +1844,8 @@ mod tests {
     fn apply_storylet_outcome_uses_stat_deltas_and_karma() {
         let mut world = WorldState::new(WorldSeed(1), NpcId(1));
         let mut memory = MemorySystem::new();
-        let storylet = Storylet {
-            id: "outcome_test".to_string(),
-            name: "Outcome Test".to_string(),
-            tags: vec![],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 0.0,
-            weight: 1.0,
-            cooldown_ticks: 0,
-            roles: vec![],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut storylet = base_storylet("outcome_test");
+        storylet.name = "Outcome Test".to_string();
         let outcome = StoryletOutcome {
             stat_deltas: vec![
                 StatDelta {
@@ -2011,38 +1884,15 @@ mod tests {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
         let mut memory = MemorySystem::new();
 
-        let storylet = Storylet {
-            id: "spike_event".to_string(),
-            name: "High drama".to_string(),
-            tags: vec!["conflict".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 20.0,
-            weight: 1.0,
-            cooldown_ticks: 50,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut storylet = base_storylet("spike_event");
+        storylet.name = "High drama".to_string();
+        storylet.tags = tags(&["conflict"]);
+        storylet.heat = 20;
+        storylet.cooldown = StoryletCooldown { ticks: 50 };
+        storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         let mut outcome = StoryletOutcome::default();
         outcome.memory_event_id = "dramatic_turn".to_string();
@@ -2077,38 +1927,21 @@ mod tests {
         world.npcs.insert(NpcId(2), npc);
 
         // Create a romance-only storylet
-        let romance_storylet = Storylet {
-            id: "romance_confession".to_string(),
-            name: "Romantic Confession".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: Some(5.0),
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![RelationshipState::Friend],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.7,
-            cooldown_ticks: 200,
-            roles: vec![StoryletRole {
-                name: "romantic_interest".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut romance_storylet = base_storylet("romance_confession");
+        romance_storylet.name = "Romantic Confession".to_string();
+        romance_storylet.tags = tags(&["romance"]);
+        romance_storylet.prerequisites = StoryletPrerequisites {
+            min_relationship_affection: Some(5.0),
+            relationship_states: vec![RelationshipState::Friend],
+            ..Default::default()
         };
+        romance_storylet.heat = 50;
+        romance_storylet.weight = 0.7;
+        romance_storylet.cooldown = StoryletCooldown { ticks: 200 };
+        romance_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "romantic_interest".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         // Set up a Stranger relationship
         world.set_relationship(
@@ -2167,38 +2000,20 @@ mod tests {
             },
         );
 
-        let storylet = Storylet {
-            id: "deepening_bond".to_string(),
-            name: "We're getting closer".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![RelationshipState::Friend],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.5,
-            cooldown_ticks: 100,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut storylet = base_storylet("deepening_bond");
+        storylet.name = "We're getting closer".to_string();
+        storylet.tags = tags(&["romance"]);
+        storylet.prerequisites = StoryletPrerequisites {
+            relationship_states: vec![RelationshipState::Friend],
+            ..Default::default()
         };
+        storylet.heat = 50;
+        storylet.weight = 0.5;
+        storylet.cooldown = StoryletCooldown { ticks: 100 };
+        storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         // Create outcome that boosts relationship values
         // Current: affection 5.0, trust 3.0, attraction 2.0, familiarity 4.0
@@ -2250,38 +2065,16 @@ mod tests {
         let mut world = WorldState::new(WorldSeed(42), NpcId(1));
 
         // Create a conflict storylet
-        let conflict_storylet = Storylet {
-            id: "heated_argument".to_string(),
-            name: "You have a heated argument".to_string(),
-            tags: vec!["conflict".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 60.0,
-            weight: 0.6,
-            cooldown_ticks: 150,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
-        };
+        let mut conflict_storylet = base_storylet("heated_argument");
+        conflict_storylet.name = "You have a heated argument".to_string();
+        conflict_storylet.tags = tags(&["conflict"]);
+        conflict_storylet.heat = 60;
+        conflict_storylet.weight = 0.6;
+        conflict_storylet.cooldown = StoryletCooldown { ticks: 150 };
+        conflict_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         // Best Friend relationship should NOT allow conflict based on state check
         world.set_relationship(
@@ -2328,38 +2121,20 @@ mod tests {
         world.npcs.insert(NpcId(2), npc);
 
         // Create a storylet that requires a "betrayal" memory tag
-        let echo_storylet = Storylet {
-            id: "revenge_moment".to_string(),
-            name: "Revenge opportunity arises".to_string(),
-            tags: vec!["echo".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec!["betrayal".to_string()],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 60.0,
-            weight: 0.8,
-            cooldown_ticks: 300,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut echo_storylet = base_storylet("revenge_moment");
+        echo_storylet.name = "Revenge opportunity arises".to_string();
+        echo_storylet.tags = tags(&["echo"]);
+        echo_storylet.prerequisites = StoryletPrerequisites {
+            memory_tags_required: vec!["betrayal".to_string()],
+            ..Default::default()
         };
+        echo_storylet.heat = 60;
+        echo_storylet.weight = 0.8;
+        echo_storylet.cooldown = StoryletCooldown { ticks: 300 };
+        echo_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         director.register_storylet(echo_storylet.clone());
 
@@ -2405,38 +2180,20 @@ mod tests {
         world.npcs.insert(NpcId(2), npc);
 
         // Create a storylet that forbids "trauma" memory tag (conflict avoidance)
-        let fragile_storylet = Storylet {
-            id: "intimate_moment".to_string(),
-            name: "Intimate conversation".to_string(),
-            tags: vec!["romance".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec![],
-                memory_tags_forbidden: vec!["trauma".to_string()],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 50.0,
-            weight: 0.7,
-            cooldown_ticks: 200,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut fragile_storylet = base_storylet("intimate_moment");
+        fragile_storylet.name = "Intimate conversation".to_string();
+        fragile_storylet.tags = tags(&["romance"]);
+        fragile_storylet.prerequisites = StoryletPrerequisites {
+            memory_tags_forbidden: vec!["trauma".to_string()],
+            ..Default::default()
         };
+        fragile_storylet.heat = 50;
+        fragile_storylet.weight = 0.7;
+        fragile_storylet.cooldown = StoryletCooldown { ticks: 200 };
+        fragile_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         director.register_storylet(fragile_storylet.clone());
 
@@ -2483,38 +2240,21 @@ mod tests {
         world.npcs.insert(NpcId(2), npc);
 
         // Create a storylet that requires a "confrontation" memory within last 50 ticks
-        let follow_up_storylet = Storylet {
-            id: "confrontation_aftermath".to_string(),
-            name: "Deal with the consequences".to_string(),
-            tags: vec!["conflict_resolution".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec!["confrontation".to_string()],
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: Some(50), // Must be within last 50 ticks
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 55.0,
-            weight: 0.65,
-            cooldown_ticks: 100,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut follow_up_storylet = base_storylet("confrontation_aftermath");
+        follow_up_storylet.name = "Deal with the consequences".to_string();
+        follow_up_storylet.tags = tags(&["conflict_resolution"]);
+        follow_up_storylet.prerequisites = StoryletPrerequisites {
+            memory_tags_required: vec!["confrontation".to_string()],
+            memory_recency_ticks: Some(50),
+            ..Default::default()
         };
+        follow_up_storylet.heat = 55;
+        follow_up_storylet.weight = 0.65;
+        follow_up_storylet.cooldown = StoryletCooldown { ticks: 100 };
+        follow_up_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         director.register_storylet(follow_up_storylet.clone());
 
@@ -2576,38 +2316,20 @@ mod tests {
         world.npcs.insert(NpcId(2), npc);
 
         // Create a storylet requiring either "love_confession" OR "jealousy" tag
-        let complex_storylet = Storylet {
-            id: "emotional_climax".to_string(),
-            name: "Emotional resolution".to_string(),
-            tags: vec!["relationship".to_string()],
-            prerequisites: StoryletPrerequisites {
-                min_relationship_affection: None,
-                min_relationship_resentment: None,
-                stat_conditions: HashMap::new(),
-                life_stages: vec![],
-                tags: vec![],
-                relationship_states: vec![],
-                memory_tags_required: vec!["love_confession".to_string(), "jealousy".to_string()], // Either one
-                memory_tags_forbidden: vec![],
-                memory_recency_ticks: None,
-                relationship_prereqs: vec![],
-                allowed_life_stages: vec![],
-                time_and_location: None,
-                digital_legacy_prereq: None,
-            },
-            heat: 80.0,
-            weight: 0.9,
-            cooldown_ticks: 400,
-            roles: vec![StoryletRole {
-                name: "target".to_string(),
-                npc_id: NpcId(2),
-            }],
-            max_uses: None,
-            choices: vec![],
-            heat_category: None,
-            actors: None,
-            interaction_tone: None,
+        let mut complex_storylet = base_storylet("emotional_climax");
+        complex_storylet.name = "Emotional resolution".to_string();
+        complex_storylet.tags = tags(&["relationship"]);
+        complex_storylet.prerequisites = StoryletPrerequisites {
+            memory_tags_required: vec!["love_confession".to_string(), "jealousy".to_string()],
+            ..Default::default()
         };
+        complex_storylet.heat = 80;
+        complex_storylet.weight = 0.9;
+        complex_storylet.cooldown = StoryletCooldown { ticks: 400 };
+        complex_storylet.roles = StoryletRoles::from(vec![StoryletRole {
+            name: "target".to_string(),
+            npc_id: NpcId(2),
+        }]);
 
         director.register_storylet(complex_storylet.clone());
 
