@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbstractNpc {
     pub id: u64,       // unique NPC id
-    pub age: u8,       // age in years
+    pub age: u16,      // age in years (avoid truncation)
     pub district: u16,
     pub wealth: i32,
     pub health: f32,

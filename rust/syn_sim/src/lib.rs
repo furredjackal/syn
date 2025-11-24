@@ -885,7 +885,7 @@ impl SimState {
                 DormantNpcData {
                     id,
                     age_years: instance.sim.abstract_npc.age as u16,
-                    life_stage: life_stage_from_age(instance.sim.abstract_npc.age as u8),
+                    life_stage: life_stage_from_age(instance.sim.abstract_npc.age as u16),
                     key_stats: instance.sim.stats.clone(),
                 },
             );
@@ -920,7 +920,7 @@ fn core_to_storage_npc(core: &AbstractNpc, stats: Option<&Stats>) -> StorageNpc 
         .unwrap_or_default();
     StorageNpc {
         id: core.id.0,
-        age: core.age.min(u8::MAX as u32) as u8,
+        age: core.age.min(u16::MAX as u32) as u16,
         district: district_to_code(&core.district),
         wealth,
         health,
@@ -942,7 +942,7 @@ fn storage_to_core_npc(stored: &StorageNpc) -> AbstractNpc {
     }
 }
 
-fn life_stage_from_age(age: u8) -> syn_core::LifeStage {
+fn life_stage_from_age(age: u16) -> syn_core::LifeStage {
     syn_core::LifeStage::from_age(age as u32)
 }
 

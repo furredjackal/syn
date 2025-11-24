@@ -715,6 +715,40 @@ pub struct StoryletUsageState {
     pub times_fired: HashMap<String, u32>,
 }
 
+/// Serializable memory entry snapshot (mirrors syn_memory::MemoryEntry without depending on that crate).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryEntryRecord {
+    pub id: String,
+    pub event_id: String,
+    pub npc_id: NpcId,
+    pub sim_tick: SimTick,
+    pub emotional_intensity: f32,
+    #[serde(default)]
+    pub stat_deltas: Vec<crate::stats::StatDelta>,
+    #[serde(default)]
+    pub relationship_deltas: Vec<crate::relationships::RelationshipDelta>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub participants: Vec<u64>,
+}
+
+impl Default for MemoryEntryRecord {
+    fn default() -> Self {
+        MemoryEntryRecord {
+            id: String::new(),
+            event_id: String::new(),
+            npc_id: NpcId(0),
+            sim_tick: SimTick(0),
+            emotional_intensity: 0.0,
+            stat_deltas: Vec::new(),
+            relationship_deltas: Vec::new(),
+            tags: Vec::new(),
+            participants: Vec::new(),
+        }
+    }
+}
+
 /// Legacy alias for compatibility; the new state lives in `relationship_pressure`.
 pub type RelationshipPressureFlags = crate::relationship_pressure::RelationshipPressureState;
 
@@ -729,6 +763,9 @@ pub struct WorldState {
     /// Player age in years (alias for player_age for stage progression).
     #[serde(default)]
     pub player_age_years: u32,
+    /// Days since birth (derived from tick cadence; used for daily systems).
+    #[serde(default)]
+    pub player_days_since_birth: u32,
     pub player_life_stage: LifeStage,
     pub player_karma: Karma,
     /// Narrative heat (0.0..100.0+): controls pacing and event intensity
@@ -762,6 +799,15 @@ pub struct WorldState {
     /// Tracks usage counts for storylets for pacing.
     #[serde(default)]
     pub storylet_usage: StoryletUsageState,
+    /// Serialized memory journal entries (per-NPC memories).
+    #[serde(default)]
+    pub memory_entries: Vec<MemoryEntryRecord>,
+    /// District-level state blobs (e.g., economic/heat per district).
+    #[serde(default)]
+    pub district_state: HashMap<String, String>,
+    /// World flags toggled by storylets and systems.
+    #[serde(default)]
+    pub world_flags: HashMap<String, bool>,
 }
 
 impl WorldState {
@@ -773,6 +819,7 @@ impl WorldState {
             player_stats: Stats::default(),
             player_age: 6, // Start at age 6
             player_age_years: 6,
+            player_days_since_birth: 6 * 365,
             player_life_stage: LifeStage::Child,
             player_karma: Karma::default(),
             narrative_heat: NarrativeHeat::default(),
@@ -786,6 +833,9 @@ impl WorldState {
             known_npcs: Vec::new(),
             game_time: GameTime::default(),
             storylet_usage: StoryletUsageState::default(),
+            memory_entries: Vec::new(),
+            district_state: HashMap::new(),
+            world_flags: HashMap::new(),
         }
     }
 
@@ -829,11 +879,14 @@ impl WorldState {
         // Advance coarse-grained game time with 24 ticks per day (4 phases x 6 ticks each)
         self.game_time.advance_ticks_with_tpd(1, 24);
         ctx.tick_index = self.game_time.tick_index;
-        // Age player once per in-game year (365 days * 24 ticks per day)
-        const TICKS_PER_YEAR: u64 = 24 * 365;
-        if self.current_tick.0 % TICKS_PER_YEAR == 0 {
-            self.player_age += 1;
-            self.player_age_years = self.player_age;
+        // Daily progression: increment days since birth every 24 ticks.
+        if self.current_tick.0 % 24 == 0 {
+            self.player_days_since_birth = self.player_days_since_birth.saturating_add(1);
+            // Derive years from days (integer division).
+            let derived_years = self.player_days_since_birth / 365;
+            // Keep legacy fields in sync.
+            self.player_age_years = derived_years;
+            self.player_age = derived_years;
             self.player_life_stage = LifeStage::from_age(self.player_age_years);
         }
         // Decay narrative heat over time (-0.1 per tick)
