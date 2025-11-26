@@ -1,6 +1,7 @@
+use syn_core::relationship_milestones::{RelationshipMilestoneEvent, RelationshipMilestoneKind};
+use syn_core::relationship_pressure::RelationshipPressureEvent;
 use syn_core::{
     time::TickContext, world_snapshot, MemoryEntryRecord, NpcId, Persistence, Relationship,
-    RelationshipMilestoneEvent, RelationshipMilestoneKind, RelationshipPressureEvent,
     RelationshipState, WorldSeed, WorldState, WorldStateSnapshot,
 };
 

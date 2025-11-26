@@ -41,6 +41,35 @@ impl DeterministicRng {
         }
     }
 
+    /// Create a new RNG with domain separation for deterministic, uncorrelated streams.
+    ///
+    /// Different domains produce completely different sequences even with the same
+    /// seed and tick, ensuring systems like tier management, NPC updates, and
+    /// the event director don't accidentally correlate.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let rng_tiers = DeterministicRng::with_domain(world_seed, tick, "tiers");
+    /// let rng_updates = DeterministicRng::with_domain(world_seed, tick, "npc_updates");
+    /// let rng_director = DeterministicRng::with_domain(world_seed, tick, "director");
+    /// ```
+    pub fn with_domain(world_seed: u64, tick: u64, domain: &str) -> Self {
+        // Hash the domain string to a u64
+        let domain_hash = domain
+            .bytes()
+            .fold(0x517cc1b727220a95u64, |acc, b| {
+                acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(b as u64)
+            });
+
+        // Combine seed, tick, and domain hash using a mixing function
+        let mixed = world_seed
+            .wrapping_mul(0x9e3779b97f4a7c15)
+            .wrapping_add(tick.wrapping_mul(0x85ebca6b))
+            .wrapping_add(domain_hash);
+
+        Self::new(mixed)
+    }
+
     /// Generate a random u32.
     pub fn gen_u32(&mut self) -> u32 {
         self.inner.gen()
@@ -128,5 +157,39 @@ mod tests {
     fn test_gen_bool() {
         let mut rng = DeterministicRng::new(42);
         let _ = rng.gen_bool(0.5); // Should not panic
+    }
+
+    #[test]
+    fn test_with_domain_is_deterministic() {
+        let mut rng1 = DeterministicRng::with_domain(12345, 100, "tiers");
+        let mut rng2 = DeterministicRng::with_domain(12345, 100, "tiers");
+
+        for _ in 0..50 {
+            assert_eq!(rng1.gen_u32(), rng2.gen_u32());
+        }
+    }
+
+    #[test]
+    fn test_different_domains_differ() {
+        let mut rng1 = DeterministicRng::with_domain(12345, 100, "tiers");
+        let mut rng2 = DeterministicRng::with_domain(12345, 100, "npc_updates");
+        let mut rng3 = DeterministicRng::with_domain(12345, 100, "director");
+
+        let val1 = rng1.gen_u32();
+        let val2 = rng2.gen_u32();
+        let val3 = rng3.gen_u32();
+
+        // All three should produce different sequences
+        assert_ne!(val1, val2);
+        assert_ne!(val2, val3);
+        assert_ne!(val1, val3);
+    }
+
+    #[test]
+    fn test_different_ticks_differ() {
+        let mut rng1 = DeterministicRng::with_domain(12345, 100, "tiers");
+        let mut rng2 = DeterministicRng::with_domain(12345, 101, "tiers");
+
+        assert_ne!(rng1.gen_u32(), rng2.gen_u32());
     }
 }

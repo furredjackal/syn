@@ -74,7 +74,7 @@ pub fn clamp_karma(value: f32) -> f32 {
 }
 
 /// Stat delta for storylets and sim updates.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StatDelta {
     pub kind: StatKind,
     pub delta: f32,

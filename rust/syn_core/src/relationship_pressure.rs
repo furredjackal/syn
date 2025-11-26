@@ -5,7 +5,7 @@ use crate::relationship_model::{
     AffectionBand, AttractionBand, RelationshipVector, ResentmentBand, TrustBand,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipBandSnapshot {
     pub affection: AffectionBand,
     pub trust: TrustBand,
@@ -33,7 +33,7 @@ pub enum RelationshipEventKind {
     ResentmentBandChanged,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipPressureEvent {
     pub actor_id: u64,
     pub target_id: u64,
@@ -48,7 +48,7 @@ pub struct RelationshipPressureEvent {
     pub tick: Option<u64>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipPressureState {
     /// Last known band snapshot for each (actor, target) pair.
     #[serde(default)]

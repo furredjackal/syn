@@ -43,3 +43,4 @@ Thumbs.db
 *.log
 .gitignore
 .junie/guidelines.md
+.github/copilot-instructions.md

@@ -12,6 +12,8 @@ use syn_core::relationship_model::{derive_role_label, RelationshipVector};
 use syn_director::{apply_choice_and_advance, select_next_event_view, DirectorEventView};
 use syn_sim::SimState;
 
+pub mod library_loader;
+
 // Re-export core types for Dart
 pub use syn_core::{
     AbstractNpc, AttachmentStyle, Karma, KarmaBand, LifeStage, MoodBand, NpcId, Relationship,

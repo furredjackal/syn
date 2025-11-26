@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
 use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
 

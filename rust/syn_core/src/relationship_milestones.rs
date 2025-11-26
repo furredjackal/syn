@@ -12,7 +12,7 @@ pub enum RelationshipMilestoneKind {
     FriendToFamily,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipMilestoneEvent {
     pub actor_id: u64,
     pub target_id: u64,
@@ -30,7 +30,7 @@ pub struct RelationshipMilestoneEvent {
     pub tick: Option<u64>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipMilestoneState {
     #[serde(default)]
     pub last_role: HashMap<(u64, u64), RelationshipRole>,

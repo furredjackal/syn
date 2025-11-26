@@ -21,7 +21,7 @@ pub enum NpcRoleTag {
 
 /// Personality vector (GDD-aligned axes).
 /// Keep it small and deterministic.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct PersonalityVector {
     pub warmth: f32,            // -1.0 (cold) .. 1.0 (warm)
     pub dominance: f32,         // -1.0 (submissive) .. 1.0 (dominant)
@@ -49,7 +49,7 @@ impl PersonalityVector {
 }
 
 /// “Definition” of an NPC type: how they should be initialized.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NpcPrototype {
     pub id: NpcId,
     pub display_name: String,
@@ -90,14 +90,14 @@ pub enum NpcActivityKind {
 }
 
 /// One day-phase schedule slot.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NpcScheduleSlot {
     pub phase: DayPhase,
     pub activity: NpcActivityKind,
 }
 
 /// Daily schedule by day phase (same each day for now).
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct NpcSchedule {
     /// Daily schedule by day phase. If empty, defaults to Home.
     #[serde(default)]

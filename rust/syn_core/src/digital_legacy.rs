@@ -17,7 +17,7 @@ use crate::types::{LifeStage, NpcId};
 use crate::{Karma, Stats}; // Re-exported from types
 
 /// Aggregated high-level legacy traits distilled from stats, karma, relationships, memories.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct LegacyVector {
     /// Overall tendency toward kindness vs cruelty.
     pub compassion_vs_cruelty: f32, // -1.0 .. 1.0
@@ -36,7 +36,7 @@ pub struct LegacyVector {
 }
 
 /// Digital imprint: a compressed "ghost profile" of a player's life.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DigitalImprint {
     /// Snapshot id; for now we keep a single primary imprint per player.
     pub id: u64,
@@ -68,7 +68,7 @@ pub struct DigitalImprint {
 }
 
 /// Wrapper for world-level legacy state.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct DigitalLegacyState {
     /// Primary imprint for the player; None until PostLife.
     #[serde(default)]

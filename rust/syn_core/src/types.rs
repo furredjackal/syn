@@ -21,7 +21,7 @@ impl WorldSeed {
 }
 
 /// Visible player stats by life stage.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Stats {
     pub health: f32,
     pub intelligence: f32,
@@ -135,7 +135,7 @@ impl Stats {
 }
 
 /// Permanent personality trait dimensions (set at NPC generation, rarely change).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Traits {
     pub stability: f32,   // calm ↔ volatile
     pub confidence: f32,  // insecure ↔ self-assured
@@ -457,7 +457,7 @@ impl RelationshipState {
 }
 
 /// 5-axis relationship vector between two NPCs.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Relationship {
     pub affection: f32,           // -10..+10 (warmth, emotional closeness)
     pub trust: f32,               // -10..+10 (reliability, safety, openness)
@@ -642,7 +642,7 @@ impl NpcId {
 }
 
 /// Lightweight NPC (stored in PopulationStore, not yet instantiated in ECS).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AbstractNpc {
     pub id: NpcId,
     pub age: u32,
@@ -669,7 +669,7 @@ impl SimTick {
 }
 
 /// Karma: accumulated ethical field (-100..+100).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Karma(pub f32);
 
 impl Karma {
@@ -708,7 +708,7 @@ impl Default for Karma {
 }
 
 /// Tracks how many times each storylet has been fired.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct StoryletUsageState {
     /// storylet_id -> times fired
     #[serde(default)]
@@ -716,7 +716,7 @@ pub struct StoryletUsageState {
 }
 
 /// Serializable memory entry snapshot (mirrors syn_memory::MemoryEntry without depending on that crate).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MemoryEntryRecord {
     pub id: String,
     pub event_id: String,
@@ -1066,12 +1066,31 @@ mod tests {
         assert!(world.narrative_heat.value() > 0.0);
         assert!(world.heat_momentum > 0.0);
 
+        let initial_heat = world.narrative_heat.value();
+
         for _ in 0..10 {
             world.tick(&mut ctx);
         }
 
-        assert!(world.narrative_heat.value() < 40.0);
-        assert!(world.heat_momentum < 20.0);
+        let final_heat = world.narrative_heat.value();
+        assert!(
+            final_heat < initial_heat,
+            "narrative heat should decay over time (final: {}, initial: {})",
+            final_heat,
+            initial_heat
+        );
+        assert!(
+            final_heat >= 0.0 && final_heat <= 100.0,
+            "narrative heat should stay within [0, 100], got {}",
+            final_heat
+        );
+
+        let momentum = world.heat_momentum;
+        assert!(
+            momentum.abs() < 1.0,
+            "heat momentum should decay toward zero; got {}",
+            momentum
+        );
 
         world.reduce_heat(100.0);
         assert_eq!(world.narrative_heat.value(), 0.0);
@@ -1201,7 +1220,6 @@ mod tests {
         assert_eq!(next_state, RelationshipState::RomanticInterest);
     }
 
-    #[test]
     #[test]
     fn test_relationship_state_partner_to_spouse() {
         // Test that very high values across all axes correctly trigger Spouse state.

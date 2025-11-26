@@ -1,7 +1,12 @@
 mod npc_registry;
 pub mod relationship_drift;
 pub mod post_life;
+pub mod systems;
 pub use npc_registry::NpcRegistry;
+pub use systems::{
+    update_npc_tiers_for_tick, update_npcs_for_tick, update_relationships_for_npc,
+    update_stats_for_npc, NpcUpdateConfig, TierUpdateConfig,
+};
 
 use std::collections::HashMap;
 use std::fs;
@@ -48,6 +53,81 @@ pub enum NpcLod {
     Tier2Active,
     Tier1Neighborhood,
     Tier0Dormant,
+}
+
+/// NPC fidelity tiers for simulation updates.
+/// - Tier0: Always simulated, high fidelity (e.g., player's immediate circle).
+/// - Tier1: Active but batched updates (e.g., neighborhood NPCs).
+/// - Tier2: Coarse / background simulation (e.g., distant population).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub enum NpcTier {
+    /// Always simulated, high fidelity.
+    Tier0,
+    /// Active but batched updates.
+    Tier1,
+    /// Coarse / background simulation.
+    #[default]
+    Tier2,
+}
+
+/// Central simulation world state for tracking NPC fidelity tiers and update timestamps.
+/// This struct tracks which tier each NPC belongs to and when they were last updated,
+/// enabling LOD-based simulation throttling.
+#[derive(Debug, Default)]
+pub struct WorldSimState {
+    /// Maps NPC IDs to their current fidelity tier.
+    npc_tiers: HashMap<NpcId, NpcTier>,
+    /// Tracks the last tick each NPC was updated.
+    last_update_tick: HashMap<NpcId, syn_core::SimTick>,
+}
+
+impl WorldSimState {
+    /// Creates a new empty WorldSimState.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the fidelity tier for an NPC.
+    pub fn set_npc_tier(&mut self, id: NpcId, tier: NpcTier) {
+        self.npc_tiers.insert(id, tier);
+    }
+
+    /// Returns the fidelity tier for an NPC, defaulting to Tier2 if not set.
+    pub fn npc_tier(&self, id: NpcId) -> NpcTier {
+        self.npc_tiers.get(&id).copied().unwrap_or(NpcTier::Tier2)
+    }
+
+    /// Records that an NPC was updated at the given tick.
+    pub fn mark_npc_updated(&mut self, id: NpcId, tick: syn_core::SimTick) {
+        self.last_update_tick.insert(id, tick);
+    }
+
+    /// Returns the last tick an NPC was updated, or None if never updated.
+    pub fn last_npc_update(&self, id: NpcId) -> Option<syn_core::SimTick> {
+        self.last_update_tick.get(&id).copied()
+    }
+
+    /// Registers a new NPC with a default tier (Tier2) and initial update tick.
+    pub fn register_npc(&mut self, id: NpcId, initial_tick: syn_core::SimTick) {
+        self.npc_tiers.entry(id).or_insert(NpcTier::Tier2);
+        self.last_update_tick.entry(id).or_insert(initial_tick);
+    }
+
+    /// Removes an NPC from tracking.
+    pub fn remove_npc(&mut self, id: NpcId) {
+        self.npc_tiers.remove(&id);
+        self.last_update_tick.remove(&id);
+    }
+
+    /// Returns an iterator over all tracked NPC IDs and their tiers.
+    pub fn iter_tiers(&self) -> impl Iterator<Item = (&NpcId, &NpcTier)> {
+        self.npc_tiers.iter()
+    }
+
+    /// Returns the number of tracked NPCs.
+    pub fn npc_count(&self) -> usize {
+        self.npc_tiers.len()
+    }
 }
 
 /// Minimal simulated NPC container used by the simulator.
@@ -1059,3 +1139,92 @@ pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
         tick_lod_transitions(world, sim);
     }
 }
+
+/// Configuration for the unified simulation tick.
+#[derive(Debug, Clone)]
+pub struct SimulationTickConfig {
+    /// Configuration for tier promotion/demotion.
+    pub tier_config: TierUpdateConfig,
+    /// Configuration for per-tier NPC update frequencies.
+    pub npc_update_config: NpcUpdateConfig,
+}
+
+impl Default for SimulationTickConfig {
+    fn default() -> Self {
+        Self {
+            tier_config: TierUpdateConfig::default(),
+            npc_update_config: NpcUpdateConfig::default(),
+        }
+    }
+}
+
+/// Result of a simulation tick, containing director output if any.
+#[derive(Debug)]
+pub struct SimulationTickResult {
+    /// The tick that was just processed.
+    pub tick: syn_core::SimTick,
+    /// Whether the director fired a storylet this tick.
+    pub storylet_fired: bool,
+    /// Key of the fired storylet, if any.
+    pub fired_storylet_key: Option<u32>,
+}
+
+/// Advance the simulation by one tick with the new tier-based system.
+///
+/// This function performs simulation steps in the correct order:
+/// 1. Advance world time
+/// 2. Tier reassignment (promotion/demotion of NPCs)
+/// 3. Per-tier NPC updates (stats, relationships)
+/// 4. [Director step would go here - caller can invoke separately]
+///
+/// The director step is intentionally left out of this function to maintain
+/// separation of concerns. Callers should invoke the director after this
+/// function returns, passing the updated world state.
+///
+/// # Determinism
+/// All operations use domain-separated RNG streams derived from the world seed
+/// and current tick, ensuring reproducible results.
+pub fn tick_simulation(
+    world: &mut WorldState,
+    sim_state: &mut WorldSimState,
+    config: &SimulationTickConfig,
+) -> SimulationTickResult {
+    // Advance world time first
+    let mut tick_ctx = syn_core::time::TickContext::default();
+    world.tick(&mut tick_ctx);
+    
+    let current_tick = world.current_tick;
+    let world_seed = world.seed.0;
+    
+    // 1. Tier reassignment with domain-separated RNG
+    let mut rng_tiers = DeterministicRng::with_domain(world_seed, current_tick.0, "tiers");
+    systems::update_npc_tiers_for_tick(world, sim_state, &config.tier_config, &mut rng_tiers);
+    
+    // 2. Per-tier NPC updates with separate RNG stream
+    let mut rng_updates = DeterministicRng::with_domain(world_seed, current_tick.0, "npc_updates");
+    systems::update_npcs_for_tick(world, sim_state, &config.npc_update_config, &mut rng_updates);
+    
+    // Return result - caller should invoke director with updated state
+    SimulationTickResult {
+        tick: current_tick,
+        storylet_fired: false,
+        fired_storylet_key: None,
+    }
+}
+
+/// Advance the simulation by multiple ticks.
+///
+/// Convenience wrapper around `tick_simulation` for advancing multiple ticks.
+pub fn tick_simulation_n(
+    world: &mut WorldState,
+    sim_state: &mut WorldSimState,
+    config: &SimulationTickConfig,
+    n: u32,
+) -> Vec<SimulationTickResult> {
+    let mut results = Vec::with_capacity(n as usize);
+    for _ in 0..n {
+        results.push(tick_simulation(world, sim_state, config));
+    }
+    results
+}
+

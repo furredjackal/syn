@@ -1,4 +1,4 @@
-use syn_api::{ApiRelationship, ApiRelationshipSnapshot, GameEngine};
+use syn_api::{ApiRelationshipSnapshot, GameEngine};
 use syn_core::relationship_model::{derive_role_label, RelationshipVector};
 
 #[test]

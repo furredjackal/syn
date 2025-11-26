@@ -4,16 +4,23 @@ use syn_api::{
     api_choose_option, api_get_current_event, api_reset_runtime, tags_to_bitset, Storylet,
     StoryletChoice, StoryletCooldown, StoryletOutcome, StoryletOutcomeSet, WorldSeed, WorldState,
 };
-use syn_director::StoryletLibrary;
+use syn_director::{StoryletLibrary, StoryletRoles};
 use syn_core::relationship_model::{RelationshipAxis, RelationshipDelta};
 use syn_core::{NpcId, StatDelta, StatKind};
 use syn_sim::SimState;
 
 fn basic_prereqs() -> syn_director::StoryletPrerequisites {
     syn_director::StoryletPrerequisites {
+        stat_conditions: vec![],
+        personality_conditions: vec![],
+        relationship_conditions: vec![],
+        district_conditions: vec![],
+        memory_echo_conditions: vec![],
+        global_conditions: vec![],
+        life_stage: None,
         min_relationship_affection: None,
         min_relationship_resentment: None,
-        stat_conditions: HashMap::new(),
+        stat_ranges: HashMap::new(),
         life_stages: vec![],
         tags: vec![],
         relationship_states: vec![],
@@ -35,7 +42,7 @@ fn sample_storylet() -> Storylet {
         prerequisites: basic_prereqs(),
         heat: 1,
         weight: 1.0,
-        roles: vec![],
+        roles: StoryletRoles::default(),
         outcomes: StoryletOutcomeSet {
             choices: vec![StoryletChoice {
                 id: "choice-api".to_string(),

@@ -8,6 +8,7 @@ members = [
     "syn_api",
     "syn_content",
     "syn_storage",
+    "syn_storylets",
 ]
 resolver = "2"
 

@@ -9,5 +9,14 @@ syn_query = { path = "../syn_query" }
 syn_memory = { path = "../syn_memory" }
 syn_sim = { path = "../syn_sim" }
 syn_storage = { path = "../syn_storage" }
+syn_storylets = { path = "../syn_storylets" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[features]
+default = []
+mmap = ["syn_storylets/mmap"]
+debug_candidates = []

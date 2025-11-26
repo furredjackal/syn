@@ -55,7 +55,7 @@ impl RelationshipVector {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipDelta {
     pub target_id: NpcId,
     pub axis: RelationshipAxis,
