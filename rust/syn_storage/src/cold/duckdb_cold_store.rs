@@ -1,13 +1,20 @@
+//! DuckDB-based cold storage for dormant NPCs.
+
 use duckdb::Connection;
 
 use crate::models::AbstractNpc;
 use crate::storage_error::StorageError;
 
+/// Cold storage using DuckDB for dormant NPC data.
+///
+/// Stores dormant (Tier 3) NPCs in a columnar database optimized
+/// for batch queries and long-term storage.
 pub struct DuckDbColdStore {
     conn: Connection,
 }
 
 impl DuckDbColdStore {
+    /// Create or open a DuckDB database at the given path.
     pub fn new(path: &str) -> Result<Self, StorageError> {
         let conn = Connection::open(path)?;
         conn.execute(
@@ -24,6 +31,7 @@ impl DuckDbColdStore {
         Ok(Self { conn })
     }
 
+    /// Insert or update a dormant NPC.
     pub fn insert_dormant(&self, npc: &AbstractNpc) -> Result<(), StorageError> {
         self.conn.execute(
             "INSERT OR REPLACE INTO npc_dormant (id, age, district, wealth, health, seed)
@@ -40,6 +48,7 @@ impl DuckDbColdStore {
         Ok(())
     }
 
+    /// Load a dormant NPC by ID.
     pub fn load_dormant(&self, id: u64) -> Result<Option<AbstractNpc>, StorageError> {
         let mut stmt = self.conn.prepare(
             "SELECT id, age, district, wealth, health, seed FROM npc_dormant WHERE id = ?",

@@ -31,6 +31,7 @@ fn basic_prereqs() -> syn_director::StoryletPrerequisites {
         allowed_life_stages: vec![],
         digital_legacy_prereq: None,
         time_and_location: None,
+        skill_requirements: vec![],
     }
 }
 

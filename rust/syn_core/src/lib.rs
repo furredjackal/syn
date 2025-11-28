@@ -5,30 +5,67 @@
 //! - Core types (Stats, Traits, Relationships, NPCs, World)
 //! - SQLite persistence layer
 //! - Utility types for serialization and querying
+//! - Character generation from seeds
+//! - District system with crime/economy simulation
+//! - Gossip/social spread mechanics
+//! - Population simulation with job markets and demographics
+//! - Failure/recovery systems with trauma spirals
+//! - High-performance collection types (FxHashMap, SmallVec)
+//! - Bitflag-based world flags for O(1) flag checks
+//! - String interning for identifiers (memory reduction + O(1) comparisons)
+//! - Optional mimalloc global allocator (enable `mimalloc-allocator` feature)
 
+// Bleeding-edge stable: deny unsafe, warn on common issues
+#![deny(unsafe_code)]
+#![warn(missing_docs)]
+#![warn(clippy::all)]
+
+// Global allocator module (activated via feature flag)
+#[cfg(feature = "mimalloc-allocator")]
+pub mod allocator;
+
+pub mod character_gen;
+pub mod collections;
 pub mod digital_legacy;
+pub mod district;
 pub mod errors;
+pub mod failure_recovery;
+pub mod gossip;
+pub mod intern;
 pub mod life_stage;
 pub mod narrative_heat;
 pub mod npc;
 pub mod npc_actions;
 pub mod npc_behavior;
 pub mod persistence;
+pub mod population;
 pub mod relationship_milestones;
 pub mod relationship_model;
 pub mod relationship_pressure;
 pub mod relationships;
 pub mod rng;
+pub mod skills;
+pub mod snapshot;
 pub mod stats;
 pub mod time;
 pub mod types;
+pub mod world_flags;
 
+pub use character_gen::*;
+pub use collections::*;
+pub use district::*;
 pub use errors::*;
+pub use failure_recovery::*;
+pub use gossip::*;
+pub use intern::*;
 pub use persistence::*;
+pub use population::*;
 pub use relationships::*;
 pub use rng::*;
+pub use skills::*;
 pub use stats::*;
 pub use types::*;
+pub use world_flags::*;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -105,7 +142,7 @@ mod tests {
             participants: vec![1, 2],
         });
         world.district_state.insert("Downtown".into(), "ok".into());
-        world.world_flags.insert("rt_flag".into(), true);
+        world.world_flags.set_any("rt_flag");
         world.known_npcs.push(NpcId(2));
 
         let before = WorldStateSnapshot::from_world(&world);

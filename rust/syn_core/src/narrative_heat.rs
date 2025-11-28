@@ -1,42 +1,62 @@
+//! Narrative Heat System
+//!
+//! Per GDD §6.2, narrative heat controls pacing:
+//! - **Low** (0-25): Quiet moments, slice-of-life events
+//! - **Medium** (25-50): Building tension, subplots develop
+//! - **High** (50-80): Intense drama, major decisions
+//! - **Critical** (80+): Climax moments, life-changing events
+//!
+//! Heat decays naturally over time to prevent permanent drama.
+
 use serde::{Deserialize, Serialize};
 
 use crate::life_stage::LifeStageStatProfile;
 use crate::relationship_model::RelationshipVector;
 use crate::Stats;
 
-/// Scalar narrative heat value, typically clamped within [0, 100].
+/// Scalar narrative heat value (0-100).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct NarrativeHeat(pub f32);
 
+/// Narrative heat band for event eligibility and UI.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NarrativeHeatBand {
+    /// Quiet moments (0-25).
     Low,
+    /// Building tension (25-50).
     Medium,
+    /// Intense drama (50-80).
     High,
+    /// Climax moments (80+).
     Critical,
 }
 
 impl NarrativeHeat {
+    /// Create a new heat value (clamped to 0-100).
     pub fn new(value: f32) -> Self {
         let mut h = Self(value);
         h.clamp();
         h
     }
 
+    /// Get the current heat value.
     pub fn value(&self) -> f32 {
         self.0
     }
 
+    /// Set the heat value (clamped to 0-100).
     pub fn set(&mut self, value: f32) {
         self.0 = value;
         self.clamp();
     }
 
+    /// Add a delta to the heat value.
     pub fn add(&mut self, delta: f32) {
         self.0 += delta;
         self.clamp();
     }
 
+    /// Clamp to valid range.
     fn clamp(&mut self) {
         if self.0 < 0.0 {
             self.0 = 0.0;
@@ -45,6 +65,7 @@ impl NarrativeHeat {
         }
     }
 
+    /// Get the current heat band.
     pub fn band(&self) -> NarrativeHeatBand {
         let v = self.0;
         if v < 25.0 {
@@ -94,22 +115,36 @@ impl std::fmt::Display for NarrativeHeatBand {
 
 /// Inputs used to compute heat deltas per tick.
 pub struct NarrativeHeatInputs<'a> {
+    /// Player's current stats.
     pub player_stats: &'a Stats,
+    /// All relationship vectors (for resentment checks).
     pub relationships: &'a [(&'a (u64, u64), &'a RelationshipVector)],
+    /// Whether player had recent trauma.
     pub has_recent_trauma: bool,
+    /// Whether player was recently betrayed.
     pub has_recent_betrayal: bool,
+    /// Whether player had a major win.
     pub has_recent_major_win: bool,
+    /// Life stage stat profile for weight adjustments.
     pub stat_profile: Option<&'a LifeStageStatProfile>,
 }
 
+/// Configuration for heat computation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NarrativeHeatConfig {
+    /// Target heat for decay.
     pub base_decay_toward: f32,
+    /// Decay amount per tick.
     pub decay_per_tick: f32,
+    /// Weight for extreme stat values.
     pub extreme_stat_weight: f32,
+    /// Weight for resentment in relationships.
     pub resentment_weight: f32,
+    /// Weight for economic stress.
     pub economic_stress_weight: f32,
+    /// Weight for trauma events.
     pub trauma_weight: f32,
+    /// Weight for major wins.
     pub win_weight: f32,
 }
 
@@ -127,6 +162,7 @@ impl Default for NarrativeHeatConfig {
     }
 }
 
+/// Compute the heat delta for a single tick based on world state.
 pub fn compute_heat_delta(inputs: &NarrativeHeatInputs<'_>, config: &NarrativeHeatConfig) -> f32 {
     let mut delta = 0.0;
 

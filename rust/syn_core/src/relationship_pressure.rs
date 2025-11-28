@@ -1,3 +1,9 @@
+//! Relationship Pressure System
+//!
+//! Tracks band transitions in relationships to trigger narrative events.
+//! When a relationship axis crosses a band threshold (e.g., Trust goes from
+//! "Wary" to "Trusted"), a pressure event is generated that storylets can react to.
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
@@ -5,16 +11,22 @@ use crate::relationship_model::{
     AffectionBand, AttractionBand, RelationshipVector, ResentmentBand, TrustBand,
 };
 
+/// Snapshot of all relationship bands at a point in time.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipBandSnapshot {
+    /// Current affection band.
     pub affection: AffectionBand,
+    /// Current trust band.
     pub trust: TrustBand,
+    /// Current attraction band.
     pub attraction: AttractionBand,
+    /// Current resentment band.
     pub resentment: ResentmentBand,
     // Familiarity could become a band in the future.
 }
 
 impl RelationshipBandSnapshot {
+    /// Create a snapshot from a relationship vector.
     pub fn from_vector(rel: &RelationshipVector) -> Self {
         Self {
             affection: rel.affection_band(),
@@ -25,20 +37,31 @@ impl RelationshipBandSnapshot {
     }
 }
 
+/// Types of relationship band change events.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RelationshipEventKind {
+    /// Affection band crossed a threshold.
     AffectionBandChanged,
+    /// Trust band crossed a threshold.
     TrustBandChanged,
+    /// Attraction band crossed a threshold.
     AttractionBandChanged,
+    /// Resentment band crossed a threshold.
     ResentmentBandChanged,
 }
 
+/// A relationship pressure event (band transition).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipPressureEvent {
+    /// NPC whose relationship changed.
     pub actor_id: u64,
+    /// NPC the relationship is with.
     pub target_id: u64,
+    /// Which axis changed.
     pub kind: RelationshipEventKind,
+    /// Previous band label.
     pub old_band: String,
+    /// New band label.
     pub new_band: String,
     /// Optional label indicating the source of the change, e.g. "storylet:<id>" or "drift".
     #[serde(default)]
@@ -48,6 +71,7 @@ pub struct RelationshipPressureEvent {
     pub tick: Option<u64>,
 }
 
+/// State for tracking relationship pressure events.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipPressureState {
     /// Last known band snapshot for each (actor, target) pair.
@@ -64,6 +88,7 @@ pub struct RelationshipPressureState {
 }
 
 impl RelationshipPressureState {
+    /// Update tracking for a relationship pair, generating events if bands changed.
     pub fn update_for_pair(
         &mut self,
         actor_id: u64,
@@ -136,11 +161,51 @@ impl RelationshipPressureState {
         self.last_bands.insert(key, new_snapshot);
     }
 
+    /// Pop the next pressure event from the queue.
     pub fn pop_next_event(&mut self) -> Option<RelationshipPressureEvent> {
         self.queue.pop_front()
     }
 
+    /// Peek at the next pressure event without removing it.
     pub fn peek_next_event(&self) -> Option<&RelationshipPressureEvent> {
         self.queue.front()
+    }
+
+    /// Decay the queue by removing old events and enforcing size limits.
+    ///
+    /// This prevents unbounded queue growth when no matching storylets fire.
+    ///
+    /// # Arguments
+    /// * `current_tick` - The current simulation tick
+    /// * `max_age_ticks` - Events older than this are removed (default: 168 = 7 days)
+    /// * `max_queue_size` - Maximum events to keep (oldest dropped first)
+    pub fn decay_queue(&mut self, current_tick: u64, max_age_ticks: u64, max_queue_size: usize) {
+        // Remove events older than max_age_ticks
+        self.queue.retain(|event| {
+            event.tick.map_or(true, |t| current_tick.saturating_sub(t) <= max_age_ticks)
+        });
+
+        // Enforce max queue size (drop oldest events)
+        while self.queue.len() > max_queue_size {
+            self.queue.pop_front();
+        }
+
+        // Also clean up stale changed_pairs (keep only recent pairs in queue)
+        let active_pairs: std::collections::HashSet<(u64, u64)> = self
+            .queue
+            .iter()
+            .map(|e| (e.actor_id, e.target_id))
+            .collect();
+        self.changed_pairs.retain(|pair| active_pairs.contains(pair));
+    }
+
+    /// Check if there are any pending pressure events.
+    pub fn has_pending_events(&self) -> bool {
+        !self.queue.is_empty()
+    }
+
+    /// Get the number of pending pressure events.
+    pub fn pending_count(&self) -> usize {
+        self.queue.len()
     }
 }

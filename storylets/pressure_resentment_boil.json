@@ -1,0 +1,114 @@
+{
+  "id": "pressure_resentment_boil",
+  "name": "Resentment Boils Over",
+  "tags": ["conflict", "drama", "resentment_peak"],
+  "prerequisites": {
+    "min_relationship_affection": null,
+    "min_relationship_resentment": 5.0,
+    "stat_conditions": {},
+    "life_stages": ["Teen", "Adult", "Elder"],
+    "tags": [],
+    "relationship_states": ["Rival", "Estranged"],
+    "memory_tags_required": ["betrayal", "humiliation"],
+    "memory_tags_forbidden": ["reconciliation"],
+    "memory_recency_ticks": 504,
+    "relationship_prereqs": [
+      {
+        "target_id": 0,
+        "axis": "Resentment",
+        "min_value": 5.0,
+        "max_value": null,
+        "min_band": null,
+        "max_band": null
+      }
+    ]
+  },
+  "heat": 85.0,
+  "weight": 0.9,
+  "cooldown_ticks": 672,
+  "roles": [
+    {
+      "name": "rival",
+      "npc_id": 0
+    }
+  ],
+  "outcomes": {
+    "choices": [
+      {
+        "id": "explosive_confrontation",
+        "label": "Let all your anger out",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": 25.0 },
+            { "stat": "aggression", "delta": 15.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Resentment", "delta": 2.0 },
+            { "axis": "Affection", "delta": -3.0 },
+            { "axis": "Trust", "delta": -2.0 }
+          ],
+          "memory_event_id": "explosive_fight",
+          "emotional_intensity": -0.9,
+          "memory_tags": ["rage", "confrontation", "escalation"],
+          "heat_spike": 35.0
+        }
+      },
+      {
+        "id": "cold_dismissal",
+        "label": "Dismiss them with icy contempt",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": 10.0 },
+            { "stat": "control", "delta": 5.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Familiarity", "delta": -2.0 },
+            { "axis": "Affection", "delta": -1.5 }
+          ],
+          "memory_event_id": "cold_rejection",
+          "emotional_intensity": -0.5,
+          "memory_tags": ["contempt", "dismissal", "cold"],
+          "heat_spike": 15.0
+        }
+      },
+      {
+        "id": "attempt_understanding",
+        "label": "Try to understand where things went wrong",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": 5.0 },
+            { "stat": "wisdom", "delta": 8.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Resentment", "delta": -1.5 },
+            { "axis": "Trust", "delta": 0.5 }
+          ],
+          "memory_event_id": "seeking_understanding",
+          "emotional_intensity": 0.2,
+          "memory_tags": ["reflection", "maturity", "peace_attempt"],
+          "heat_spike": 5.0
+        }
+      },
+      {
+        "id": "public_humiliation",
+        "label": "Humiliate them in front of others",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "reputation", "delta": -10.0 },
+            { "stat": "satisfaction", "delta": 5.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Resentment", "delta": 4.0 },
+            { "axis": "Trust", "delta": -4.0 },
+            { "axis": "Affection", "delta": -5.0 }
+          ],
+          "karma_delta": -15.0,
+          "memory_event_id": "public_humiliation_dealt",
+          "emotional_intensity": -0.8,
+          "memory_tags": ["cruelty", "revenge", "humiliation"],
+          "heat_spike": 50.0
+        }
+      }
+    ]
+  }
+}

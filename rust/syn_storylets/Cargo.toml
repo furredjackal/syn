@@ -3,6 +3,9 @@ name = "syn_storylets"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "storyletc"
 path = "src/bin/storyletc.rs"

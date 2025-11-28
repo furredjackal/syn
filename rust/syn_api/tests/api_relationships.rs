@@ -117,10 +117,10 @@ fn derive_role_label_produces_expected_labels() {
     let label = derive_role_label(&rel_vec);
     assert_eq!(label, "Friend");
 
-    // Test "Acquaintance" - moderate affection
+    // Test "Acquaintance" - friendly affection but neutral/wary trust
     let rel_vec = RelationshipVector {
         affection: 4.0, // Friendly
-        trust: 2.0,
+        trust: 0.0,     // Neutral (not Trusted)
         attraction: 0.0,
         familiarity: 2.0,
         resentment: 0.0,

@@ -1,15 +1,25 @@
+//! Time and scheduling system.
+//!
+//! Manages game time progression with 24 ticks per day (1 tick = 1 in-game hour).
+//! Provides day phases for NPC schedules and narrative pacing.
+
 use serde::{Deserialize, Serialize};
 
 /// Coarse-grained day phase, used for schedules and narrative pacing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DayPhase {
+    /// Morning phase (hours 0-5).
     Morning,
+    /// Afternoon phase (hours 6-11).
     Afternoon,
+    /// Evening phase (hours 12-17).
     Evening,
+    /// Night phase (hours 18-23).
     Night,
 }
 
 impl DayPhase {
+    /// Get all day phases in order.
     pub fn all() -> [DayPhase; 4] {
         [
             DayPhase::Morning,
@@ -20,6 +30,7 @@ impl DayPhase {
     }
 }
 
+/// Game time state tracking ticks, days, and phases.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct GameTime {
     /// Legacy/global tick counter; maintained for backward compatibility.
@@ -96,5 +107,6 @@ impl GameTime {
 /// Carries the current tick index so systems share a single source of truth.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TickContext {
+    /// Current tick index in the simulation.
     pub tick_index: u64,
 }

@@ -1,26 +1,53 @@
+//! 5-Axis Relationship Model
+//!
+//! This module implements the core relationship vector system per GDD §5.
+//! Relationships are modeled as 5-axis vectors:
+//! - **Affection**: Emotional warmth (-10 to +10)
+//! - **Trust**: Reliability, safety (-10 to +10)
+//! - **Attraction**: Romantic/sexual pull (-10 to +10)
+//! - **Familiarity**: Shared history (-10 to +10)
+//! - **Resentment**: Hostility, grudges (-10 to +10)
+//!
+//! Axes are converted to bands for eligibility checking and UI display.
+
 use serde::{Deserialize, Serialize};
 
+/// Clamp a relationship axis value to valid range.
 fn clamp_axis(value: f32) -> f32 {
     value.clamp(-10.0, 10.0)
 }
 
+/// The 5 axes of the relationship model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RelationshipAxis {
+    /// Emotional warmth and closeness.
     Affection,
+    /// Reliability and safety.
     Trust,
+    /// Romantic or sexual pull.
     Attraction,
+    /// Shared time and history.
     Familiarity,
+    /// Hostility and grudges.
     Resentment,
 }
 
+/// High-level relationship roles derived from axis combinations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RelationshipRole {
+    /// No meaningful connection.
     Stranger,
+    /// Casual acquaintance.
     Acquaintance,
+    /// Positive friendship.
     Friend,
+    /// Conflicted, hostile.
     Rival,
+    /// Trusted ally (not romantic).
     Ally,
+    /// Romantic interest or partner.
     Romance,
+    /// Family-like bond.
     Family,
 }
 
@@ -39,16 +66,23 @@ impl std::fmt::Display for RelationshipRole {
     }
 }
 
+/// 5-axis relationship vector between two characters.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RelationshipVector {
+    /// Emotional warmth (-10 to +10).
     pub affection: f32,
+    /// Reliability, safety (-10 to +10).
     pub trust: f32,
+    /// Romantic/sexual pull (-10 to +10).
     pub attraction: f32,
+    /// Shared time, history (-10 to +10).
     pub familiarity: f32,
+    /// Hostility, grudges (-10 to +10).
     pub resentment: f32,
 }
 
 impl RelationshipVector {
+    /// Get the value of a specific axis.
     pub fn get(&self, axis: RelationshipAxis) -> f32 {
         match axis {
             RelationshipAxis::Affection => self.affection,
@@ -59,6 +93,7 @@ impl RelationshipVector {
         }
     }
 
+    /// Set the value of a specific axis (clamped to -10..+10).
     pub fn set(&mut self, axis: RelationshipAxis, value: f32) {
         let clamped = clamp_axis(value);
         match axis {
@@ -70,10 +105,12 @@ impl RelationshipVector {
         }
     }
 
+    /// Apply a delta to a specific axis.
     pub fn apply_delta(&mut self, axis: RelationshipAxis, delta: f32) {
         self.set(axis, self.get(axis) + delta);
     }
 
+    /// Get the affection band for this vector.
     pub fn affection_band(&self) -> AffectionBand {
         let v = self.affection;
         if v <= -5.0 {
@@ -89,6 +126,7 @@ impl RelationshipVector {
         }
     }
 
+    /// Get the trust band for this vector.
     pub fn trust_band(&self) -> TrustBand {
         let v = self.trust;
         if v <= -5.0 {
@@ -104,6 +142,7 @@ impl RelationshipVector {
         }
     }
 
+    /// Get the attraction band for this vector.
     pub fn attraction_band(&self) -> AttractionBand {
         let v = self.attraction;
         if v <= 0.0 {
@@ -119,6 +158,7 @@ impl RelationshipVector {
         }
     }
 
+    /// Get the resentment band for this vector.
     pub fn resentment_band(&self) -> ResentmentBand {
         let v = self.resentment;
         if v <= 0.0 {
@@ -134,6 +174,7 @@ impl RelationshipVector {
         }
     }
 
+    /// Derive the high-level relationship role from axis bands.
     pub fn role(&self) -> RelationshipRole {
         let aff = self.affection_band();
         let trust = self.trust_band();
@@ -179,12 +220,18 @@ pub fn derive_role_label(rel: &RelationshipVector) -> String {
     rel.role().to_string()
 }
 
+/// Affection axis band (emotional warmth tier).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AffectionBand {
+    /// Cold/distant (-10 to -5).
     Stranger,
+    /// Casual (-5 to 1).
     Acquaintance,
+    /// Warm (1 to 5).
     Friendly,
+    /// Very warm (5 to 8).
     Close,
+    /// Deeply bonded (8+).
     Devoted,
 }
 
@@ -201,12 +248,18 @@ impl std::fmt::Display for AffectionBand {
     }
 }
 
+/// Trust axis band (reliability tier).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrustBand {
+    /// Completely unknown (-10 to -5).
     Unknown,
+    /// Suspicious (-5 to -1).
     Wary,
+    /// Default (-1 to 2).
     Neutral,
+    /// Reliable (2 to 7).
     Trusted,
+    /// Absolute trust (7+).
     DeepTrust,
 }
 
@@ -223,12 +276,18 @@ impl std::fmt::Display for TrustBand {
     }
 }
 
+/// Attraction axis band (romantic interest tier).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AttractionBand {
+    /// No attraction (0 or below).
     None,
+    /// Slight interest (0 to 3).
     Curious,
+    /// Definite interest (3 to 6).
     Interested,
+    /// Strong attraction (6 to 8).
     Strong,
+    /// Overwhelming attraction (8+).
     Intense,
 }
 
@@ -245,12 +304,18 @@ impl std::fmt::Display for AttractionBand {
     }
 }
 
+/// Resentment axis band (hostility tier).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResentmentBand {
+    /// No resentment (0 or below).
     None,
+    /// Mild annoyance (0 to 3).
     Irritated,
+    /// Active dislike (3 to 6).
     Resentful,
+    /// Hostile (6 to 8).
     Hostile,
+    /// Seeking revenge (8+).
     Vindictive,
 }
 
@@ -267,15 +332,22 @@ impl std::fmt::Display for ResentmentBand {
     }
 }
 
+/// A pending change to a relationship axis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationshipDelta {
+    /// NPC initiating the change.
     pub actor_id: u64,
+    /// NPC receiving the change.
     pub target_id: u64,
+    /// Which axis to modify.
     pub axis: RelationshipAxis,
+    /// Amount to change (+/-).
     pub delta: f32,
+    /// Optional source event/storylet.
     pub source: Option<String>,
 }
 
+/// Apply a batch of relationship deltas to vectors.
 pub fn apply_relationship_deltas<'a, V>(get_rel: &mut V, deltas: &[RelationshipDelta])
 where
     V: FnMut(u64, u64) -> &'a mut RelationshipVector,

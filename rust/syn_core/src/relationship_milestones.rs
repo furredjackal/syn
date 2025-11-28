@@ -1,23 +1,40 @@
+//! Relationship Milestones System
+//!
+//! Tracks significant relationship role transitions (e.g., Friend→Rival, Stranger→Romance).
+//! These milestones are narrative-significant events that can trigger storylets and achievements.
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
 use crate::relationship_model::{RelationshipRole, RelationshipVector};
 
+/// Types of significant relationship role transitions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RelationshipMilestoneKind {
+    /// Friend became a Rival (betrayal, conflict).
     FriendToRival,
+    /// Rival became an Ally (shared crisis, redemption).
     RivalToAlly,
+    /// Stranger became a Romance (attraction sparked).
     StrangerToRomance,
+    /// Romance ended (breakup, betrayal).
     RomanceCollapse,
+    /// Friend became like Family (deep bond).
     FriendToFamily,
 }
 
+/// A milestone event recording a significant role transition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipMilestoneEvent {
+    /// NPC whose relationship changed.
     pub actor_id: u64,
+    /// NPC the relationship is with.
     pub target_id: u64,
+    /// Type of milestone.
     pub kind: RelationshipMilestoneKind,
+    /// Previous role label.
     pub from_role: String,
+    /// New role label.
     pub to_role: String,
     /// Optional reason string based on GDD cues ("betrayal memory", "shared trauma", etc.).
     #[serde(default)]
@@ -30,15 +47,19 @@ pub struct RelationshipMilestoneEvent {
     pub tick: Option<u64>,
 }
 
+/// State for tracking relationship milestones.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RelationshipMilestoneState {
+    /// Last known role for each (actor, target) pair.
     #[serde(default)]
     pub last_role: HashMap<(u64, u64), RelationshipRole>,
+    /// FIFO queue of recent milestone events.
     #[serde(default)]
     pub queue: VecDeque<RelationshipMilestoneEvent>,
 }
 
 impl RelationshipMilestoneState {
+    /// Record the current role for a relationship pair.
     pub fn record_role_for_pair(
         &mut self,
         actor_id: u64,
@@ -48,14 +69,17 @@ impl RelationshipMilestoneState {
         self.last_role.insert((actor_id, target_id), new_role);
     }
 
+    /// Pop the next milestone event from the queue.
     pub fn pop_next(&mut self) -> Option<RelationshipMilestoneEvent> {
         self.queue.pop_front()
     }
 
+    /// Peek at the next milestone event without removing it.
     pub fn peek_next(&self) -> Option<&RelationshipMilestoneEvent> {
         self.queue.front()
     }
 
+    /// Evaluate a relationship for milestones and record any that occurred.
     #[allow(clippy::too_many_arguments)]
     pub fn evaluate_and_record_milestones_for_pair(
         &mut self,
@@ -89,6 +113,9 @@ impl RelationshipMilestoneState {
         self.record_role_for_pair(actor_id, target_id, new_role);
     }
 
+    /// Detect if a role transition constitutes a milestone based on memory tags.
+    ///
+    /// Returns the milestone kind if the transition is significant, None otherwise.
     pub fn detect_milestone(
         prev: RelationshipRole,
         new: RelationshipRole,
@@ -143,6 +170,7 @@ impl RelationshipMilestoneState {
         None
     }
 
+    /// Get a human-readable reason string for a milestone kind.
     fn reason_for_milestone(kind: RelationshipMilestoneKind, _memory_tags: &[String]) -> String {
         match kind {
             RelationshipMilestoneKind::FriendToRival => "high resentment + betrayal memory".into(),

@@ -1,0 +1,93 @@
+{
+  "id": "pressure_trust_breakdown",
+  "name": "Trust Shattered",
+  "tags": ["drama", "confrontation", "trust_crisis"],
+  "prerequisites": {
+    "min_relationship_affection": null,
+    "min_relationship_resentment": null,
+    "stat_conditions": {},
+    "life_stages": ["Teen", "Adult", "Elder"],
+    "tags": [],
+    "relationship_states": [],
+    "memory_tags_required": ["betrayal"],
+    "memory_tags_forbidden": ["forgiveness"],
+    "memory_recency_ticks": 168,
+    "relationship_prereqs": [
+      {
+        "target_id": 0,
+        "axis": "Trust",
+        "min_value": null,
+        "max_value": 0.0,
+        "min_band": null,
+        "max_band": "Neutral"
+      }
+    ]
+  },
+  "heat": 75.0,
+  "weight": 0.8,
+  "cooldown_ticks": 336,
+  "roles": [
+    {
+      "name": "betrayer",
+      "npc_id": 0
+    }
+  ],
+  "outcomes": {
+    "choices": [
+      {
+        "id": "confront_directly",
+        "label": "Confront them about the betrayal",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": 15.0 },
+            { "stat": "confidence", "delta": 5.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Trust", "delta": -2.0 },
+            { "axis": "Resentment", "delta": 3.0 }
+          ],
+          "memory_event_id": "confrontation_trust",
+          "emotional_intensity": -0.7,
+          "memory_tags": ["confrontation", "trust_crisis", "anger"],
+          "heat_spike": 20.0
+        }
+      },
+      {
+        "id": "give_chance",
+        "label": "Give them a chance to explain",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": 5.0 },
+            { "stat": "empathy", "delta": 3.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Trust", "delta": 1.0 },
+            { "axis": "Affection", "delta": 0.5 }
+          ],
+          "memory_event_id": "second_chance_given",
+          "emotional_intensity": 0.3,
+          "memory_tags": ["forgiveness", "understanding", "patience"],
+          "heat_spike": 5.0
+        }
+      },
+      {
+        "id": "walk_away",
+        "label": "Walk away without a word",
+        "outcome": {
+          "stat_impacts": [
+            { "stat": "stress", "delta": -5.0 },
+            { "stat": "isolation", "delta": 10.0 }
+          ],
+          "relationship_impacts": [
+            { "axis": "Familiarity", "delta": -3.0 },
+            { "axis": "Trust", "delta": -1.0 }
+          ],
+          "memory_event_id": "silent_rejection",
+          "emotional_intensity": -0.4,
+          "memory_tags": ["rejection", "distance", "hurt"],
+          "heat_spike": 10.0
+        }
+      }
+    ]
+  }
+}

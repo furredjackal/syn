@@ -6,8 +6,14 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
+# Note: Can't inherit workspace lints because FFI requires unsafe
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+unsafe_code = "allow"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
 
 [dependencies]
 syn_core = { path = "../syn_core" }
@@ -27,5 +33,7 @@ flutter_rust_bridge_codegen = "^2.0"
 tempfile = "3.8"
 
 [features]
-default = []
+default = ["mimalloc"]
+# High-performance allocator for production builds
+mimalloc = ["syn_core/mimalloc-allocator"]
 mmap = ["syn_storylets/mmap"]

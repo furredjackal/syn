@@ -1,10 +1,15 @@
 //! Core types: Stats, Traits, Relationships, NPCs, World state.
 
 use crate::digital_legacy::DigitalLegacyState;
+use crate::district::DistrictRegistry;
+use crate::failure_recovery::FailureRecoverySystem;
+use crate::gossip::GossipSystem;
 use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
 use crate::npc::NpcPrototype;
+use crate::population::PopulationSimulation;
 use crate::relationship_milestones::RelationshipMilestoneState;
 use crate::relationship_pressure::RelationshipPressureState;
+use crate::skills::PlayerSkills;
 use crate::time::{GameTime, TickContext};
 use crate::{clamp_for, KarmaBand, MoodBand, StatKind};
 use serde::{Deserialize, Serialize};
@@ -15,6 +20,7 @@ use std::collections::HashMap;
 pub struct WorldSeed(pub u64);
 
 impl WorldSeed {
+    /// Create a new world seed from a u64 value.
     pub fn new(seed: u64) -> Self {
         WorldSeed(seed)
     }
@@ -23,19 +29,27 @@ impl WorldSeed {
 /// Visible player stats by life stage.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Stats {
+    /// Physical health (0-100).
     pub health: f32,
+    /// Mental acuity and knowledge (0-100).
     pub intelligence: f32,
+    /// Social charm and persuasiveness (0-100).
     pub charisma: f32,
+    /// Financial resources (0-100).
     pub wealth: f32,
+    /// Current emotional state (-10 to +10).
     pub mood: f32,
+    /// Physical attractiveness (0-100).
     pub appearance: f32,
+    /// Social standing and fame (-10 to +10).
     pub reputation: f32,
+    /// Life experience and judgment (0-100).
     pub wisdom: f32,
-    /// Child-exclusive
+    /// Child-exclusive: desire to explore and learn.
     pub curiosity: Option<f32>,
-    /// Child-exclusive
+    /// Child-exclusive: physical and mental energy.
     pub energy: Option<f32>,
-    /// Teen+ NSFW mode
+    /// Teen+ NSFW mode: sexual drive.
     pub libido: Option<f32>,
 }
 
@@ -80,6 +94,7 @@ impl Stats {
         }
     }
 
+    /// Get the value of a stat by kind.
     pub fn get(&self, kind: StatKind) -> f32 {
         match kind {
             StatKind::Health => self.health,
@@ -96,6 +111,7 @@ impl Stats {
         }
     }
 
+    /// Set the value of a stat by kind, clamping to valid range.
     pub fn set(&mut self, kind: StatKind, value: f32) {
         match kind {
             StatKind::Health => self.health = value,
@@ -113,11 +129,13 @@ impl Stats {
         self.clamp();
     }
 
+    /// Apply a delta to a stat (adds to current value).
     pub fn apply_delta(&mut self, kind: StatKind, delta: f32) {
         let current = self.get(kind);
         self.set(kind, current + delta);
     }
 
+    /// Get the mood band for the current mood value.
     pub fn mood_band(&self) -> MoodBand {
         let m = self.mood;
         if m <= -6.0 {
@@ -137,13 +155,20 @@ impl Stats {
 /// Permanent personality trait dimensions (set at NPC generation, rarely change).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Traits {
-    pub stability: f32,   // calm ↔ volatile
-    pub confidence: f32,  // insecure ↔ self-assured
-    pub sociability: f32, // introverted ↔ extroverted
-    pub empathy: f32,     // detached ↔ sensitive
-    pub impulsivity: f32, // cautious ↔ reckless
-    pub ambition: f32,    // apathetic ↔ driven
-    pub charm: f32,       // awkward ↔ charismatic
+    /// Calm ↔ volatile (0-100).
+    pub stability: f32,
+    /// Insecure ↔ self-assured (0-100).
+    pub confidence: f32,
+    /// Introverted ↔ extroverted (0-100).
+    pub sociability: f32,
+    /// Detached ↔ sensitive (0-100).
+    pub empathy: f32,
+    /// Cautious ↔ reckless (0-100).
+    pub impulsivity: f32,
+    /// Apathetic ↔ driven (0-100).
+    pub ambition: f32,
+    /// Awkward ↔ charismatic (0-100).
+    pub charm: f32,
 }
 
 impl Default for Traits {
@@ -174,30 +199,46 @@ impl Traits {
 }
 
 /// High-level action intents evaluated by the behavior utility system.
+/// Per GDD §7.4: work, socialize, withdraw, romance, escalate, self-improve, risk, relax, explore
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BehaviorAction {
+    /// Focus on career, productivity, earning.
     Work,
+    /// Seek social connections, conversations, bonding.
     Socialize,
+    /// Retreat from others, isolate, recharge alone.
     Withdraw,
+    /// Pursue romantic or intimate connections.
     Romance,
-    Conflict,
+    /// Amplify conflict, confront, or escalate tension.
+    Escalate,
+    /// Study, learn, practice skills.
     SelfImprove,
+    /// Take chances, gamble, seek thrills.
     Risk,
+    /// Rest, destress, leisure activities.
     Relax,
+    /// Discover new places, ideas, experiences.
     Explore,
 }
 
 /// Core needs referenced by behavior scoring.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BehaviorNeed {
+    /// Need for connection, belonging, and relationships.
     Social,
+    /// Need for excitement, novelty, and engagement.
     Stimulation,
+    /// Need for safety, stability, and predictability.
     Security,
+    /// Need for status, respect, and achievement.
     Recognition,
+    /// Need for ease, relaxation, and pleasure.
     Comfort,
 }
 
 impl BehaviorNeed {
+    /// Get the string key for this need (used in serialization).
     pub fn as_key(&self) -> &'static str {
         match self {
             BehaviorNeed::Social => "social",
@@ -230,13 +271,14 @@ impl BehaviorNeed {
 }
 
 impl BehaviorAction {
+    /// Base weight for this action in utility scoring (0.0-1.0 scale).
     pub fn base_weight(&self) -> f32 {
         match self {
             BehaviorAction::Work => 0.9,
             BehaviorAction::Socialize => 0.8,
             BehaviorAction::Withdraw => 0.6,
             BehaviorAction::Romance => 0.7,
-            BehaviorAction::Conflict => 0.4,
+            BehaviorAction::Escalate => 0.4,
             BehaviorAction::SelfImprove => 0.8,
             BehaviorAction::Risk => 0.5,
             BehaviorAction::Relax => 0.7,
@@ -244,13 +286,14 @@ impl BehaviorAction {
         }
     }
 
+    /// The primary need this action satisfies.
     pub fn primary_need(&self) -> BehaviorNeed {
         match self {
             BehaviorAction::Work => BehaviorNeed::Recognition,
             BehaviorAction::Socialize => BehaviorNeed::Social,
             BehaviorAction::Withdraw => BehaviorNeed::Comfort,
             BehaviorAction::Romance => BehaviorNeed::Social,
-            BehaviorAction::Conflict => BehaviorNeed::Security,
+            BehaviorAction::Escalate => BehaviorNeed::Security,
             BehaviorAction::SelfImprove => BehaviorNeed::Recognition,
             BehaviorAction::Risk => BehaviorNeed::Stimulation,
             BehaviorAction::Relax => BehaviorNeed::Comfort,
@@ -258,13 +301,14 @@ impl BehaviorAction {
         }
     }
 
+    /// Optional secondary need this action partially satisfies.
     pub fn secondary_need(&self) -> Option<BehaviorNeed> {
         match self {
             BehaviorAction::Work => Some(BehaviorNeed::Security),
             BehaviorAction::Socialize => Some(BehaviorNeed::Recognition),
             BehaviorAction::Withdraw => None,
             BehaviorAction::Romance => Some(BehaviorNeed::Comfort),
-            BehaviorAction::Conflict => Some(BehaviorNeed::Recognition),
+            BehaviorAction::Escalate => Some(BehaviorNeed::Recognition),
             BehaviorAction::SelfImprove => Some(BehaviorNeed::Security),
             BehaviorAction::Risk => Some(BehaviorNeed::Recognition),
             BehaviorAction::Relax => Some(BehaviorNeed::Security),
@@ -272,11 +316,13 @@ impl BehaviorAction {
         }
     }
 
+    /// Mood modifier for this action (0.5-1.5 scale).
+    /// Negative mood boosts Withdraw/Escalate, positive boosts Romance/Socialize.
     pub fn mood_multiplier(&self, mood: f32) -> f32 {
         let normalized = mood.clamp(-10.0, 10.0) / 10.0;
         match self {
             BehaviorAction::Withdraw if normalized < -0.2 => 1.2,
-            BehaviorAction::Conflict if normalized < -0.2 => 1.15,
+            BehaviorAction::Escalate if normalized < -0.2 => 1.15,
             BehaviorAction::Relax if normalized < -0.2 => 1.1,
             BehaviorAction::Romance | BehaviorAction::Socialize if normalized > 0.2 => 1.2,
             BehaviorAction::Explore | BehaviorAction::Risk if normalized > 0.2 => 1.1,
@@ -285,6 +331,8 @@ impl BehaviorAction {
         .clamp(0.5, 1.5)
     }
 
+    /// Trait-based bias for this action (0.5-1.5 scale).
+    /// Maps personality traits to action preferences.
     pub fn trait_bias(&self, traits: &Traits) -> f32 {
         let normalize = |value: f32| -> f32 { (value / 50.0).clamp(0.5, 1.5) };
         match self {
@@ -292,7 +340,7 @@ impl BehaviorAction {
             BehaviorAction::Socialize => normalize(traits.sociability + traits.empathy / 2.0),
             BehaviorAction::Withdraw => normalize(100.0 - traits.sociability),
             BehaviorAction::Romance => normalize((traits.charm + traits.empathy) / 2.0),
-            BehaviorAction::Conflict => {
+            BehaviorAction::Escalate => {
                 normalize(100.0 - traits.empathy + traits.impulsivity / 2.0)
             }
             BehaviorAction::SelfImprove => normalize(traits.confidence + traits.ambition / 2.0),
@@ -302,21 +350,25 @@ impl BehaviorAction {
         }
     }
 
+    /// Attachment style modifier for this action.
+    /// Anxious boosts romance/escalate, Avoidant boosts withdraw.
     pub fn attachment_bias(&self, attachment: AttachmentStyle) -> f32 {
         match (self, attachment) {
             (BehaviorAction::Romance, AttachmentStyle::Anxious) => 1.2,
             (BehaviorAction::Romance, AttachmentStyle::Avoidant) => 0.8,
             (BehaviorAction::Withdraw, AttachmentStyle::Avoidant) => 1.2,
-            (BehaviorAction::Conflict, AttachmentStyle::Anxious) => 1.1,
+            (BehaviorAction::Escalate, AttachmentStyle::Anxious) => 1.1,
             (BehaviorAction::Socialize, AttachmentStyle::Secure) => 1.1,
             _ => 1.0,
         }
     }
 
+    /// World context fit for this action (0.5-1.5 scale).
+    /// High heat boosts Escalate, low health boosts Relax/Withdraw.
     pub fn context_fit(&self, world: &WorldState) -> f32 {
         let heat = world.narrative_heat.value();
         match self {
-            BehaviorAction::Conflict | BehaviorAction::Risk => {
+            BehaviorAction::Escalate | BehaviorAction::Risk => {
                 (0.8 + (heat / 150.0)).clamp(0.5, 1.6)
             }
             BehaviorAction::Relax | BehaviorAction::Withdraw => {
@@ -326,13 +378,14 @@ impl BehaviorAction {
         }
     }
 
+    /// Get storylet tags associated with this action.
     pub fn tags(&self) -> &'static [&'static str] {
         match self {
             BehaviorAction::Work => &["career", "work"],
             BehaviorAction::Socialize => &["friendship", "social"],
             BehaviorAction::Withdraw => &["introspective", "solitude"],
             BehaviorAction::Romance => &["romance"],
-            BehaviorAction::Conflict => &["conflict", "rivalry"],
+            BehaviorAction::Escalate => &["escalate", "conflict", "rivalry"],
             BehaviorAction::SelfImprove => &["self_improvement", "growth"],
             BehaviorAction::Risk => &["risk", "crime"],
             BehaviorAction::Relax => &["slice_of_life", "calm"],
@@ -340,6 +393,7 @@ impl BehaviorAction {
         }
     }
 
+    /// Check if a storylet tag matches this action.
     pub fn matches_tag(&self, tag: &str) -> bool {
         let tag_lower = tag.to_lowercase();
         self.tags()
@@ -347,6 +401,7 @@ impl BehaviorAction {
             .any(|candidate| tag_lower.contains(candidate))
     }
 
+    /// Estimate need urgency multiplier based on traits/stats.
     pub fn estimated_need_multiplier(&self, traits: &Traits, stats: &Stats) -> f32 {
         let primary = self.primary_need().estimate_from_stats(traits, stats);
         let secondary = self
@@ -361,6 +416,8 @@ impl BehaviorAction {
         ((primary + secondary) / divisor).clamp(0.4, 2.0)
     }
 
+    /// Full utility score for this action given a complete character profile.
+    /// Combines base weight, trait bias, mood, attachment, context, and need urgency.
     pub fn intent_score_with_profile(
         &self,
         traits: &Traits,
@@ -383,7 +440,7 @@ pub fn behavior_action_from_tags(tags: &[String]) -> Option<BehaviorAction> {
     let lowercased: Vec<String> = tags.iter().map(|t| t.to_lowercase()).collect();
     for action in [
         BehaviorAction::Romance,
-        BehaviorAction::Conflict,
+        BehaviorAction::Escalate,
         BehaviorAction::Work,
         BehaviorAction::Socialize,
         BehaviorAction::SelfImprove,
@@ -402,17 +459,28 @@ pub fn behavior_action_from_tags(tags: &[String]) -> Option<BehaviorAction> {
 /// Relationship state machine: tracks type of relationship (friend, rival, partner, etc.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RelationshipState {
-    Stranger,         // No meaningful relationship yet
-    Acquaintance,     // Know of each other, minimal affection
-    Friend,           // Stable positive relationship
-    CloseFriend,      // Very close, high trust and affection
-    BestFriend,       // Deepest platonic bond
-    RomanticInterest, // Attracted, considering romance
-    Partner,          // In a romantic relationship
-    Spouse,           // Married or deeply committed
-    Rival,            // Conflicted, high resentment
-    Estranged,        // Former close relationship broken
-    BrokenHeart,      // Recent breakup/betrayal recovery
+    /// No meaningful relationship yet.
+    Stranger,
+    /// Know of each other, minimal affection.
+    Acquaintance,
+    /// Stable positive relationship.
+    Friend,
+    /// Very close, high trust and affection.
+    CloseFriend,
+    /// Deepest platonic bond.
+    BestFriend,
+    /// Attracted, considering romance.
+    RomanticInterest,
+    /// In a romantic relationship.
+    Partner,
+    /// Married or deeply committed.
+    Spouse,
+    /// Conflicted, high resentment.
+    Rival,
+    /// Former close relationship broken.
+    Estranged,
+    /// Recent breakup/betrayal recovery.
+    BrokenHeart,
 }
 
 impl Default for RelationshipState {
@@ -459,12 +527,18 @@ impl RelationshipState {
 /// 5-axis relationship vector between two NPCs.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Relationship {
-    pub affection: f32,           // -10..+10 (warmth, emotional closeness)
-    pub trust: f32,               // -10..+10 (reliability, safety, openness)
-    pub attraction: f32,          // -10..+10 (romantic/sexual pull)
-    pub familiarity: f32,         // -10..+10 (shared time, history, routine)
-    pub resentment: f32,          // -10..+10 (hostility, grudges)
-    pub state: RelationshipState, // Current state of the relationship
+    /// Warmth, emotional closeness (-10..+10).
+    pub affection: f32,
+    /// Reliability, safety, openness (-10..+10).
+    pub trust: f32,
+    /// Romantic/sexual pull (-10..+10).
+    pub attraction: f32,
+    /// Shared time, history, routine (-10..+10).
+    pub familiarity: f32,
+    /// Hostility, grudges (-10..+10).
+    pub resentment: f32,
+    /// Current state of the relationship.
+    pub state: RelationshipState,
 }
 
 impl Default for Relationship {
@@ -490,6 +564,7 @@ impl Relationship {
         self.resentment = self.resentment.clamp(-10.0, 10.0);
     }
 
+    /// Apply a delta to a specific relationship axis.
     pub fn apply_delta(&mut self, axis: crate::RelationshipAxis, delta: f32) {
         match axis {
             crate::RelationshipAxis::Affection => {
@@ -582,16 +657,24 @@ impl Relationship {
 /// Life stage of a character (affects visible stats and event eligibility).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LifeStage {
-    PreSim,     // 0-5 (not playable; used for generation)
-    Child,      // 6-12
-    Teen,       // 13-18
-    YoungAdult, // 19-29
-    Adult,      // 30-59
-    Elder,      // 60-89
-    Digital,    // 90+
+    /// Ages 0-5 (not playable; used for generation).
+    PreSim,
+    /// Ages 6-12.
+    Child,
+    /// Ages 13-18.
+    Teen,
+    /// Ages 19-29.
+    YoungAdult,
+    /// Ages 30-59.
+    Adult,
+    /// Ages 60-89.
+    Elder,
+    /// Ages 90+ (digital transcendence).
+    Digital,
 }
 
 impl LifeStage {
+    /// Convert age to life stage.
     pub fn from_age(age: u32) -> Self {
         match age {
             0..=5 => LifeStage::PreSim,
@@ -604,6 +687,7 @@ impl LifeStage {
         }
     }
 
+    /// Get the age range (min, max) for this life stage.
     pub fn age_range(&self) -> (u32, u32) {
         match self {
             LifeStage::PreSim => (0, 5),
@@ -620,8 +704,11 @@ impl LifeStage {
 /// Attachment style (affects social trait modifiers).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AttachmentStyle {
+    /// Seeks reassurance, fears abandonment.
     Anxious,
+    /// Maintains distance, fears intimacy.
     Avoidant,
+    /// Comfortable with closeness and independence.
     Secure,
 }
 
@@ -636,6 +723,7 @@ impl Default for AttachmentStyle {
 pub struct NpcId(pub u64);
 
 impl NpcId {
+    /// Create a new NPC identifier.
     pub fn new(id: u64) -> Self {
         NpcId(id)
     }
@@ -644,13 +732,21 @@ impl NpcId {
 /// Lightweight NPC (stored in PopulationStore, not yet instantiated in ECS).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AbstractNpc {
+    /// Unique NPC identifier.
     pub id: NpcId,
+    /// Current age in years.
     pub age: u32,
+    /// Current occupation/job title.
     pub job: String,
+    /// District where NPC resides.
     pub district: String,
+    /// Household identifier for family grouping.
     pub household_id: u64,
+    /// Personality traits.
     pub traits: Traits,
+    /// Seed for deterministic generation.
     pub seed: u64,
+    /// Social attachment style.
     pub attachment_style: AttachmentStyle,
 }
 
@@ -659,10 +755,12 @@ pub struct AbstractNpc {
 pub struct SimTick(pub u64);
 
 impl SimTick {
+    /// Create a new simulation tick.
     pub fn new(tick: u64) -> Self {
         SimTick(tick)
     }
 
+    /// Calculate days elapsed (24 ticks per day).
     pub fn days_elapsed(&self) -> u32 {
         (self.0 / 24) as u32 // Assume 24 ticks per day
     }
@@ -673,18 +771,22 @@ impl SimTick {
 pub struct Karma(pub f32);
 
 impl Karma {
+    /// Create new karma at neutral (0).
     pub fn new() -> Self {
         Karma(0.0)
     }
 
+    /// Apply a karma delta (clamped to -100..+100).
     pub fn apply_delta(&mut self, delta: f32) {
         self.0 = crate::clamp_karma(self.0 + delta);
     }
 
+    /// Clamp karma to valid range.
     pub fn clamp(&mut self) {
         self.0 = crate::clamp_karma(self.0);
     }
 
+    /// Get the karma band (moral alignment tier).
     pub fn band(&self) -> KarmaBand {
         let k = self.0;
         if k <= -60.0 {
@@ -718,17 +820,26 @@ pub struct StoryletUsageState {
 /// Serializable memory entry snapshot (mirrors syn_memory::MemoryEntry without depending on that crate).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MemoryEntryRecord {
+    /// Unique memory identifier.
     pub id: String,
+    /// Storylet/event that created this memory.
     pub event_id: String,
+    /// NPC who holds this memory.
     pub npc_id: NpcId,
+    /// When this memory was formed.
     pub sim_tick: SimTick,
+    /// Emotional intensity (0.0-1.0).
     pub emotional_intensity: f32,
+    /// Stat changes caused by this event.
     #[serde(default)]
     pub stat_deltas: Vec<crate::stats::StatDelta>,
+    /// Relationship changes caused by this event.
     #[serde(default)]
     pub relationship_deltas: Vec<crate::relationships::RelationshipDelta>,
+    /// Tags for memory categorization.
     #[serde(default)]
     pub tags: Vec<String>,
+    /// NPCs involved in this memory.
     #[serde(default)]
     pub participants: Vec<u64>,
 }
@@ -755,10 +866,15 @@ pub type RelationshipPressureFlags = crate::relationship_pressure::RelationshipP
 /// Global world state snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorldState {
+    /// World seed for deterministic generation.
     pub seed: WorldSeed,
+    /// Current simulation tick.
     pub current_tick: SimTick,
+    /// Player character's NPC ID.
     pub player_id: NpcId,
+    /// Player's visible stats.
     pub player_stats: Stats,
+    /// Player age in years (legacy field).
     pub player_age: u32,
     /// Player age in years (alias for player_age for stage progression).
     #[serde(default)]
@@ -766,7 +882,9 @@ pub struct WorldState {
     /// Days since birth (derived from tick cadence; used for daily systems).
     #[serde(default)]
     pub player_days_since_birth: u32,
+    /// Player's current life stage.
     pub player_life_stage: LifeStage,
+    /// Player's karma (ethical alignment).
     pub player_karma: Karma,
     /// Narrative heat (0.0..100.0+): controls pacing and event intensity
     #[serde(default)]
@@ -803,14 +921,31 @@ pub struct WorldState {
     #[serde(default)]
     pub memory_entries: Vec<MemoryEntryRecord>,
     /// District-level state blobs (e.g., economic/heat per district).
+    /// DEPRECATED: Use `districts` instead. Kept for backward compatibility.
     #[serde(default)]
     pub district_state: HashMap<String, String>,
-    /// World flags toggled by storylets and systems.
+    /// District registry with full simulation state.
     #[serde(default)]
-    pub world_flags: HashMap<String, bool>,
+    pub districts: DistrictRegistry,
+    /// Player skill progression data.
+    #[serde(default)]
+    pub player_skills: PlayerSkills,
+    /// Gossip/social spread system for rumors and reputation diffusion.
+    #[serde(default)]
+    pub gossip: GossipSystem,
+    /// Population simulation: job market, demographics, black-swan events.
+    #[serde(default)]
+    pub population: PopulationSimulation,
+    /// Failure/recovery system: trauma spirals, cooldowns, recovery thresholds.
+    #[serde(default)]
+    pub failure_recovery: FailureRecoverySystem,
+    /// World flags toggled by storylets and systems (bitflag-optimized).
+    #[serde(default)]
+    pub world_flags: crate::world_flags::WorldFlags,
 }
 
 impl WorldState {
+    /// Create a new world state with the given seed and player ID.
     pub fn new(seed: WorldSeed, player_id: NpcId) -> Self {
         WorldState {
             seed,
@@ -835,8 +970,20 @@ impl WorldState {
             storylet_usage: StoryletUsageState::default(),
             memory_entries: Vec::new(),
             district_state: HashMap::new(),
-            world_flags: HashMap::new(),
+            districts: DistrictRegistry::generate_default_city(seed.0),
+            player_skills: PlayerSkills::default(),
+            gossip: GossipSystem::default(),
+            population: PopulationSimulation::default(),
+            failure_recovery: FailureRecoverySystem::default(),
+            world_flags: crate::world_flags::WorldFlags::new(),
         }
+    }
+
+    /// Create a new world with an empty district registry (for tests/custom setup).
+    pub fn new_empty(seed: WorldSeed, player_id: NpcId) -> Self {
+        let mut world = Self::new(seed, player_id);
+        world.districts = DistrictRegistry::new();
+        world
     }
 
     /// Get or initialize relationship between two NPCs.
@@ -852,6 +999,7 @@ impl WorldState {
         self.relationships.insert((from, to), rel);
     }
 
+    /// Apply a list of relationship deltas to the player's relationships.
     pub fn apply_relationship_deltas(&mut self, deltas: &[crate::RelationshipDelta]) {
         for d in deltas {
             let mut current = self.get_relationship(self.player_id, d.target_id);
@@ -891,8 +1039,9 @@ impl WorldState {
         }
         // Decay narrative heat over time (-0.1 per tick)
         self.narrative_heat.add(-0.1);
-        // Momentum decays faster so persistent spikes eventually cool
-        self.heat_momentum *= 0.9;
+        // Momentum decays aggressively so spikes cool within ~10 ticks
+        // 0.7^10 ≈ 0.028, so momentum of 20 → ~0.56 after 10 ticks
+        self.heat_momentum *= 0.7;
         if self.heat_momentum.abs() < 0.05 {
             self.heat_momentum = 0.0;
         }
@@ -960,31 +1109,54 @@ impl WorldState {
 /// Excludes volatile runtime-only data (ECS handles, caches).
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorldStateSnapshot {
+    /// World seed for deterministic generation.
     pub seed: WorldSeed,
+    /// Current simulation tick.
     pub current_tick: SimTick,
+    /// Player character's NPC ID.
     pub player_id: NpcId,
+    /// Player's visible stats.
     pub player_stats: Stats,
+    /// Player age in years.
     pub player_age_years: u32,
+    /// Days since birth.
     pub player_days_since_birth: u32,
+    /// Player's current life stage.
     pub player_life_stage: LifeStage,
+    /// Player's karma (ethical alignment).
     pub player_karma: Karma,
+    /// Narrative heat value.
     pub narrative_heat: NarrativeHeat,
+    /// Heat momentum (trend).
     pub heat_momentum: f32,
+    /// All NPC relationships.
     pub relationships: HashMap<(NpcId, NpcId), Relationship>,
+    /// NPC population cache.
     pub npcs: HashMap<NpcId, AbstractNpc>,
+    /// Relationship pressure flags.
     pub relationship_pressure: RelationshipPressureState,
+    /// Relationship milestone state.
     pub relationship_milestones: RelationshipMilestoneState,
+    /// Digital legacy state.
     pub digital_legacy: DigitalLegacyState,
+    /// NPC prototypes.
     pub npc_prototypes: HashMap<NpcId, NpcPrototype>,
+    /// Known NPC IDs.
     pub known_npcs: Vec<NpcId>,
+    /// Game time tick index.
     pub game_time_tick: u64,
+    /// Storylet usage tracking.
     pub storylet_usage: StoryletUsageState,
+    /// Memory journal entries.
     pub memory_entries: Vec<MemoryEntryRecord>,
+    /// District state (deprecated).
     pub district_state: HashMap<String, String>,
-    pub world_flags: HashMap<String, bool>,
+    /// World flags.
+    pub world_flags: crate::world_flags::WorldFlags,
 }
 
 impl WorldStateSnapshot {
+    /// Create a snapshot from the current world state.
     pub fn from_world(world: &WorldState) -> Self {
         WorldStateSnapshot {
             seed: world.seed,
@@ -1129,8 +1301,8 @@ mod tests {
         world.player_stats.mood = 5.0;
 
         let romance_bias = world.player_behavior_bias(BehaviorAction::Romance);
-        let conflict_bias = world.player_behavior_bias(BehaviorAction::Conflict);
-        assert!(romance_bias > conflict_bias);
+        let escalate_bias = world.player_behavior_bias(BehaviorAction::Escalate);
+        assert!(romance_bias > escalate_bias);
     }
 
     // ==================== Relationship State Transition Tests ====================

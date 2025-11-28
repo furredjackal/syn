@@ -955,7 +955,7 @@ impl SimState {
         Ok(())
     }
 
-    pub fn demote_npc(&mut self, world: &mut WorldState, id: NpcId) -> Result<(), StorageError> {
+    pub fn demote_npc(&mut self, _world: &mut WorldState, id: NpcId) -> Result<(), StorageError> {
         if let Some(instance) = self.npc_registry.instances.remove(&id) {
             let storage_npc = core_to_storage_npc(&instance.sim.abstract_npc, Some(instance.sim.current_stats()));
             self.storage.save_active(&storage_npc)?;
@@ -1066,7 +1066,8 @@ fn tick_lod_transitions(world: &mut WorldState, sim: &mut SimState) {
         .collect();
 
     for id in to_demote {
-        if let Err(err) = sim.demote_npc(world, id) {
+        let result = sim.demote_npc(world, id);
+        if let Err(err) = result {
             eprintln!("Failed to demote NPC {id:?}: {err}");
         }
     }

@@ -72,12 +72,14 @@ impl DeterministicRng {
 
     /// Generate a random u32.
     pub fn gen_u32(&mut self) -> u32 {
-        self.inner.gen()
+        use rand::Rng;
+        self.inner.r#gen()
     }
 
     /// Generate a random u64.
     pub fn gen_u64(&mut self) -> u64 {
-        self.inner.gen()
+        use rand::Rng;
+        self.inner.r#gen()
     }
 
     /// Generate a random f32 in range [0.0..1.0).

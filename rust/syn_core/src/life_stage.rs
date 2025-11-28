@@ -1,39 +1,60 @@
+//! Life Stage Configuration
+//!
+//! Defines stat weights, visibility settings, and narrative heat configs per life stage.
+//! Each stage (Child, Teen, YoungAdult, Adult, Elder, Digital) has distinct gameplay focus.
+
 use serde::{Deserialize, Serialize};
 
 use crate::narrative_heat::NarrativeHeatConfig;
 use crate::LifeStage;
 
-/// Which stats are “foregrounded” and how strongly they matter in this stage.
+/// Which stats are "foregrounded" and how strongly they matter in this stage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LifeStageStatProfile {
+    /// Importance of mood in this life stage.
     pub mood_weight: f32,
+    /// Importance of health in this life stage.
     pub health_weight: f32,
+    /// Importance of wealth in this life stage.
     pub wealth_weight: f32,
+    /// Importance of charisma in this life stage.
     pub charisma_weight: f32,
+    /// Importance of reputation in this life stage.
     pub reputation_weight: f32,
+    /// Importance of wisdom in this life stage.
     pub wisdom_weight: f32,
 }
 
 /// Which stats are visible/emphasized in UI for this stage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LifeStageStatVisibility {
+    /// Show wealth stat in UI.
     pub show_wealth: bool,
+    /// Show reputation stat in UI.
     pub show_reputation: bool,
+    /// Show wisdom stat in UI.
     pub show_wisdom: bool,
+    /// Show karma stat in UI.
     pub show_karma: bool,
 }
 
 /// Config bundle for a given stage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LifeStageConfig {
+    /// Stat weights for this life stage.
     pub stat_profile: LifeStageStatProfile,
+    /// UI visibility settings for this life stage.
     pub visibility: LifeStageStatVisibility,
+    /// Narrative heat configuration for this life stage.
     pub heat_config: NarrativeHeatConfig,
+    /// Minimum age for this life stage.
     pub min_age: u32,
+    /// Maximum age for this life stage.
     pub max_age: u32,
 }
 
 impl LifeStage {
+    /// Get the configuration for this life stage.
     pub fn config(self) -> LifeStageConfig {
         match self {
             LifeStage::PreSim | LifeStage::Child => LifeStageConfig {
@@ -201,6 +222,7 @@ impl LifeStage {
         }
     }
 
+    /// Determine the life stage for a given age.
     pub fn stage_for_age(age: u32) -> LifeStage {
         for stage in [
             LifeStage::PreSim,

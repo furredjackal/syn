@@ -236,6 +236,7 @@ fn test_library_lookup_methods() {
         life_stage: LifeStage::Adult,
         heat: 5,
         weight: 1.0,
+        roles: vec![],
         prerequisites: Prerequisites::default(),
         cooldowns: Cooldowns::default(),
         outcomes: Outcome::default(),

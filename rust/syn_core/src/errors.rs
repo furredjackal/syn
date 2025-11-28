@@ -5,9 +5,13 @@ use std::fmt;
 /// SYN error types.
 #[derive(Debug)]
 pub enum SynError {
+    /// Database or save/load error.
     PersistenceError(String),
+    /// Simulation logic error.
     SimulationError(String),
+    /// Invalid game state detected.
     InvalidState(String),
+    /// Entity not found.
     NotFound(String),
 }
 
@@ -24,4 +28,5 @@ impl fmt::Display for SynError {
 
 impl std::error::Error for SynError {}
 
+/// Result type alias using SynError.
 pub type Result<T> = std::result::Result<T, SynError>;

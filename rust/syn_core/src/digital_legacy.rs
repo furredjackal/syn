@@ -81,9 +81,13 @@ pub struct DigitalLegacyState {
 
 /// Input bundle for computing legacy vector.
 pub struct LegacyInputs<'a> {
+    /// Final player stats at death/transition.
     pub final_stats: &'a Stats,
+    /// Final karma value.
     pub final_karma: &'a Karma,
+    /// All relationship vectors at end of life.
     pub relationships: &'a [(&'a (NpcId, NpcId), &'a RelationshipVector)],
+    /// Significant relationship transitions achieved.
     pub relationship_milestones: &'a [RelationshipMilestoneEvent],
     /// Flattened memory tag counts, e.g. "betrayal" -> 3, "support" -> 5
     pub memory_tag_counts: &'a HashMap<String, u32>,

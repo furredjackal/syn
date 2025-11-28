@@ -251,7 +251,7 @@ impl PressureState {
     }
 
     /// Get pressures matching a kind.
-    pub fn by_kind(&self, kind: &PressureKind) -> impl Iterator<Item = &Pressure> {
+    pub fn by_kind(&self, kind: &PressureKind) -> impl Iterator<Item = &Pressure> + use<'_> {
         let kind = kind.clone();
         self.active.values().filter(move |p| !p.resolved && p.kind == kind)
     }

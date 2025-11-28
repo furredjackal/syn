@@ -3,6 +3,9 @@ name = "syn_query"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 syn_core = { path = "../syn_core" }
 serde = { version = "1.0", features = ["derive"] }

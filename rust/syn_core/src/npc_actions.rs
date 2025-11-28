@@ -55,7 +55,9 @@ pub struct NpcActionEffect {
 /// A fully chosen action instance for a specific NPC this tick.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NpcActionInstance {
+    /// ID of the NPC performing this action.
     pub npc_id: NpcId,
+    /// Type of action being performed.
     pub kind: NpcActionKind,
     /// True if this action is directed toward the player as target.
     pub targets_player: bool,

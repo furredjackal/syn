@@ -325,6 +325,10 @@ pub struct StoryletPrerequisites {
     /// Optional time/location gating aligned with NPC schedule.
     #[serde(default)]
     pub time_and_location: Option<TimeAndLocationPrereqs>,
+
+    /// Skill requirements for this storylet.
+    #[serde(default)]
+    pub skill_requirements: Vec<SkillRequirement>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -375,6 +379,57 @@ pub struct GlobalWorldStateFlag {
     pub flag: String,
     #[serde(default)]
     pub value: bool,
+}
+
+/// Skill requirement for storylet eligibility.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SkillRequirement {
+    /// Skill ID that must be learned (e.g., "programming", "cooking")
+    #[serde(default)]
+    pub skill_id: String,
+    /// Minimum tier required (0=Novice, 1=Beginner, 2=Intermediate, 3=Advanced, 4=Expert, 5=Master)
+    #[serde(default)]
+    pub min_tier: Option<u8>,
+    /// Minimum XP required (alternative to tier)
+    #[serde(default)]
+    pub min_xp: Option<u32>,
+    /// Maximum tier allowed (for beginner-only content)
+    #[serde(default)]
+    pub max_tier: Option<u8>,
+}
+
+impl SkillRequirement {
+    /// Check if player skills meet this requirement.
+    pub fn is_met(&self, player_skills: &syn_core::skills::SkillState) -> bool {
+        use syn_core::skills::SkillId;
+        
+        let skill_id = SkillId::new(&self.skill_id);
+        let tier = player_skills.get_tier(&skill_id);
+        let xp = player_skills.get_xp(&skill_id);
+
+        // Check minimum tier
+        if let Some(min_tier) = self.min_tier {
+            if tier.as_level() < min_tier {
+                return false;
+            }
+        }
+
+        // Check minimum XP
+        if let Some(min_xp) = self.min_xp {
+            if xp < min_xp {
+                return false;
+            }
+        }
+
+        // Check maximum tier
+        if let Some(max_tier) = self.max_tier {
+            if tier.as_level() > max_tier {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 impl StoryletPrerequisites {
@@ -1832,6 +1887,12 @@ pub fn apply_storylet_outcome_with_memory(
     if !outcome.relationship_deltas.is_empty() {
         update_relationship_pressure_flags(world, &outcome.relationship_deltas);
     }
+
+    // Decay the relationship pressure queue to prevent unbounded growth
+    // Max age: 168 ticks (7 days), Max queue size: 10 events
+    world
+        .relationship_pressure
+        .decay_queue(current_tick.0, 168, 10);
 }
 
 pub fn next_hot_relationship(world: &mut WorldState) -> Option<RelationshipPressureEvent> {

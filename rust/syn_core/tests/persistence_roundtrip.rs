@@ -54,7 +54,7 @@ fn init_world_with_basic_state() -> WorldState {
     });
 
     world.district_state.insert("Downtown".into(), "ok".into());
-    world.world_flags.insert("int_flag".into(), true);
+    world.world_flags.set_any("int_flag");
     world.known_npcs.push(NpcId(2));
 
     world

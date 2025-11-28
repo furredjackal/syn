@@ -47,14 +47,20 @@ pub enum BehaviorKind {
 /// Intensity for each need.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct NeedVector {
+    /// Desire for connection and validation.
     pub social: f32,
+    /// Desire for safety and financial stability.
     pub security: f32,
+    /// Desire for status and praise.
     pub recognition: f32,
+    /// Desire for physical/mental ease.
     pub comfort: f32,
+    /// Desire for control and independence.
     pub autonomy: f32,
 }
 
 impl NeedVector {
+    /// Get the intensity of a specific need.
     pub fn get(&self, kind: NeedKind) -> f32 {
         match kind {
             NeedKind::Social => self.social,
@@ -65,6 +71,7 @@ impl NeedVector {
         }
     }
 
+    /// Set the intensity of a specific need (clamped to 0.0-1.5).
     pub fn set(&mut self, kind: NeedKind, value: f32) {
         let v = value.clamp(0.0, 1.5); // allow some overshoot, but bounded
         match kind {
@@ -80,18 +87,23 @@ impl NeedVector {
 /// A single behavior choice with a utility score used for comparison.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehaviorIntent {
+    /// High-level behavior category.
     pub kind: BehaviorKind,
+    /// Utility score for this behavior (higher = more desirable).
     pub utility: f32,
 }
 
 /// Short-lived snapshot: what this NPC is currently leaning toward.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehaviorSnapshot {
+    /// Current need intensities.
     pub needs: NeedVector,
+    /// The chosen behavioral intent.
     pub chosen_intent: BehaviorIntent,
-    /// Target actor if any (player or another NPC).
+    /// True if target is the player.
     #[serde(default)]
     pub target_player: bool,
+    /// Target NPC ID if not player.
     #[serde(default)]
     pub target_npc_id: Option<NpcId>,
 }

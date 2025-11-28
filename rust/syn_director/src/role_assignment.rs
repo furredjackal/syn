@@ -18,6 +18,7 @@ use syn_core::{
 use syn_storylets::library::{CompiledStorylet, StoryletKey};
 
 use crate::eligibility::EligibilityContext;
+use syn_memory::MemorySystem;
 
 /// Result of assigning actors to storylet roles.
 #[derive(Debug, Clone)]
@@ -39,10 +40,17 @@ pub struct RoleCandidate {
 
 /// Role assignment engine for deterministic narrative casting.
 ///
-/// Generic over a world state reference to avoid tightly coupling to WorldState structure.
+/// Uses multi-factor scoring based on:
+/// - Relationship vectors (affection, trust, resentment, attraction)
+/// - NPC memories (tags like "betrayal", "support", "jealousy" boost role affinity)
+/// - NPC traits/personality
+/// - Current mood
+///
+/// All scoring is deterministic, using seeded RNG derived from world seed, tick, storylet,
+/// and role name to ensure reproducible casting decisions.
 pub struct RoleAssignmentEngine<'a> {
     world: &'a WorldState,
-    memory: &'a syn_memory::MemorySystem,
+    memory: &'a MemorySystem,
     current_tick: SimTick,
 }
 
@@ -245,7 +253,113 @@ impl<'a> RoleAssignmentEngine<'a> {
         // For now, generic boost for presence (can be specialized per role)
         score += self.world.player_stats.get(StatKind::Mood) * 0.1;
 
+        // Memory-aware scoring: NPCs with relevant memory tags score higher for matching roles
+        score += self.compute_memory_score(&normalized_role, actor_id);
+
         score
+    }
+
+    /// Compute memory-based score contribution for an actor in a role.
+    ///
+    /// Maps memory tags to role affinities. For example:
+    /// - "betrayal" → boosts "accuser", "rival", "antagonist" scores
+    /// - "support" → boosts "friend", "ally", "mentor" scores
+    /// - "jealousy" → boosts "rival", "antagonist" scores
+    /// - "confession" → boosts "romance", "love_interest" scores
+    ///
+    /// Only considers memories between the player and the candidate NPC.
+    fn compute_memory_score(&self, normalized_role: &str, actor_id: NpcId) -> f32 {
+        let player_id = self.world.player_id.0;
+        let actor_id_raw = actor_id.0;
+
+        // Get the NPC's journal if it exists
+        let Some(journal) = self.memory.get_journal(actor_id) else {
+            return 0.0;
+        };
+
+        // Only consider memories involving both player and this NPC
+        let relevant_memories: Vec<_> = journal
+            .entries
+            .iter()
+            .filter(|m| {
+                m.participants.contains(&player_id) && m.participants.contains(&actor_id_raw)
+            })
+            .collect();
+
+        if relevant_memories.is_empty() {
+            return 0.0;
+        }
+
+        let mut memory_score = 0.0;
+
+        // Define role-tag affinity mappings
+        // Each (role_pattern, positive_tags, negative_tags)
+        let role_affinities: &[(&str, &[&str], &[&str])] = &[
+            // Antagonistic roles: boosted by betrayal, jealousy, conflict, resentment
+            ("rival", &["betrayal", "jealousy", "conflict", "resentment", "argument"], &["support", "reconciliation"]),
+            ("antagonist", &["betrayal", "jealousy", "conflict", "resentment", "trauma"], &["support", "reconciliation"]),
+            ("accuser", &["betrayal", "witness", "caught", "scandal"], &["forgiveness"]),
+            
+            // Friendly roles: boosted by support, help, shared experiences
+            ("friend", &["support", "help", "shared_moment", "trust", "bonding"], &["betrayal", "conflict"]),
+            ("ally", &["support", "teamwork", "loyalty", "trust"], &["betrayal", "conflict"]),
+            
+            // Romantic roles: boosted by confession, intimacy, attraction signals
+            ("romance", &["confession", "intimacy", "flirt", "attraction", "date"], &["rejection", "betrayal"]),
+            ("love", &["confession", "intimacy", "attraction", "passion"], &["rejection"]),
+            
+            // Mentor roles: boosted by guidance, teaching moments
+            ("mentor", &["guidance", "advice", "teaching", "wisdom"], &["condescension"]),
+            ("guide", &["guidance", "help", "teaching"], &[]),
+            
+            // Witness/observer roles: anyone who was present at key events
+            ("witness", &["witnessed", "present", "observed", "saw"], &[]),
+            
+            // Confidant: trusted with secrets
+            ("confidant", &["secret", "trust", "confession", "private"], &["betrayal", "gossip"]),
+            
+            // Victim: suffered negative events
+            ("victim", &["trauma", "hurt", "loss", "abuse"], &[]),
+        ];
+
+        // Find matching role affinity
+        for (role_pattern, positive_tags, negative_tags) in role_affinities {
+            if normalized_role.contains(role_pattern) {
+                // Count positive tag matches
+                for memory in &relevant_memories {
+                    let lower_tags: Vec<String> = memory.tags.iter().map(|t| t.to_lowercase()).collect();
+                    
+                    for positive_tag in *positive_tags {
+                        if lower_tags.iter().any(|t| t.contains(positive_tag)) {
+                            // Stronger memories have more impact
+                            let intensity_factor = 1.0 + memory.emotional_intensity.abs();
+                            memory_score += 5.0 * intensity_factor;
+                        }
+                    }
+                    
+                    for negative_tag in *negative_tags {
+                        if lower_tags.iter().any(|t| t.contains(negative_tag)) {
+                            let intensity_factor = 1.0 + memory.emotional_intensity.abs();
+                            memory_score -= 1.5 * intensity_factor;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recency bonus: more recent memories have stronger influence
+        let recency_window = 168u64; // 7 days in ticks (24 ticks/day)
+        let current = self.current_tick.0;
+        for memory in &relevant_memories {
+            let age = current.saturating_sub(memory.sim_tick.0);
+            if age < recency_window {
+                // Scale bonus by recency (newer = stronger)
+                let recency_factor = 1.0 - (age as f32 / recency_window as f32);
+                memory_score += recency_factor * memory.emotional_intensity.abs() * 2.0;
+            }
+        }
+
+        memory_score
     }
 
     /// Deterministically select the best candidate using seeded RNG for tie-breaking.
@@ -552,5 +666,227 @@ mod tests {
         assert_eq!(assignments.mapping.get("primary"), Some(&NpcId(2)));
         // NpcId(3) should be secondary (couldn't reuse NpcId(2))
         assert_eq!(assignments.mapping.get("secondary"), Some(&NpcId(3)));
+    }
+
+    #[test]
+    fn test_memory_boosts_rival_role() {
+        use syn_memory::MemoryEntry;
+
+        // NpcId(2) has neutral relationship but betrayal memory
+        // NpcId(3) has higher resentment but no betrayal memory
+        let mut setup = TestSetup::new()
+            .with_npc_relationship(NpcId(1), NpcId(2), 0.0, 0.0, 0.0, 2.0)  // Low resentment
+            .with_npc_relationship(NpcId(1), NpcId(3), 0.0, 0.0, 0.0, 5.0); // Higher resentment
+
+        // Add betrayal memory for NpcId(2) involving player (NpcId(1))
+        let mut entry = MemoryEntry::new(
+            "mem_betrayal".to_string(),
+            "player_betrayed_npc".to_string(),
+            NpcId(2),
+            SimTick(50),
+            -0.9, // Highly negative emotional intensity
+        );
+        entry.tags = vec!["betrayal".to_string(), "trust_broken".to_string()];
+        entry.participants = vec![1, 2]; // Player (1) and NPC (2)
+        setup.memory.record_memory(entry);
+
+        let engine = RoleAssignmentEngine {
+            world: &setup.world,
+            memory: &setup.memory,
+            current_tick: SimTick(100),
+        };
+
+        let rival_role = RoleSlot {
+            name: "rival".to_string(),
+            required: true,
+            constraints: None,
+        };
+
+        let storylet = make_test_storylet("confrontation", vec![rival_role]);
+
+        let result = engine.assign_roles_for_storylet(&storylet, Some(&[NpcId(2), NpcId(3)]));
+
+        assert!(result.is_some());
+        let assignments = result.unwrap();
+
+        // NpcId(2) should be chosen as rival due to betrayal memory boost
+        // despite NpcId(3) having higher resentment
+        assert_eq!(
+            assignments.mapping.get("rival"),
+            Some(&NpcId(2)),
+            "NPC with betrayal memory should be cast as rival over one with just higher resentment"
+        );
+    }
+
+    #[test]
+    fn test_memory_boosts_friend_role() {
+        use syn_memory::MemoryEntry;
+
+        // NpcId(2) has lower affection but support memories
+        // NpcId(3) has higher affection but no memories
+        let mut setup = TestSetup::new()
+            .with_npc_relationship(NpcId(1), NpcId(2), 3.0, 3.0, 0.0, 0.0)  // Lower affection
+            .with_npc_relationship(NpcId(1), NpcId(3), 6.0, 6.0, 0.0, 0.0); // Higher affection
+
+        // Add support memory for NpcId(2)
+        let mut entry = MemoryEntry::new(
+            "mem_support".to_string(),
+            "npc_helped_player".to_string(),
+            NpcId(2),
+            SimTick(50),
+            0.8, // Positive emotional intensity
+        );
+        entry.tags = vec!["support".to_string(), "help".to_string(), "bonding".to_string()];
+        entry.participants = vec![1, 2];
+        setup.memory.record_memory(entry);
+
+        // Add another support memory to boost further
+        let mut entry2 = MemoryEntry::new(
+            "mem_support2".to_string(),
+            "shared_moment".to_string(),
+            NpcId(2),
+            SimTick(80),
+            0.7,
+        );
+        entry2.tags = vec!["shared_moment".to_string(), "trust".to_string()];
+        entry2.participants = vec![1, 2];
+        setup.memory.record_memory(entry2);
+
+        let engine = RoleAssignmentEngine {
+            world: &setup.world,
+            memory: &setup.memory,
+            current_tick: SimTick(100),
+        };
+
+        let friend_role = RoleSlot {
+            name: "friend".to_string(),
+            required: true,
+            constraints: None,
+        };
+
+        let storylet = make_test_storylet("hangout", vec![friend_role]);
+
+        let result = engine.assign_roles_for_storylet(&storylet, Some(&[NpcId(2), NpcId(3)]));
+
+        assert!(result.is_some());
+        let assignments = result.unwrap();
+
+        // NpcId(2) should be chosen as friend due to support memory boosts
+        assert_eq!(
+            assignments.mapping.get("friend"),
+            Some(&NpcId(2)),
+            "NPC with support memories should be cast as friend over one with just higher affection"
+        );
+    }
+
+    #[test]
+    fn test_memory_recency_bonus() {
+        use syn_memory::MemoryEntry;
+
+        // Both NPCs have equal relationships with moderate resentment (good for rival)
+        // But NpcId(2) has more recent memory
+        let mut setup = TestSetup::new()
+            .with_npc_relationship(NpcId(1), NpcId(2), 0.0, 0.0, 0.0, 4.0) // Moderate resentment
+            .with_npc_relationship(NpcId(1), NpcId(3), 0.0, 0.0, 0.0, 4.0); // Equal resentment
+
+        // Old betrayal memory for NpcId(3) - outside recency window
+        let mut old_entry = MemoryEntry::new(
+            "mem_old".to_string(),
+            "old_betrayal".to_string(),
+            NpcId(3),
+            SimTick(10), // Very old (outside 168 tick window at tick 200)
+            -0.8,
+        );
+        old_entry.tags = vec!["betrayal".to_string()];
+        old_entry.participants = vec![1, 3];
+        setup.memory.record_memory(old_entry);
+
+        // Recent betrayal memory for NpcId(2)
+        let mut recent_entry = MemoryEntry::new(
+            "mem_recent".to_string(),
+            "recent_betrayal".to_string(),
+            NpcId(2),
+            SimTick(195), // Very recent (within 168 tick window at tick 200)
+            -0.8,
+        );
+        recent_entry.tags = vec!["betrayal".to_string()];
+        recent_entry.participants = vec![1, 2];
+        setup.memory.record_memory(recent_entry);
+
+        let engine = RoleAssignmentEngine {
+            world: &setup.world,
+            memory: &setup.memory,
+            current_tick: SimTick(200),
+        };
+
+        let rival_role = RoleSlot {
+            name: "rival".to_string(),
+            required: true,
+            constraints: None,
+        };
+
+        let storylet = make_test_storylet("argument", vec![rival_role]);
+
+        let result = engine.assign_roles_for_storylet(&storylet, Some(&[NpcId(2), NpcId(3)]));
+
+        assert!(result.is_some());
+        let assignments = result.unwrap();
+
+        // NpcId(2) should be preferred due to recency bonus
+        assert_eq!(
+            assignments.mapping.get("rival"),
+            Some(&NpcId(2)),
+            "NPC with more recent betrayal memory should score higher for rival role"
+        );
+    }
+
+    #[test]
+    fn test_memory_irrelevant_to_wrong_role() {
+        use syn_memory::MemoryEntry;
+
+        // NpcId(2) has betrayal memory (good for rival, irrelevant for romance)
+        // NpcId(3) has higher attraction
+        let mut setup = TestSetup::new()
+            .with_npc_relationship(NpcId(1), NpcId(2), 5.0, 5.0, 3.0, 0.0)  // Lower attraction
+            .with_npc_relationship(NpcId(1), NpcId(3), 5.0, 5.0, 7.0, 0.0); // Higher attraction
+
+        // Betrayal memory for NpcId(2) - irrelevant for romance role
+        let mut entry = MemoryEntry::new(
+            "mem_betrayal".to_string(),
+            "betrayal".to_string(),
+            NpcId(2),
+            SimTick(50),
+            -0.9,
+        );
+        entry.tags = vec!["betrayal".to_string()];
+        entry.participants = vec![1, 2];
+        setup.memory.record_memory(entry);
+
+        let engine = RoleAssignmentEngine {
+            world: &setup.world,
+            memory: &setup.memory,
+            current_tick: SimTick(100),
+        };
+
+        let romance_role = RoleSlot {
+            name: "romance_interest".to_string(),
+            required: true,
+            constraints: None,
+        };
+
+        let storylet = make_test_storylet("date", vec![romance_role]);
+
+        let result = engine.assign_roles_for_storylet(&storylet, Some(&[NpcId(2), NpcId(3)]));
+
+        assert!(result.is_some());
+        let assignments = result.unwrap();
+
+        // NpcId(3) should be chosen - betrayal memory doesn't help romance role
+        // and NpcId(3) has higher attraction
+        assert_eq!(
+            assignments.mapping.get("romance_interest"),
+            Some(&NpcId(3)),
+            "Betrayal memory should not boost romance role - higher attraction NPC should win"
+        );
     }
 }

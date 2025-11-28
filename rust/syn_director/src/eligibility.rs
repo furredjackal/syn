@@ -283,14 +283,14 @@ impl<'a, S: StoryletSource> EligibilityEngine<'a, S> {
         
         // Check recession flag if specified (from world_flags)
         if let Some(true) = world_prereqs.recession_active {
-            if !ctx.world.world_flags.get("recession_active").copied().unwrap_or(false) {
+            if !ctx.world.world_flags.has_any("recession_active") {
                 return false;
             }
         }
         
         // Check black swan event if specified (from world_flags)
         if let Some(ref black_swan_id) = world_prereqs.required_black_swan_id {
-            if !ctx.world.world_flags.get(black_swan_id).copied().unwrap_or(false) {
+            if !ctx.world.world_flags.has_any(black_swan_id) {
                 return false;
             }
         }
@@ -311,14 +311,14 @@ impl<'a, S: StoryletSource> EligibilityEngine<'a, S> {
     fn check_flag_conditions(&self, flags: &GlobalFlags, ctx: &EligibilityContext) -> bool {
         // All must_be_set flags must be true
         for flag in &flags.must_be_set {
-            if !ctx.world.world_flags.get(flag).copied().unwrap_or(false) {
+            if !ctx.world.world_flags.has_any(flag) {
                 return false;
             }
         }
         
         // All must_be_unset flags must be false
         for flag in &flags.must_be_unset {
-            if ctx.world.world_flags.get(flag).copied().unwrap_or(false) {
+            if ctx.world.world_flags.has_any(flag) {
                 return false;
             }
         }

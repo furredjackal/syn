@@ -12,6 +12,77 @@ members = [
 ]
 resolver = "2"
 
+# ============================================================================
+# Bleeding-Edge Stable: Workspace-wide settings for performance & safety
+# ============================================================================
+
+[workspace.lints.rust]
+# Safety guarantees
+unsafe_code = "deny"
+# Code quality
+missing_docs = "allow"
+rust_2024_compatibility = "warn"
+# Future-proofing
+keyword_idents = "warn"
+non_ascii_idents = "warn"
+# Performance traps
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+# Performance
+large_enum_variant = "warn"
+unnecessary_box_returns = "warn"
+inefficient_to_string = "warn"
+manual_memcpy = "warn"
+# Correctness
+float_cmp = "warn"
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
+# Style (bleeding edge clean code)
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+
 [workspace.dependencies]
+# Time handling
 chrono = { version = "=0.4.34", default-features = false, features = ["clock", "serde"] }
 time = { version = "0.3.36", features = ["macros", "serde"] }
+
+# Bleeding-edge stable crates
+rustc-hash = "2.0"          # FxHashMap - fastest stable hasher
+ahash = "0.8"               # Alternative fast hasher with DOS resistance
+smallvec = "1.13"           # Stack-allocated small vectors
+compact_str = "0.8"         # Inline small strings (no heap for <=24 chars)
+arrayvec = "0.7"            # Fixed-capacity stack vectors
+bumpalo = "3.16"            # Arena allocator for hot paths
+parking_lot = "0.12"        # Faster Mutex/RwLock than std
+thiserror = "2.0"           # Zero-cost error handling
+derive_more = "1.0"         # Reduce boilerplate derives
+
+# Serialization (fast)
+serde = { version = "1.0", features = ["derive", "rc"] }
+rkyv = "0.8"                # Zero-copy deserialization
+
+# Testing & Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.5"            # Property-based testing
+
+[profile.release]
+lto = "thin"                # Link-time optimization (fast builds, good perf)
+codegen-units = 1           # Better optimization
+panic = "abort"             # Smaller binary, faster panics
+strip = true                # Strip symbols
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true                # For profiling
+
+[profile.dev]
+opt-level = 1               # Faster dev builds with some optimization
+debug = true
+
+[profile.bench]
+inherits = "release"
+debug = true                # Symbols for flamegraph

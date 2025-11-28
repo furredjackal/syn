@@ -9,28 +9,42 @@ use crate::{LifeStage, Stats};
 /// High-level role tags for NPCs used by Director/systems.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NpcRoleTag {
+    /// Family member (parent, sibling, etc.).
     Family,
+    /// Same-age peer (classmate, friend).
     Peer,
+    /// Work colleague.
     Coworker,
+    /// Authority figure (teacher, boss, police).
     Authority,
+    /// Potential or current romantic interest.
     RomanticInterest,
+    /// Conflict source (bully, rival).
     Antagonist,
+    /// Guidance provider (coach, mentor).
     Mentor,
-    Background, // low-impact filler
+    /// Low-impact background NPC.
+    Background,
 }
 
 /// Personality vector (GDD-aligned axes).
 /// Keep it small and deterministic.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct PersonalityVector {
-    pub warmth: f32,            // -1.0 (cold) .. 1.0 (warm)
-    pub dominance: f32,         // -1.0 (submissive) .. 1.0 (dominant)
-    pub volatility: f32,        // -1.0 (stable) .. 1.0 (explosive)
-    pub conscientiousness: f32, // 0.0 .. 1.0
-    pub openness: f32,          // 0.0 .. 1.0
+    /// Cold (-1) to warm (+1).
+    pub warmth: f32,
+    /// Submissive (-1) to dominant (+1).
+    pub dominance: f32,
+    /// Stable (-1) to explosive (+1).
+    pub volatility: f32,
+    /// Careless (0) to diligent (1).
+    pub conscientiousness: f32,
+    /// Closed (0) to open (1).
+    pub openness: f32,
 }
 
 impl PersonalityVector {
+    /// Clamp all axes to valid ranges.
     pub fn clamp(&mut self) {
         let clamp01 = |v: &mut f32| {
             if *v < 0.0 {
@@ -48,10 +62,12 @@ impl PersonalityVector {
     }
 }
 
-/// “Definition” of an NPC type: how they should be initialized.
+/// "Definition" of an NPC type: how they should be initialized.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NpcPrototype {
+    /// Unique NPC identifier.
     pub id: NpcId,
+    /// Display name shown in UI.
     pub display_name: String,
 
     /// Optional narrative label: "Your Childhood Friend", etc.
@@ -80,19 +96,28 @@ pub struct NpcPrototype {
 /// High-level activity type for schedule and presence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NpcActivityKind {
+    /// At home.
     Home,
+    /// At work.
     Work,
+    /// At school.
     School,
+    /// Out at night (bar, club, party).
     Nightlife,
+    /// Running errands.
     Errands,
+    /// Only available online.
     OnlineOnly,
+    /// Not available for interaction.
     Offscreen,
 }
 
 /// One day-phase schedule slot.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NpcScheduleSlot {
+    /// Which time of day.
     pub phase: DayPhase,
+    /// What they're doing.
     pub activity: NpcActivityKind,
 }
 
@@ -117,6 +142,7 @@ impl NpcSchedule {
 }
 
 impl NpcPrototype {
+    /// Set a default work schedule (work morning/afternoon, home evening/night).
     pub fn with_default_work_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![
@@ -141,6 +167,7 @@ impl NpcPrototype {
         self
     }
 
+    /// Set a default school schedule (school morning/afternoon, home evening/night).
     pub fn with_default_school_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![
@@ -165,6 +192,7 @@ impl NpcPrototype {
         self
     }
 
+    /// Set a default nightlife schedule (home morning, errands afternoon, nightlife evening/night).
     pub fn with_default_nightlife_schedule(mut self) -> Self {
         self.schedule = NpcSchedule {
             daily_slots: vec![

@@ -451,7 +451,7 @@ impl Persistence {
             serde_json::from_str(&row.memory_entries).map_err(|_| rusqlite::Error::InvalidQuery)?;
         let district_state: HashMap<String, String> =
             serde_json::from_str(&row.district_state).map_err(|_| rusqlite::Error::InvalidQuery)?;
-        let world_flags: HashMap<String, bool> =
+        let world_flags: crate::world_flags::WorldFlags =
             serde_json::from_str(&row.world_flags).map_err(|_| rusqlite::Error::InvalidQuery)?;
         let relationships_pairs: Vec<((u64, u64), Relationship)> =
             serde_json::from_str(&row.relationships).map_err(|_| rusqlite::Error::InvalidQuery)?;
@@ -510,6 +510,11 @@ impl Persistence {
             storylet_usage,
             memory_entries,
             district_state,
+            districts: crate::district::DistrictRegistry::generate_default_city(seed.0),
+            player_skills: crate::skills::PlayerSkills::default(),
+            gossip: crate::gossip::GossipSystem::default(),
+            population: crate::population::PopulationSimulation::default(),
+            failure_recovery: crate::failure_recovery::FailureRecoverySystem::default(),
             world_flags,
         };
 
@@ -590,8 +595,11 @@ impl Persistence {
 /// Serialized storylet entry stored in SQLite.
 #[derive(Debug, Clone)]
 pub struct StoryletRecord {
+    /// Unique storylet identifier.
     pub id: String,
+    /// Display name for the storylet.
     pub name: String,
+    /// Full JSON data for the storylet.
     pub json_data: String,
 }
 
@@ -684,9 +692,7 @@ mod tests {
             participants: vec![1, 2],
         });
         world.district_state.insert("Downtown".into(), "ok".into());
-        world
-            .world_flags
-            .insert("met_childhood_friend".into(), true);
+        world.world_flags.set_any("met_childhood_friend");
         let proto = NpcPrototype {
             id: NpcId(2),
             display_name: "Tester".to_string(),
@@ -760,7 +766,7 @@ mod tests {
             loaded.district_state.get("Downtown"),
             Some(&"ok".to_string())
         );
-        assert_eq!(loaded.world_flags.get("met_childhood_friend"), Some(&true));
+        assert!(loaded.world_flags.has_any("met_childhood_friend"));
         let _ = snapshot_json(&loaded);
 
         let _ = fs::remove_file(db_path);
@@ -821,7 +827,7 @@ mod tests {
         storylet_usage: StoryletUsageState,
         memory_entries: Vec<crate::types::MemoryEntryRecord>,
         district_state: HashMap<String, String>,
-        world_flags: HashMap<String, bool>,
+        world_flags: crate::world_flags::WorldFlags,
     }
 
     impl WorldStateJsonSnapshot {
@@ -1053,7 +1059,7 @@ mod tests {
 
         // District/world state
         world.district_state.insert("Downtown".into(), "ok".into());
-        world.world_flags.insert("flag_test".into(), true);
+        world.world_flags.set_any("flag_test");
         world.known_npcs.push(NpcId(2));
 
         // Digital legacy sample

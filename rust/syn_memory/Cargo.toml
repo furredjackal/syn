@@ -3,6 +3,9 @@ name = "syn_memory"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 syn_core = { path = "../syn_core" }
