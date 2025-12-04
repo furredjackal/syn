@@ -74,7 +74,7 @@ fn sample_storylet() -> Storylet {
 #[test]
 fn api_flow_returns_events() {
     let world = WorldState::new(WorldSeed(5), NpcId(1));
-    let sim = SimState::new();
+    let sim = SimState::new_for_test();
     let library = StoryletLibrary::from_storylets(vec![sample_storylet()]);
 
     api_reset_runtime(world, sim, library);

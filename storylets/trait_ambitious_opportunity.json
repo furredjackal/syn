@@ -1,0 +1,84 @@
+{
+  "id": "trait_ambitious_opportunity",
+  "name": "Climbing Higher",
+  "description": "Your ambition spots a chance to advance that others overlook or fear.",
+  "tags": ["ambition", "career", "opportunity", "advancement", "drive"],
+  "prerequisites": {
+    "player_prereqs": {
+      "min_age": 20,
+      "mood_range": null,
+      "required_stats": null,
+      "forbidden_stats": null
+    },
+    "npc_prereqs": [],
+    "relationship_prereqs": [],
+    "world_prereqs": {
+      "required_flags": [],
+      "forbidden_flags": [],
+      "required_tick_range": null,
+      "required_day_phase": null,
+      "required_life_stage": null,
+      "required_district_state": null,
+      "required_black_swan_id": null
+    },
+    "trait_thresholds": [
+      { "trait_name": "ambition", "min": 70.0, "max": null }
+    ],
+    "district_conditions": [],
+    "digital_legacy_prereq": null
+  },
+  "heat": 4.0,
+  "weight": 1.1,
+  "outcomes": {
+    "base_heat_delta": 2.0,
+    "heat_category": "Medium",
+    "choices": [
+      {
+        "id": "seize_it",
+        "label": "Make your move",
+        "description": "This is your moment. You've been preparing for this.",
+        "stat_deltas": [
+          { "stat": "wealth", "delta": 30.0 },
+          { "stat": "stress", "delta": 15.0 },
+          { "stat": "reputation", "delta": 10.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["made_power_move"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "seized_opportunity"
+      },
+      {
+        "id": "plan_more",
+        "label": "Prepare further",
+        "description": "The timing isn't perfect. Build more foundation first.",
+        "stat_deltas": [
+          { "stat": "intelligence", "delta": 3.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": [],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "strategic_patience"
+      },
+      {
+        "id": "collaborate",
+        "label": "Find allies first",
+        "description": "You can't do this alone. Build your coalition.",
+        "stat_deltas": [
+          { "stat": "charisma", "delta": 3.0 },
+          { "stat": "stress", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["building_alliance"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "coalition_building"
+      }
+    ]
+  },
+  "roles": [],
+  "cooldown_ticks": 600,
+  "once_per_lifetime": false,
+  "domain": "Career"
+}

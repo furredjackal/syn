@@ -1,0 +1,116 @@
+{
+  "id": "gossip_betrayal_discovery",
+  "name": "Betrayal Discovery",
+  "description": "You discover that someone you trusted has been spreading rumors about you.",
+  "tags": ["betrayal", "trust", "gossip", "relationship", "conflict", "drama"],
+  "prerequisites": {
+    "player_prereqs": {
+      "min_age": 14,
+      "mood_range": null,
+      "required_stats": null,
+      "forbidden_stats": null
+    },
+    "npc_prereqs": [],
+    "relationship_prereqs": [],
+    "world_prereqs": {
+      "required_flags": [],
+      "forbidden_flags": ["confronted_gossiper"],
+      "required_tick_range": null,
+      "required_day_phase": null,
+      "required_life_stage": null,
+      "required_district_state": null,
+      "required_black_swan_id": null
+    },
+    "district_conditions": [],
+    "digital_legacy_prereq": null
+  },
+  "heat": 7.0,
+  "weight": 1.2,
+  "outcomes": {
+    "base_heat_delta": 6.0,
+    "heat_category": "High",
+    "choices": [
+      {
+        "id": "cut_them_off",
+        "label": "Cut them out of your life",
+        "description": "End the relationship immediately. Trust is broken beyond repair.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 10.0 }
+        ],
+        "relationship_deltas": [
+          { "role": "betrayer", "axis": "trust", "delta": -8.0 },
+          { "role": "betrayer", "axis": "affection", "delta": -5.0 },
+          { "role": "betrayer", "axis": "resentment", "delta": 6.0 }
+        ],
+        "flags_to_set": ["ended_relationship_over_gossip"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "betrayal_cut_off"
+      },
+      {
+        "id": "demand_explanation",
+        "label": "Demand an explanation",
+        "description": "Confront them and ask why they did this.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 5.0 }
+        ],
+        "relationship_deltas": [
+          { "role": "betrayer", "axis": "trust", "delta": -3.0 }
+        ],
+        "flags_to_set": ["confronted_betrayer"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "demanded_explanation"
+      },
+      {
+        "id": "forgive_them",
+        "label": "Choose forgiveness",
+        "description": "Everyone makes mistakes. Give them another chance.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": -5.0 },
+          { "stat": "karma", "delta": 5.0 }
+        ],
+        "relationship_deltas": [
+          { "role": "betrayer", "axis": "trust", "delta": -2.0 },
+          { "role": "betrayer", "axis": "affection", "delta": 1.0 }
+        ],
+        "flags_to_set": ["forgave_gossiper"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "forgiveness"
+      },
+      {
+        "id": "plot_revenge",
+        "label": "Plan your revenge",
+        "description": "They'll regret crossing you. Two can play this game.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 8.0 },
+          { "stat": "karma", "delta": -10.0 }
+        ],
+        "relationship_deltas": [
+          { "role": "betrayer", "axis": "resentment", "delta": 8.0 }
+        ],
+        "flags_to_set": ["planning_revenge"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "revenge_plotting"
+      }
+    ]
+  },
+  "roles": [
+    {
+      "id": "betrayer",
+      "description": "The person who betrayed your trust by spreading rumors",
+      "required_tags": ["betrayal", "gossip"],
+      "preferred_tags": ["rivalry", "jealousy"],
+      "forbidden_tags": ["loyal", "trustworthy"],
+      "relationship_requirements": {
+        "min_familiarity": 3.0,
+        "max_trust": 7.0
+      }
+    }
+  ],
+  "cooldown_ticks": 1440,
+  "once_per_lifetime": false,
+  "domain": "Conflict"
+}

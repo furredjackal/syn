@@ -1,0 +1,84 @@
+{
+  "id": "trait_high_empathy_help",
+  "name": "Someone Needs You",
+  "description": "Your empathetic nature picks up on someone's distress that others miss.",
+  "tags": ["empathy", "help", "social", "kindness", "connection"],
+  "prerequisites": {
+    "player_prereqs": {
+      "min_age": 10,
+      "mood_range": null,
+      "required_stats": null,
+      "forbidden_stats": null
+    },
+    "npc_prereqs": [],
+    "relationship_prereqs": [],
+    "world_prereqs": {
+      "required_flags": [],
+      "forbidden_flags": [],
+      "required_tick_range": null,
+      "required_day_phase": null,
+      "required_life_stage": null,
+      "required_district_state": null,
+      "required_black_swan_id": null
+    },
+    "trait_thresholds": [
+      { "trait_name": "empathy", "min": 70.0, "max": null }
+    ],
+    "district_conditions": [],
+    "digital_legacy_prereq": null
+  },
+  "heat": 3.0,
+  "weight": 1.0,
+  "outcomes": {
+    "base_heat_delta": 2.0,
+    "heat_category": "Low",
+    "choices": [
+      {
+        "id": "offer_help",
+        "label": "Reach out to them",
+        "description": "Ask if they're okay. Sometimes that's all someone needs.",
+        "stat_deltas": [
+          { "stat": "karma", "delta": 5.0 },
+          { "stat": "stress", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["helped_stranger"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "helped_someone"
+      },
+      {
+        "id": "observe",
+        "label": "Keep watching quietly",
+        "description": "You sense they need space more than intervention.",
+        "stat_deltas": [
+          { "stat": "karma", "delta": 1.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": [],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "quiet_observation"
+      },
+      {
+        "id": "get_involved",
+        "label": "Take action on their behalf",
+        "description": "They need more than words - you step in directly.",
+        "stat_deltas": [
+          { "stat": "karma", "delta": 10.0 },
+          { "stat": "stress", "delta": 10.0 },
+          { "stat": "reputation", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["intervened_for_stranger"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "direct_intervention"
+      }
+    ]
+  },
+  "roles": [],
+  "cooldown_ticks": 360,
+  "once_per_lifetime": false,
+  "domain": "Social"
+}

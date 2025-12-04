@@ -1,0 +1,54 @@
+{
+  "id": "relationship_romantic_confession",
+  "name": "The Moment of Truth",
+  "description": "Your feelings have grown too strong to ignore. It's time to confess.",
+  "tags": ["romance", "confession", "emotional", "relationship"],
+  "domain": "Romance",
+  "life_stage": "Teen",
+  "heat": 6,
+  "weight": 0.8,
+  "roles": [
+    { "name": "protagonist", "required": true },
+    { "name": "love_interest", "required": true }
+  ],
+  "prerequisites": {
+    "relationship_prerequisites": [
+      {
+        "from_role": "protagonist",
+        "to_role": "love_interest",
+        "thresholds": [
+          { "axis": "attraction", "min": 5.0 },
+          { "axis": "affection", "min": 4.0 },
+          { "axis": "resentment", "max": 2.0 }
+        ]
+      }
+    ]
+  },
+  "cooldowns": {
+    "global_cooldown_ticks": 720,
+    "per_actor_cooldown_ticks": 2160
+  },
+  "outcomes": {
+    "choices": [
+      {
+        "id": "confess_feelings",
+        "label": "Tell them how you feel",
+        "stat_deltas": [
+          { "stat": "mood", "delta": -1.0 }
+        ],
+        "relationship_deltas": [
+          { "axis": "Attraction", "delta": 1.0 },
+          { "axis": "Familiarity", "delta": 1.0 }
+        ],
+        "memory_tags": ["confession", "vulnerability", "romantic_risk"]
+      },
+      {
+        "id": "hold_back",
+        "label": "Not yet... wait for a better moment",
+        "stat_deltas": [],
+        "relationship_deltas": [],
+        "memory_tags": ["hesitation", "unspoken_feelings"]
+      }
+    ]
+  }
+}

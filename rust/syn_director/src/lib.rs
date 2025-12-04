@@ -37,6 +37,8 @@ use syn_core::{
         ResentmentBand, TrustBand,
     },
     relationship_pressure::{RelationshipEventKind, RelationshipPressureEvent},
+    district_pressure::DistrictPressureEvent,
+    gossip_pressure::{GossipEventKind, GossipPressureEvent},
     LifeStage, NpcId, RelationshipAxis as CoreRelationshipAxis, RelationshipState, SimTick, StatDelta, StoryletUsageState, WorldState,
 };
 use syn_memory::{MemoryEntry, MemorySystem};
@@ -1051,6 +1053,102 @@ fn digital_legacy_score_multiplier(world: &WorldState, pre: &Option<DigitalLegac
     }
 }
 
+/// Check if a storylet's tags match any district pressure event tags.
+fn storylet_matches_district_pressure(
+    storylet: &Storylet,
+    event: &DistrictPressureEvent,
+) -> bool {
+    let event_tags = event.kind.tags();
+    // Convert event tags to a bitset and check for overlap
+    let event_bitset = TagBitset::from_tags_slice(
+        &event_tags.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+    );
+    storylet.tags.matches(&event_bitset)
+}
+
+/// Score bonus from district pressure events.
+///
+/// Returns a bonus if the storylet:
+/// 1. Has district_conditions matching a district with pending pressure events (+30)
+/// 2. Has tags matching the pressure event type (+20)
+fn score_district_pressure_bonus(
+    world: &WorldState,
+    storylet: &Storylet,
+) -> f32 {
+    let pre = &storylet.prerequisites;
+    let mut bonus = 0.0;
+
+    // Check if storylet has district conditions
+    for dc in &pre.district_conditions {
+        // Find matching pressure events for this district
+        for event in world.district_pressure.queue.iter() {
+            if event.district_name == dc.district {
+                // District match bonus
+                bonus += 30.0;
+                // Tag match bonus (additional if storylet tags match pressure type)
+                if storylet_matches_district_pressure(storylet, event) {
+                    bonus += 20.0;
+                }
+                break; // Only one bonus per district condition
+            }
+        }
+    }
+
+    // Also check storylet tags for general crisis/prosperity themes
+    if bonus == 0.0 && !world.district_pressure.queue.is_empty() {
+        for event in world.district_pressure.queue.iter() {
+            if storylet_matches_district_pressure(storylet, event) {
+                bonus += 15.0;
+                break;
+            }
+        }
+    }
+
+    bonus
+}
+
+/// Check if a storylet's tags match any gossip pressure event tags.
+fn storylet_matches_gossip_pressure(
+    storylet: &Storylet,
+    event: &GossipPressureEvent,
+) -> bool {
+    let event_tags = event.kind.tags();
+    // Convert event tags to a bitset and check for overlap
+    let event_bitset = TagBitset::from_tags_slice(
+        &event_tags.iter().map(|s| s.to_string()).collect::<Vec<_>>()
+    );
+    storylet.tags.matches(&event_bitset)
+}
+
+/// Score bonus from gossip pressure events.
+///
+/// Returns a bonus if the storylet has tags matching gossip event types:
+/// - Scandal (+25), Betrayal (+20), Reputation damage (+15), other gossip (+10)
+fn score_gossip_pressure_bonus(
+    world: &WorldState,
+    storylet: &Storylet,
+) -> f32 {
+    let mut bonus = 0.0;
+
+    for event in &world.gossip_pressure.events {
+        if storylet_matches_gossip_pressure(storylet, event) {
+            // Scale bonus by event severity and type
+            let type_bonus = match event.kind {
+                GossipEventKind::ScandalCirculating => 25.0,
+                GossipEventKind::BetrayalGossip => 20.0,
+                GossipEventKind::ReputationDamaged => 15.0,
+                GossipEventKind::SocialExclusion => 12.0,
+                GossipEventKind::NegativeRumorSpreading => 10.0,
+                GossipEventKind::PositiveBuzz => 5.0,
+            };
+            bonus += type_bonus * event.severity;
+        }
+    }
+
+    // Cap total gossip bonus to prevent overwhelming other factors
+    bonus.min(50.0)
+}
+
 fn score_storylet_full(
     director: &EventDirector,
     world: &WorldState,
@@ -1063,7 +1161,10 @@ fn score_storylet_full(
     let stage_mult = life_stage_score_multiplier(world, &storylet.prerequisites);
     let legacy_mult =
         digital_legacy_score_multiplier(world, &storylet.prerequisites.digital_legacy_prereq);
-    let mut score = base * heat_mult * stage_mult * legacy_mult;
+    // Pressure bonuses (additive)
+    let district_bonus = score_district_pressure_bonus(world, storylet);
+    let gossip_bonus = score_gossip_pressure_bonus(world, storylet);
+    let mut score = base * heat_mult * stage_mult * legacy_mult + district_bonus + gossip_bonus;
     if storylet.outcomes.heat_category.is_some() && !storylet_heat_band_match(heat_band, storylet) {
         score *= 0.5;
     }

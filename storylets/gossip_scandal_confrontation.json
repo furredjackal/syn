@@ -1,0 +1,95 @@
+{
+  "id": "gossip_scandal_confrontation",
+  "name": "Scandal Confrontation",
+  "description": "Rumors have been spreading about you, and now you must face the consequences.",
+  "tags": ["scandal", "gossip", "reputation", "conflict", "social", "drama"],
+  "prerequisites": {
+    "player_prereqs": {
+      "min_age": 16,
+      "mood_range": null,
+      "required_stats": null,
+      "forbidden_stats": null
+    },
+    "npc_prereqs": [],
+    "relationship_prereqs": [],
+    "world_prereqs": {
+      "required_flags": [],
+      "forbidden_flags": [],
+      "required_tick_range": null,
+      "required_day_phase": null,
+      "required_life_stage": null,
+      "required_district_state": null,
+      "required_black_swan_id": null
+    },
+    "district_conditions": [],
+    "digital_legacy_prereq": null
+  },
+  "heat": 8.0,
+  "weight": 1.0,
+  "outcomes": {
+    "base_heat_delta": 5.0,
+    "heat_category": "High",
+    "choices": [
+      {
+        "id": "confront_source",
+        "label": "Confront the source",
+        "description": "Track down whoever started this and demand answers.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 10.0 },
+          { "stat": "reputation", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["confronted_gossiper"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "confronted_rumors"
+      },
+      {
+        "id": "deny_everything",
+        "label": "Deny everything publicly",
+        "description": "Make a public statement denying all rumors.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["denied_scandal"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "public_denial"
+      },
+      {
+        "id": "ignore_it",
+        "label": "Rise above it",
+        "description": "Refuse to dignify the rumors with a response.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": -5.0 },
+          { "stat": "reputation", "delta": -10.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": [],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "ignored_scandal"
+      },
+      {
+        "id": "own_it",
+        "label": "Own your truth",
+        "description": "Acknowledge what's true and face it head-on.",
+        "stat_deltas": [
+          { "stat": "stress", "delta": 15.0 },
+          { "stat": "reputation", "delta": 15.0 },
+          { "stat": "charisma", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["owned_scandal"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "owned_truth"
+      }
+    ]
+  },
+  "roles": [],
+  "cooldown_ticks": 720,
+  "once_per_lifetime": false,
+  "domain": "Social"
+}

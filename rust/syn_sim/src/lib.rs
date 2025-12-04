@@ -920,6 +920,18 @@ impl SimState {
         }
     }
 
+    /// Create a SimState with temporary storage for testing.
+    /// Uses unique paths based on thread ID and timestamp to avoid conflicts.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn new_for_test() -> Self {
+        let storage = init_temp_storage().expect("failed to initialize temp storage");
+        Self {
+            npc_registry: crate::npc_registry::NpcRegistry::default(),
+            population: PopulationStore::default(),
+            storage,
+        }
+    }
+
     pub fn save_active_npc(&self, npc: &StorageNpc) -> Result<(), StorageError> {
         self.storage.save_active(npc)
     }
@@ -979,6 +991,30 @@ fn init_default_storage() -> Result<HybridStorage, StorageError> {
     let _ = fs::create_dir_all(data_dir);
     let hot_path = data_dir.join("hot.redb");
     let cold_path = data_dir.join("world.duckdb");
+    HybridStorage::new(
+        hot_path.to_string_lossy().as_ref(),
+        cold_path.to_string_lossy().as_ref(),
+    )
+}
+
+/// Initialize storage with unique temporary paths for testing.
+#[cfg(any(test, feature = "test-utils"))]
+fn init_temp_storage() -> Result<HybridStorage, StorageError> {
+    use std::time::SystemTime;
+    use std::thread;
+
+    let thread_id = format!("{:?}", thread::current().id());
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    
+    let unique_id = format!("{}_{}", thread_id.replace(|c: char| !c.is_alphanumeric(), "_"), timestamp);
+    let temp_dir = std::env::temp_dir().join(format!("syn_test_{}", unique_id));
+    let _ = fs::create_dir_all(&temp_dir);
+    
+    let hot_path = temp_dir.join("hot.redb");
+    let cold_path = temp_dir.join("world.duckdb");
     HybridStorage::new(
         hot_path.to_string_lossy().as_ref(),
         cold_path.to_string_lossy().as_ref(),

@@ -1,0 +1,52 @@
+{
+  "id": "relationship_stranger_introduction",
+  "name": "A New Face",
+  "description": "Someone unfamiliar catches your attention. An opportunity to make a new connection.",
+  "tags": ["social", "introduction", "new_connection", "slice_of_life"],
+  "domain": "SliceOfLife",
+  "life_stage": "YoungAdult",
+  "heat": 2,
+  "weight": 1.5,
+  "roles": [
+    { "name": "protagonist", "required": true },
+    { "name": "stranger", "required": true }
+  ],
+  "prerequisites": {
+    "relationship_prerequisites": [
+      {
+        "from_role": "protagonist",
+        "to_role": "stranger",
+        "thresholds": [
+          { "axis": "familiarity", "max": 1.0 }
+        ]
+      }
+    ]
+  },
+  "cooldowns": {
+    "global_cooldown_ticks": 24,
+    "per_actor_cooldown_ticks": 168
+  },
+  "outcomes": {
+    "choices": [
+      {
+        "id": "introduce_yourself",
+        "label": "Introduce yourself",
+        "stat_deltas": [],
+        "relationship_deltas": [
+          { "axis": "Familiarity", "delta": 2.0 },
+          { "axis": "Affection", "delta": 0.5 }
+        ],
+        "memory_tags": ["first_meeting", "introduction"]
+      },
+      {
+        "id": "observe_quietly",
+        "label": "Observe from a distance",
+        "stat_deltas": [],
+        "relationship_deltas": [
+          { "axis": "Familiarity", "delta": 0.5 }
+        ],
+        "memory_tags": ["observation", "curiosity"]
+      }
+    ]
+  }
+}

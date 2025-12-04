@@ -1,0 +1,83 @@
+{
+  "id": "trait_impulsive_risk",
+  "name": "Risky Opportunity",
+  "description": "Your impulsive nature spots a high-risk, high-reward opportunity that others would pass on.",
+  "tags": ["risk", "impulsivity", "opportunity", "career", "money"],
+  "prerequisites": {
+    "player_prereqs": {
+      "min_age": 18,
+      "mood_range": null,
+      "required_stats": null,
+      "forbidden_stats": null
+    },
+    "npc_prereqs": [],
+    "relationship_prereqs": [],
+    "world_prereqs": {
+      "required_flags": [],
+      "forbidden_flags": [],
+      "required_tick_range": null,
+      "required_day_phase": null,
+      "required_life_stage": null,
+      "required_district_state": null,
+      "required_black_swan_id": null
+    },
+    "trait_thresholds": [
+      { "trait_name": "impulsivity", "min": 65.0, "max": null }
+    ],
+    "district_conditions": [],
+    "digital_legacy_prereq": null
+  },
+  "heat": 5.0,
+  "weight": 1.2,
+  "outcomes": {
+    "base_heat_delta": 3.0,
+    "heat_category": "Medium",
+    "choices": [
+      {
+        "id": "take_the_risk",
+        "label": "Go for it!",
+        "description": "Fortune favors the bold. You dive in headfirst.",
+        "stat_deltas": [
+          { "stat": "wealth", "delta": 50.0 },
+          { "stat": "stress", "delta": 15.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": ["took_major_risk"],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "risky_success"
+      },
+      {
+        "id": "hesitate",
+        "label": "Wait and see",
+        "description": "Maybe this time you should think it through...",
+        "stat_deltas": [
+          { "stat": "stress", "delta": -5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": [],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "hesitation"
+      },
+      {
+        "id": "partial_commit",
+        "label": "Test the waters",
+        "description": "Commit partially - hedge your bets.",
+        "stat_deltas": [
+          { "stat": "wealth", "delta": 20.0 },
+          { "stat": "stress", "delta": 5.0 }
+        ],
+        "relationship_deltas": [],
+        "flags_to_set": [],
+        "flags_to_clear": [],
+        "follow_up_storylet_id": null,
+        "memory_tag": "cautious_risk"
+      }
+    ]
+  },
+  "roles": [],
+  "cooldown_ticks": 720,
+  "once_per_lifetime": false,
+  "domain": "Career"
+}

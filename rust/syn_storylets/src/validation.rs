@@ -693,14 +693,14 @@ pub fn default_storylet_validator() -> StoryletValidator {
         .with_stat_range("reputation", -50.0, 50.0)
         .with_stat_range("energy", 0.0, 100.0)
         .with_stat_range("hunger", 0.0, 100.0)
-        // Default personality traits
-        .with_trait_range("impulsivity", 0.0, 10.0)
-        .with_trait_range("empathy", 0.0, 10.0)
-        .with_trait_range("ambition", 0.0, 10.0)
-        .with_trait_range("resilience", 0.0, 10.0)
-        .with_trait_range("trust", 0.0, 10.0)
-        .with_trait_range("honesty", 0.0, 10.0)
-        .with_trait_range("creativity", 0.0, 10.0)
+        // Default personality traits (per GDD §7.4: all traits are 0-100)
+        .with_trait_range("stability", 0.0, 100.0)
+        .with_trait_range("confidence", 0.0, 100.0)
+        .with_trait_range("sociability", 0.0, 100.0)
+        .with_trait_range("empathy", 0.0, 100.0)
+        .with_trait_range("impulsivity", 0.0, 100.0)
+        .with_trait_range("ambition", 0.0, 100.0)
+        .with_trait_range("charm", 0.0, 100.0)
         // Relationship axes (always -10..=10)
         .with_axes(vec![
             "affection",

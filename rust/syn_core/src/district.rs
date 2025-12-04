@@ -561,6 +561,11 @@ impl DistrictRegistry {
         self.districts.is_empty()
     }
 
+    /// Iterate over all districts.
+    pub fn iter(&self) -> impl Iterator<Item = &District> {
+        self.districts.values()
+    }
+
     /// Tick all districts forward.
     pub fn tick_all(&mut self, rng: &mut DeterministicRng) {
         for district in self.districts.values_mut() {

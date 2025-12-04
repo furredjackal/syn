@@ -57,7 +57,34 @@ impl LifeStage {
     /// Get the configuration for this life stage.
     pub fn config(self) -> LifeStageConfig {
         match self {
-            LifeStage::PreSim | LifeStage::Child => LifeStageConfig {
+            LifeStage::PreSim => LifeStageConfig {
+                stat_profile: LifeStageStatProfile {
+                    mood_weight: 2.0,
+                    health_weight: 1.5,
+                    wealth_weight: 0.0,
+                    charisma_weight: 0.5,
+                    reputation_weight: 0.0,
+                    wisdom_weight: 0.0,
+                },
+                visibility: LifeStageStatVisibility {
+                    show_wealth: false,
+                    show_reputation: false,
+                    show_wisdom: false,
+                    show_karma: false,
+                },
+                heat_config: NarrativeHeatConfig {
+                    base_decay_toward: 10.0,
+                    decay_per_tick: 0.5,
+                    extreme_stat_weight: 1.0,
+                    resentment_weight: 0.5,
+                    economic_stress_weight: 0.0,
+                    trauma_weight: 2.0,
+                    win_weight: 1.0,
+                },
+                min_age: 0,
+                max_age: 5,
+            },
+            LifeStage::Child => LifeStageConfig {
                 stat_profile: LifeStageStatProfile {
                     mood_weight: 2.0,
                     health_weight: 1.5,

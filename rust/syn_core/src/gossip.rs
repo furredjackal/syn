@@ -143,6 +143,12 @@ impl RumorKnowledge {
 /// Result of a gossip spread attempt.
 #[derive(Debug, Clone)]
 pub struct SpreadResult {
+    /// Rumor that was spread
+    pub rumor_id: String,
+    /// Who the rumor is about
+    pub subject_id: NpcId,
+    /// NPC who spread the rumor
+    pub spreader_id: NpcId,
     /// NPC who received the rumor
     pub recipient_id: NpcId,
     /// Whether they accepted/believed it
@@ -440,6 +446,9 @@ impl GossipSystem {
         }
 
         Some(SpreadResult {
+            rumor_id: rumor_id.to_string(),
+            subject_id: rumor.subject_id,
+            spreader_id: spreader.id,
             recipient_id: receiver.id,
             accepted: true,
             belief,
@@ -494,6 +503,72 @@ impl GossipSystem {
 
                     let rel_key = (spreader_id, *receiver_id);
                     let relationship = world.relationships.get(&rel_key);
+
+                    if let Some(result) = self.try_spread_rumor(
+                        spreader,
+                        receiver,
+                        &rumor_id,
+                        relationship,
+                        current_tick,
+                        rng,
+                    ) {
+                        results.push(result);
+                    }
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Simulate gossip spread for one tick using borrowed NPC and relationship data.
+    /// This variant avoids borrowing WorldState, allowing it to be called from WorldState::tick.
+    pub fn tick_spread_with(
+        &mut self,
+        npcs: &HashMap<NpcId, AbstractNpc>,
+        relationships: &HashMap<(NpcId, NpcId), Relationship>,
+        current_tick: u64,
+        rng: &mut DeterministicRng,
+    ) -> Vec<SpreadResult> {
+        let mut results = Vec::new();
+
+        // Collect NPCs who know rumors and might spread them
+        let spreaders: Vec<(NpcId, Vec<String>)> = self
+            .knowledge
+            .iter()
+            .map(|(npc_id, known)| (*npc_id, known.keys().cloned().collect()))
+            .collect();
+
+        for (spreader_id, known_rumors) in spreaders {
+            let spreader = match npcs.get(&spreader_id) {
+                Some(npc) => npc,
+                None => continue,
+            };
+
+            // Skip if not sociable enough
+            if spreader.traits.sociability < 20.0 {
+                continue;
+            }
+
+            for rumor_id in known_rumors {
+                let rumor = match self.rumors.get(&rumor_id) {
+                    Some(r) => r,
+                    None => continue,
+                };
+
+                // Skip stale rumors
+                if !rumor.is_fresh(current_tick, self.config.rumor_decay_ticks) {
+                    continue;
+                }
+
+                // Find potential recipients (NPCs the spreader knows)
+                for (receiver_id, receiver) in npcs {
+                    if *receiver_id == spreader_id {
+                        continue;
+                    }
+
+                    let rel_key = (spreader_id, *receiver_id);
+                    let relationship = relationships.get(&rel_key);
 
                     if let Some(result) = self.try_spread_rumor(
                         spreader,

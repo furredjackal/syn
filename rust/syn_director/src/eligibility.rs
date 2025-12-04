@@ -184,27 +184,136 @@ impl<'a, S: StoryletSource> EligibilityEngine<'a, S> {
         true
     }
 
-    /// Check trait threshold conditions.
+    /// Check trait threshold conditions against the player's personality vector.
     /// 
-    /// Note: This is a stub implementation. In full implementation,
-    /// we would check against a traits/personality system in WorldState.
-    fn check_trait_thresholds(&self, prereqs: &Prerequisites, _ctx: &EligibilityContext) -> bool {
-        if let Some(ref _thresholds) = prereqs.trait_thresholds {
-            // TODO: Implement when personality traits system is available in WorldState
-            // For now, always pass (no traits to check)
+    /// Traits are permanent personality dimensions (stability, confidence, sociability,
+    /// empathy, impulsivity, ambition, charm) ranging from 0-100.
+    fn check_trait_thresholds(&self, prereqs: &Prerequisites, ctx: &EligibilityContext) -> bool {
+        if let Some(ref thresholds) = prereqs.trait_thresholds {
+            // Get the player's traits from their NPC data
+            let player_traits = match ctx.world.npcs.get(&ctx.world.player_id) {
+                Some(npc) => &npc.traits,
+                None => return true, // No player NPC found, pass by default
+            };
+
+            for threshold in thresholds {
+                // Look up the trait value by name
+                let trait_value = match player_traits.get_by_name(&threshold.trait_name) {
+                    Some(v) => v,
+                    None => {
+                        // Unknown trait name - skip this check (validation should catch this earlier)
+                        continue;
+                    }
+                };
+
+                // Check minimum threshold
+                if let Some(min) = threshold.min {
+                    if trait_value < min {
+                        return false;
+                    }
+                }
+
+                // Check maximum threshold
+                if let Some(max) = threshold.max {
+                    if trait_value > max {
+                        return false;
+                    }
+                }
+            }
         }
         true
     }
 
     /// Check relationship prerequisites between NPC roles.
     ///
-    /// Note: This is a stub implementation. Full implementation would:
-    /// - Resolve role assignments (Mentor, Love Interest, etc.) to specific NPCs
-    /// - Check relationship vectors for each pair
-    fn check_relationship_prerequisites(&self, prereqs: &Prerequisites, _ctx: &EligibilityContext) -> bool {
-        if let Some(ref _rel_prereqs) = prereqs.relationship_prerequisites {
-            // TODO: Implement when role assignment system is available
-            // For now, always pass (roles not yet resolved)
+    /// This validates that at least one NPC exists who could satisfy each relationship
+    /// prerequisite. The "protagonist" role is assumed to be the player.
+    ///
+    /// For other roles, we check if any known NPC has a relationship with the player
+    /// that meets the specified thresholds on each axis.
+    fn check_relationship_prerequisites(&self, prereqs: &Prerequisites, ctx: &EligibilityContext) -> bool {
+        let Some(ref rel_prereqs) = prereqs.relationship_prerequisites else {
+            return true;
+        };
+
+        for rel_prereq in rel_prereqs {
+            // Determine the direction: from_role → to_role
+            // "protagonist" or "player" is the player character
+            let from_is_player = rel_prereq.from_role.to_lowercase() == "protagonist" 
+                || rel_prereq.from_role.to_lowercase() == "player";
+            let to_is_player = rel_prereq.to_role.to_lowercase() == "protagonist"
+                || rel_prereq.to_role.to_lowercase() == "player";
+
+            // If both roles are the player, skip (self-relationship)
+            if from_is_player && to_is_player {
+                continue;
+            }
+
+            // Check if at least one known NPC satisfies the relationship thresholds
+            let mut found_valid_candidate = false;
+
+            for &npc_id in &ctx.world.known_npcs {
+                // Skip the player themselves
+                if npc_id == ctx.world.player_id {
+                    continue;
+                }
+
+                // Get relationship in the correct direction
+                let relationship = if from_is_player {
+                    // Player → NPC (player's feelings toward NPC)
+                    ctx.world.get_relationship(ctx.world.player_id, npc_id)
+                } else if to_is_player {
+                    // NPC → Player (NPC's feelings toward player)
+                    ctx.world.get_relationship(npc_id, ctx.world.player_id)
+                } else {
+                    // Both roles are NPCs - we'd need to check NPC→NPC relationships
+                    // For now, if neither role is the player, we can't validate at eligibility time
+                    // This will be handled during full role assignment
+                    found_valid_candidate = true;
+                    break;
+                };
+
+                // Check all thresholds for this relationship
+                if self.relationship_meets_thresholds(&relationship, &rel_prereq.thresholds) {
+                    found_valid_candidate = true;
+                    break;
+                }
+            }
+
+            if !found_valid_candidate {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Check if a relationship meets all the specified axis thresholds.
+    fn relationship_meets_thresholds(
+        &self,
+        relationship: &syn_core::types::Relationship,
+        thresholds: &[syn_storylets::RelationshipThreshold],
+    ) -> bool {
+        for threshold in thresholds {
+            let axis_value = match threshold.axis.to_lowercase().as_str() {
+                "affection" => relationship.affection,
+                "trust" => relationship.trust,
+                "attraction" => relationship.attraction,
+                "familiarity" => relationship.familiarity,
+                "resentment" => relationship.resentment,
+                _ => continue, // Unknown axis, skip
+            };
+
+            if let Some(min) = threshold.min {
+                if axis_value < min {
+                    return false;
+                }
+            }
+            if let Some(max) = threshold.max {
+                if axis_value > max {
+                    return false;
+                }
+            }
         }
         true
     }
@@ -510,5 +619,488 @@ mod tests {
         // Should be eligible since no prerequisites
         let eligible = engine.find_eligible_storylets(&ctx);
         assert_eq!(eligible.len(), 1, "Storylet should be eligible");
+    }
+
+    #[test]
+    fn test_trait_threshold_minimum() {
+        use syn_core::types::{AbstractNpc, AttachmentStyle, Traits};
+        use syn_storylets::TraitThresholds;
+
+        // Create a storylet requiring high impulsivity (min 60)
+        let storylet = CompiledStorylet {
+            id: StoryletId::new("risky_event"),
+            key: StoryletKey(0),
+            name: "Risky Opportunity".to_string(),
+            description: None,
+            tags: vec![],
+            domain: StoryDomain::Career,
+            life_stage: syn_storylets::LifeStage::Adult,
+            heat: 3,
+            weight: 1.0,
+            roles: vec![],
+            prerequisites: Prerequisites {
+                trait_thresholds: Some(vec![
+                    TraitThresholds {
+                        trait_name: "impulsivity".to_string(),
+                        min: Some(60.0),
+                        max: None,
+                    },
+                ]),
+                ..Default::default()
+            },
+            cooldowns: Cooldowns::default(),
+            outcomes: Outcome::default(),
+            follow_ups_resolved: vec![],
+        };
+
+        let source = MockStoryletSource {
+            storylets: vec![storylet],
+        };
+
+        let engine = EligibilityEngine::new(&source);
+        let mut world = WorldState::new(syn_core::WorldSeed(42), NpcId(1));
+        world.player_life_stage = syn_core::LifeStage::Adult;
+        
+        // Create player NPC with LOW impulsivity (30) - should NOT pass
+        let low_impulsivity_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 25,
+            job: "Worker".to_string(),
+            district: "Downtown".to_string(),
+            household_id: 1,
+            traits: Traits {
+                impulsivity: 30.0,
+                ..Default::default()
+            },
+            seed: 42,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(1), low_impulsivity_npc);
+        
+        let memory = MemorySystem::new();
+        let ctx = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        // Should NOT be eligible (impulsivity 30 < required 60)
+        let eligible = engine.find_eligible_storylets(&ctx);
+        assert!(eligible.is_empty(), "Storylet should NOT be eligible with low impulsivity");
+
+        // Now update to HIGH impulsivity (75) - should pass
+        if let Some(npc) = world.npcs.get_mut(&NpcId(1)) {
+            npc.traits.impulsivity = 75.0;
+        }
+
+        let ctx2 = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        let eligible2 = engine.find_eligible_storylets(&ctx2);
+        assert_eq!(eligible2.len(), 1, "Storylet SHOULD be eligible with high impulsivity");
+    }
+
+    #[test]
+    fn test_trait_threshold_maximum() {
+        use syn_core::types::{AbstractNpc, AttachmentStyle, Traits};
+        use syn_storylets::TraitThresholds;
+
+        // Create a storylet requiring LOW stability (max 40)
+        let storylet = CompiledStorylet {
+            id: StoryletId::new("emotional_event"),
+            key: StoryletKey(0),
+            name: "Emotional Outburst".to_string(),
+            description: None,
+            tags: vec![],
+            domain: StoryDomain::SliceOfLife,
+            life_stage: syn_storylets::LifeStage::Teen,
+            heat: 4,
+            weight: 1.0,
+            roles: vec![],
+            prerequisites: Prerequisites {
+                trait_thresholds: Some(vec![
+                    TraitThresholds {
+                        trait_name: "stability".to_string(),
+                        min: None,
+                        max: Some(40.0),
+                    },
+                ]),
+                ..Default::default()
+            },
+            cooldowns: Cooldowns::default(),
+            outcomes: Outcome::default(),
+            follow_ups_resolved: vec![],
+        };
+
+        let source = MockStoryletSource {
+            storylets: vec![storylet],
+        };
+
+        let engine = EligibilityEngine::new(&source);
+        let mut world = WorldState::new(syn_core::WorldSeed(42), NpcId(1));
+        world.player_life_stage = syn_core::LifeStage::Teen;
+        
+        // Create player NPC with HIGH stability (70) - should NOT pass
+        let high_stability_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 15,
+            job: "Student".to_string(),
+            district: "Suburbs".to_string(),
+            household_id: 1,
+            traits: Traits {
+                stability: 70.0,
+                ..Default::default()
+            },
+            seed: 42,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(1), high_stability_npc);
+        
+        let memory = MemorySystem::new();
+        let ctx = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        // Should NOT be eligible (stability 70 > max 40)
+        let eligible = engine.find_eligible_storylets(&ctx);
+        assert!(eligible.is_empty(), "Storylet should NOT be eligible with high stability");
+
+        // Now update to LOW stability (25) - should pass
+        if let Some(npc) = world.npcs.get_mut(&NpcId(1)) {
+            npc.traits.stability = 25.0;
+        }
+
+        let ctx2 = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        let eligible2 = engine.find_eligible_storylets(&ctx2);
+        assert_eq!(eligible2.len(), 1, "Storylet SHOULD be eligible with low stability");
+    }
+
+    #[test]
+    fn test_relationship_prerequisite_high_trust() {
+        use syn_core::types::{AbstractNpc, AttachmentStyle, Traits, Relationship};
+        use syn_storylets::{RelationshipPrerequisites, RelationshipThreshold, RoleSlot};
+
+        // Create a storylet requiring high trust from protagonist to target
+        let storylet = CompiledStorylet {
+            id: StoryletId::new("trust_confession"),
+            key: StoryletKey(0),
+            name: "Heart-to-Heart".to_string(),
+            description: None,
+            tags: vec![],
+            domain: StoryDomain::Friendship,
+            life_stage: syn_storylets::LifeStage::YoungAdult,
+            heat: 4,
+            weight: 1.0,
+            roles: vec![
+                RoleSlot { name: "protagonist".to_string(), required: true, constraints: None },
+                RoleSlot { name: "trusted_friend".to_string(), required: true, constraints: None },
+            ],
+            prerequisites: Prerequisites {
+                relationship_prerequisites: Some(vec![
+                    RelationshipPrerequisites {
+                        from_role: "protagonist".to_string(),
+                        to_role: "trusted_friend".to_string(),
+                        thresholds: vec![
+                            RelationshipThreshold { axis: "trust".to_string(), min: Some(5.0), max: None },
+                        ],
+                    },
+                ]),
+                ..Default::default()
+            },
+            cooldowns: Cooldowns::default(),
+            outcomes: Outcome::default(),
+            follow_ups_resolved: vec![],
+        };
+
+        let source = MockStoryletSource {
+            storylets: vec![storylet],
+        };
+
+        let engine = EligibilityEngine::new(&source);
+        let mut world = WorldState::new(syn_core::WorldSeed(42), NpcId(1));
+        world.player_life_stage = syn_core::LifeStage::YoungAdult;
+        
+        // Create player NPC
+        let player_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 22,
+            job: "Office Worker".to_string(),
+            district: "Downtown".to_string(),
+            household_id: 1,
+            traits: Traits::default(),
+            seed: 42,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(1), player_npc);
+
+        // Create an NPC with LOW trust (2.0) - should NOT satisfy prerequisite
+        let npc2 = AbstractNpc {
+            id: NpcId(2),
+            age: 25,
+            job: "Colleague".to_string(),
+            district: "Downtown".to_string(),
+            household_id: 2,
+            traits: Traits::default(),
+            seed: 43,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(2), npc2);
+        world.known_npcs.push(NpcId(2));
+
+        // Set low trust relationship
+        world.set_relationship(NpcId(1), NpcId(2), Relationship {
+            trust: 2.0,
+            affection: 3.0,
+            ..Default::default()
+        });
+
+        let memory = MemorySystem::new();
+        let ctx = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        // Should NOT be eligible (no NPC with trust >= 5.0)
+        let eligible = engine.find_eligible_storylets(&ctx);
+        assert!(eligible.is_empty(), "Storylet should NOT be eligible without high-trust NPC");
+
+        // Now update to HIGH trust (7.0) - should pass
+        world.set_relationship(NpcId(1), NpcId(2), Relationship {
+            trust: 7.0,
+            affection: 5.0,
+            ..Default::default()
+        });
+
+        let ctx2 = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        let eligible2 = engine.find_eligible_storylets(&ctx2);
+        assert_eq!(eligible2.len(), 1, "Storylet SHOULD be eligible with high-trust NPC");
+    }
+
+    #[test]
+    fn test_relationship_prerequisite_rivalry() {
+        use syn_core::types::{AbstractNpc, AttachmentStyle, Traits, Relationship};
+        use syn_storylets::{RelationshipPrerequisites, RelationshipThreshold, RoleSlot};
+
+        // Create a storylet requiring high resentment (rivalry)
+        let storylet = CompiledStorylet {
+            id: StoryletId::new("rival_confrontation"),
+            key: StoryletKey(0),
+            name: "Boiling Point".to_string(),
+            description: None,
+            tags: vec![],
+            domain: StoryDomain::Conflict,
+            life_stage: syn_storylets::LifeStage::Adult,
+            heat: 7,
+            weight: 1.0,
+            roles: vec![
+                RoleSlot { name: "protagonist".to_string(), required: true, constraints: None },
+                RoleSlot { name: "rival".to_string(), required: true, constraints: None },
+            ],
+            prerequisites: Prerequisites {
+                relationship_prerequisites: Some(vec![
+                    RelationshipPrerequisites {
+                        from_role: "protagonist".to_string(),
+                        to_role: "rival".to_string(),
+                        thresholds: vec![
+                            RelationshipThreshold { axis: "resentment".to_string(), min: Some(4.0), max: None },
+                            RelationshipThreshold { axis: "familiarity".to_string(), min: Some(2.0), max: None },
+                        ],
+                    },
+                ]),
+                ..Default::default()
+            },
+            cooldowns: Cooldowns::default(),
+            outcomes: Outcome::default(),
+            follow_ups_resolved: vec![],
+        };
+
+        let source = MockStoryletSource {
+            storylets: vec![storylet],
+        };
+
+        let engine = EligibilityEngine::new(&source);
+        let mut world = WorldState::new(syn_core::WorldSeed(42), NpcId(1));
+        world.player_life_stage = syn_core::LifeStage::Adult;
+        
+        // Create player NPC
+        let player_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 35,
+            job: "Manager".to_string(),
+            district: "Business".to_string(),
+            household_id: 1,
+            traits: Traits::default(),
+            seed: 42,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(1), player_npc);
+
+        // Create potential rival NPC
+        let rival_npc = AbstractNpc {
+            id: NpcId(3),
+            age: 33,
+            job: "Competitor".to_string(),
+            district: "Business".to_string(),
+            household_id: 3,
+            traits: Traits::default(),
+            seed: 44,
+            attachment_style: AttachmentStyle::Avoidant,
+        };
+        world.npcs.insert(NpcId(3), rival_npc);
+        world.known_npcs.push(NpcId(3));
+
+        // Set rivalry relationship (high resentment, high familiarity)
+        world.set_relationship(NpcId(1), NpcId(3), Relationship {
+            resentment: 6.0,
+            familiarity: 4.0,
+            trust: -2.0,
+            affection: -1.0,
+            ..Default::default()
+        });
+
+        let memory = MemorySystem::new();
+        let ctx = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        // Should be eligible (resentment 6.0 >= 4.0, familiarity 4.0 >= 2.0)
+        let eligible = engine.find_eligible_storylets(&ctx);
+        assert_eq!(eligible.len(), 1, "Storylet SHOULD be eligible with rival NPC");
+
+        // Now reduce resentment below threshold
+        world.set_relationship(NpcId(1), NpcId(3), Relationship {
+            resentment: 2.0,  // Below threshold of 4.0
+            familiarity: 4.0,
+            trust: -2.0,
+            affection: -1.0,
+            ..Default::default()
+        });
+
+        let ctx2 = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        let eligible2 = engine.find_eligible_storylets(&ctx2);
+        assert!(eligible2.is_empty(), "Storylet should NOT be eligible without sufficient resentment");
+    }
+
+    #[test]
+    fn test_relationship_prerequisite_max_threshold() {
+        use syn_core::types::{AbstractNpc, AttachmentStyle, Traits, Relationship};
+        use syn_storylets::{RelationshipPrerequisites, RelationshipThreshold, RoleSlot};
+
+        // Create a storylet for meeting strangers (low familiarity required)
+        let storylet = CompiledStorylet {
+            id: StoryletId::new("stranger_intro"),
+            key: StoryletKey(0),
+            name: "A New Face".to_string(),
+            description: None,
+            tags: vec![],
+            domain: StoryDomain::SliceOfLife,
+            life_stage: syn_storylets::LifeStage::YoungAdult,
+            heat: 2,
+            weight: 1.0,
+            roles: vec![
+                RoleSlot { name: "protagonist".to_string(), required: true, constraints: None },
+                RoleSlot { name: "stranger".to_string(), required: true, constraints: None },
+            ],
+            prerequisites: Prerequisites {
+                relationship_prerequisites: Some(vec![
+                    RelationshipPrerequisites {
+                        from_role: "protagonist".to_string(),
+                        to_role: "stranger".to_string(),
+                        thresholds: vec![
+                            RelationshipThreshold { axis: "familiarity".to_string(), min: None, max: Some(1.0) },
+                        ],
+                    },
+                ]),
+                ..Default::default()
+            },
+            cooldowns: Cooldowns::default(),
+            outcomes: Outcome::default(),
+            follow_ups_resolved: vec![],
+        };
+
+        let source = MockStoryletSource {
+            storylets: vec![storylet],
+        };
+
+        let engine = EligibilityEngine::new(&source);
+        let mut world = WorldState::new(syn_core::WorldSeed(42), NpcId(1));
+        world.player_life_stage = syn_core::LifeStage::YoungAdult;
+        
+        // Create player NPC
+        let player_npc = AbstractNpc {
+            id: NpcId(1),
+            age: 22,
+            job: "Worker".to_string(),
+            district: "City".to_string(),
+            household_id: 1,
+            traits: Traits::default(),
+            seed: 42,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(1), player_npc);
+
+        // Create a stranger NPC (default relationship = 0 familiarity)
+        let stranger_npc = AbstractNpc {
+            id: NpcId(4),
+            age: 24,
+            job: "Unknown".to_string(),
+            district: "City".to_string(),
+            household_id: 4,
+            traits: Traits::default(),
+            seed: 45,
+            attachment_style: AttachmentStyle::Secure,
+        };
+        world.npcs.insert(NpcId(4), stranger_npc);
+        world.known_npcs.push(NpcId(4));
+
+        // Default relationship has 0 familiarity - should pass max threshold
+        let memory = MemorySystem::new();
+        let ctx = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        // Should be eligible (familiarity 0.0 <= 1.0)
+        let eligible = engine.find_eligible_storylets(&ctx);
+        assert_eq!(eligible.len(), 1, "Storylet SHOULD be eligible with stranger");
+
+        // Now increase familiarity above threshold
+        world.set_relationship(NpcId(1), NpcId(4), Relationship {
+            familiarity: 5.0,  // Above max threshold of 1.0
+            ..Default::default()
+        });
+
+        let ctx2 = EligibilityContext {
+            world: &world,
+            memory: &memory,
+            current_tick: SimTick(0),
+        };
+
+        let eligible2 = engine.find_eligible_storylets(&ctx2);
+        assert!(eligible2.is_empty(), "Storylet should NOT be eligible once familiarity exceeds max");
     }
 }

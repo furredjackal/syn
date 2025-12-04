@@ -1,0 +1,55 @@
+{
+  "id": "relationship_high_trust_confession",
+  "name": "Heart-to-Heart",
+  "description": "A trusted friend opens up about something they've been struggling with.",
+  "tags": ["emotional", "friendship", "trust", "conversation"],
+  "domain": "Friendship",
+  "life_stage": "YoungAdult",
+  "heat": 4,
+  "weight": 1.0,
+  "roles": [
+    { "name": "protagonist", "required": true },
+    { "name": "trusted_friend", "required": true }
+  ],
+  "prerequisites": {
+    "relationship_prerequisites": [
+      {
+        "from_role": "protagonist",
+        "to_role": "trusted_friend",
+        "thresholds": [
+          { "axis": "trust", "min": 5.0 },
+          { "axis": "familiarity", "min": 3.0 }
+        ]
+      }
+    ]
+  },
+  "cooldowns": {
+    "global_cooldown_ticks": 168,
+    "per_actor_cooldown_ticks": 336
+  },
+  "outcomes": {
+    "choices": [
+      {
+        "id": "listen_supportively",
+        "label": "Listen and offer support",
+        "stat_deltas": [],
+        "relationship_deltas": [
+          { "axis": "Affection", "delta": 1.5 },
+          { "axis": "Trust", "delta": 1.0 }
+        ],
+        "memory_tags": ["support", "emotional_support"]
+      },
+      {
+        "id": "share_own_struggles",
+        "label": "Share your own struggles too",
+        "stat_deltas": [],
+        "relationship_deltas": [
+          { "axis": "Affection", "delta": 2.0 },
+          { "axis": "Trust", "delta": 1.5 },
+          { "axis": "Familiarity", "delta": 0.5 }
+        ],
+        "memory_tags": ["mutual_vulnerability", "deepened_bond"]
+      }
+    ]
+  }
+}

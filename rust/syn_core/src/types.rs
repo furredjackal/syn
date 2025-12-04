@@ -4,6 +4,7 @@ use crate::digital_legacy::DigitalLegacyState;
 use crate::district::DistrictRegistry;
 use crate::failure_recovery::FailureRecoverySystem;
 use crate::gossip::GossipSystem;
+use crate::gossip_pressure::GossipPressureState;
 use crate::narrative_heat::{NarrativeHeat, NarrativeHeatBand};
 use crate::npc::NpcPrototype;
 use crate::population::PopulationSimulation;
@@ -196,6 +197,32 @@ impl Traits {
         self.ambition = self.ambition.clamp(0.0, 100.0);
         self.charm = self.charm.clamp(0.0, 100.0);
     }
+
+    /// Get a trait value by name (case-insensitive).
+    /// Returns None if the trait name is not recognized.
+    pub fn get_by_name(&self, name: &str) -> Option<f32> {
+        match name.to_lowercase().as_str() {
+            "stability" => Some(self.stability),
+            "confidence" => Some(self.confidence),
+            "sociability" => Some(self.sociability),
+            "empathy" => Some(self.empathy),
+            "impulsivity" => Some(self.impulsivity),
+            "ambition" => Some(self.ambition),
+            "charm" => Some(self.charm),
+            _ => None,
+        }
+    }
+
+    /// List of all valid trait names.
+    pub const TRAIT_NAMES: &'static [&'static str] = &[
+        "stability",
+        "confidence",
+        "sociability",
+        "empathy",
+        "impulsivity",
+        "ambition",
+        "charm",
+    ];
 }
 
 /// High-level action intents evaluated by the behavior utility system.
@@ -927,12 +954,18 @@ pub struct WorldState {
     /// District registry with full simulation state.
     #[serde(default)]
     pub districts: DistrictRegistry,
+    /// District pressure events (crime spikes, economic crashes, etc.).
+    #[serde(default)]
+    pub district_pressure: crate::district_pressure::DistrictPressureState,
     /// Player skill progression data.
     #[serde(default)]
     pub player_skills: PlayerSkills,
     /// Gossip/social spread system for rumors and reputation diffusion.
     #[serde(default)]
     pub gossip: GossipSystem,
+    /// Gossip-to-pressure bridge for director storylet triggering.
+    #[serde(default)]
+    pub gossip_pressure: GossipPressureState,
     /// Population simulation: job market, demographics, black-swan events.
     #[serde(default)]
     pub population: PopulationSimulation,
@@ -971,8 +1004,10 @@ impl WorldState {
             memory_entries: Vec::new(),
             district_state: HashMap::new(),
             districts: DistrictRegistry::generate_default_city(seed.0),
+            district_pressure: crate::district_pressure::DistrictPressureState::default(),
             player_skills: PlayerSkills::default(),
             gossip: GossipSystem::default(),
+            gossip_pressure: GossipPressureState::default(),
             population: PopulationSimulation::default(),
             failure_recovery: FailureRecoverySystem::default(),
             world_flags: crate::world_flags::WorldFlags::new(),
@@ -1037,7 +1072,79 @@ impl WorldState {
             self.player_age = derived_years;
             self.player_life_stage = LifeStage::from_age(self.player_age_years);
         }
+        // Tick districts (every 6 ticks = 1 phase to reduce compute)
+        if self.current_tick.0 % 6 == 0 {
+            let mut rng = crate::rng::DeterministicRng::with_domain(
+                self.seed.0,
+                self.current_tick.0,
+                "district_tick",
+            );
+            // Tick district simulation
+            self.districts.tick_all(&mut rng);
+            // Update district pressure events
+            let current_tick = self.current_tick.0;
+            for district in self.districts.iter() {
+                self.district_pressure.update_for_district(district, current_tick);
+            }
+            // Decay old district pressure events (same TTL as relationship pressure)
+            self.district_pressure.decay_queue(current_tick, 168, 10);
+        }
+        // Tick gossip spread (every 6 ticks to match district phase cadence)
+        if self.current_tick.0 % 6 == 0 {
+            let mut rng = crate::rng::DeterministicRng::with_domain(
+                self.seed.0,
+                self.current_tick.0,
+                "gossip_tick",
+            );
+            let current_tick = self.current_tick.0;
+            let player_id = self.player_id;
+
+            // Spread rumors through the social network
+            let spread_results = self.gossip.tick_spread_with(
+                &self.npcs,
+                &self.relationships,
+                current_tick,
+                &mut rng,
+            );
+
+            // Build valence and scandalous lookup maps from current rumors
+            let valences: std::collections::HashMap<String, f32> = self
+                .gossip
+                .rumors
+                .iter()
+                .map(|(id, r)| (id.clone(), r.valence))
+                .collect();
+            let scandalous: std::collections::HashMap<String, bool> = self
+                .gossip
+                .rumors
+                .iter()
+                .map(|(id, r)| (id.clone(), r.is_scandalous))
+                .collect();
+
+            // Process spread results into pressure events
+            let new_events = self.gossip_pressure.process_spread_results(
+                &spread_results,
+                player_id,
+                &valences,
+                &scandalous,
+                current_tick,
+            );
+
+            // Add heat for significant gossip events
+            for event in &new_events {
+                self.add_heat(event.kind.heat_bonus());
+            }
+
+            // Decay gossip pressure events
+            self.gossip_pressure.decay(current_tick, 168, 10);
+
+            // Periodic cleanup of stale rumors (every 24 ticks = daily)
+            if current_tick % 24 == 0 {
+                self.gossip.cleanup(current_tick);
+            }
+        }
         // Decay narrative heat over time (-0.1 per tick)
+        self.narrative_heat.add(-0.1);
         self.narrative_heat.add(-0.1);
         // Momentum decays aggressively so spikes cool within ~10 ticks
         // 0.7^10 ≈ 0.028, so momentum of 20 → ~0.56 after 10 ticks
