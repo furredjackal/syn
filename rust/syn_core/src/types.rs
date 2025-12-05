@@ -379,13 +379,18 @@ impl BehaviorAction {
 
     /// Attachment style modifier for this action.
     /// Anxious boosts romance/escalate, Avoidant boosts withdraw.
+    /// Fearful has conflicted biases - wants romance but also withdraws.
     pub fn attachment_bias(&self, attachment: AttachmentStyle) -> f32 {
         match (self, attachment) {
             (BehaviorAction::Romance, AttachmentStyle::Anxious) => 1.2,
             (BehaviorAction::Romance, AttachmentStyle::Avoidant) => 0.8,
+            (BehaviorAction::Romance, AttachmentStyle::Fearful) => 1.0,  // Conflicted - wants but fears
             (BehaviorAction::Withdraw, AttachmentStyle::Avoidant) => 1.2,
+            (BehaviorAction::Withdraw, AttachmentStyle::Fearful) => 1.15, // Tends to retreat
             (BehaviorAction::Escalate, AttachmentStyle::Anxious) => 1.1,
+            (BehaviorAction::Escalate, AttachmentStyle::Fearful) => 1.2,  // Push-pull creates conflict
             (BehaviorAction::Socialize, AttachmentStyle::Secure) => 1.1,
+            (BehaviorAction::Socialize, AttachmentStyle::Fearful) => 0.9, // Hesitant in groups
             _ => 1.0,
         }
     }
@@ -729,19 +734,183 @@ impl LifeStage {
 }
 
 /// Attachment style (affects social trait modifiers).
+/// Per GDD §3.7: Attachment is the 8th personality dimension, but stored as an enum
+/// for clarity. Use helper methods to blend into continuous 0..100 trait calculations.
+/// Based on the four-category model of adult attachment (Bartholomew & Horowitz, 1991).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AttachmentStyle {
-    /// Seeks reassurance, fears abandonment.
+    /// Seeks reassurance, fears abandonment. High anxiety, low avoidance.
     Anxious,
-    /// Maintains distance, fears intimacy.
+    /// Maintains distance, fears intimacy. Low anxiety, high avoidance.
     Avoidant,
-    /// Comfortable with closeness and independence.
+    /// Comfortable with closeness and independence. Low anxiety, low avoidance.
     Secure,
+    /// Wants closeness but fears it; push-pull dynamics. High anxiety, high avoidance.
+    /// Also known as Disorganized or Fearful-Avoidant attachment.
+    Fearful,
 }
 
 impl Default for AttachmentStyle {
     fn default() -> Self {
         AttachmentStyle::Secure
+    }
+}
+
+impl AttachmentStyle {
+    /// Convert attachment style to a continuous 0..100 trait value.
+    /// Maps on an "attachment need" axis (low = avoidant, high = anxious):
+    /// - Avoidant: 12.5 (center of 0..25 range)
+    /// - Secure: 37.5 (center of 25..50 range)
+    /// - Fearful: 62.5 (center of 50..75 range) - high need but conflicted
+    /// - Anxious: 87.5 (center of 75..100 range)
+    ///
+    /// This allows blending attachment into personality calculations
+    /// alongside the other 7 continuous traits.
+    pub fn as_trait_value(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 12.5,
+            AttachmentStyle::Secure => 37.5,
+            AttachmentStyle::Fearful => 62.5,
+            AttachmentStyle::Anxious => 87.5,
+        }
+    }
+
+    /// Get attachment as a normalized modifier for personality calculations.
+    /// Returns a value centered around 1.0:
+    /// - Avoidant: 0.25 (reduces attachment-driven behaviors)
+    /// - Secure: 0.75 (slightly below baseline - healthy independence)
+    /// - Fearful: 1.25 (amplified but conflicted)
+    /// - Anxious: 1.75 (strongly amplifies attachment-driven behaviors)
+    pub fn as_trait_modifier(&self) -> f32 {
+        self.as_trait_value() / 50.0
+    }
+
+    /// Get modifier for social need calculations.
+    /// Per GDD: Anxious attachment increases social need urgency,
+    /// Avoidant decreases it. Fearful has high need but suppresses it.
+    pub fn social_need_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 0.7,  // Lower social need
+            AttachmentStyle::Secure => 1.0,   // Baseline
+            AttachmentStyle::Fearful => 1.2,  // High need but conflicted
+            AttachmentStyle::Anxious => 1.4,  // Highest social need
+        }
+    }
+
+    /// Get modifier for trust-building rate in relationships.
+    /// Per GDD: Avoidant slows trust accumulation, Anxious can be faster
+    /// but also more volatile. Fearful is slowest due to fear of intimacy.
+    pub fn trust_rate_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 0.6,  // Slow trust building
+            AttachmentStyle::Secure => 1.0,   // Normal rate
+            AttachmentStyle::Fearful => 0.4,  // Very slow - fears intimacy despite wanting it
+            AttachmentStyle::Anxious => 1.2,  // Faster but volatile
+        }
+    }
+
+    /// Get modifier for affection growth rate.
+    /// Per GDD: Anxious attachment leads to faster affection spikes,
+    /// Avoidant caps affection growth. Fearful oscillates - can spike then retreat.
+    pub fn affection_rate_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 0.5,  // Capped affection growth
+            AttachmentStyle::Secure => 1.0,   // Normal growth
+            AttachmentStyle::Fearful => 1.3,  // Quick to attach but unstable
+            AttachmentStyle::Anxious => 1.5,  // Quickest to attach
+        }
+    }
+
+    /// Get modifier for jealousy/resentment buildup.
+    /// Per GDD: Anxious attachment increases jealousy tendency.
+    /// Fearful has highest jealousy due to combined fear of abandonment and intimacy.
+    pub fn jealousy_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 0.5,  // Less prone to jealousy
+            AttachmentStyle::Secure => 1.0,   // Baseline
+            AttachmentStyle::Fearful => 2.0,  // Highest - fears both abandonment and closeness
+            AttachmentStyle::Anxious => 1.8,  // High jealousy tendency
+        }
+    }
+
+    /// Get modifier for betrayal damage (how much trust is lost on betrayal).
+    /// Per GDD: Avoidant takes higher betrayal damage due to rare trust investment.
+    /// Fearful takes extreme damage - confirms their worst fears about relationships.
+    pub fn betrayal_damage_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 1.5,  // Rare trust → devastating when broken
+            AttachmentStyle::Secure => 1.0,   // Normal damage
+            AttachmentStyle::Fearful => 2.0,  // Extreme - "I knew I couldn't trust anyone"
+            AttachmentStyle::Anxious => 1.2,  // Hurts but can recover faster
+        }
+    }
+
+    /// Get the maximum affection cap for this attachment style.
+    /// Per GDD: Avoidant NPCs have a soft cap on affection.
+    /// Fearful can reach high affection but it's unstable.
+    pub fn affection_cap(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 6.0,  // Caps at "close friend" territory
+            AttachmentStyle::Secure => 10.0,  // Full range
+            AttachmentStyle::Fearful => 8.0,  // Can get close but self-sabotages at intimacy
+            AttachmentStyle::Anxious => 10.0, // Full range (often maxes quickly)
+        }
+    }
+
+    /// Create attachment style from a continuous 0..100 value.
+    /// Useful for procedural generation or blending.
+    /// Ranges: Avoidant (0-25), Secure (25-50), Fearful (50-75), Anxious (75-100)
+    pub fn from_trait_value(value: f32) -> Self {
+        if value < 25.0 {
+            AttachmentStyle::Avoidant
+        } else if value < 50.0 {
+            AttachmentStyle::Secure
+        } else if value < 75.0 {
+            AttachmentStyle::Fearful
+        } else {
+            AttachmentStyle::Anxious
+        }
+    }
+
+    /// Get a human-readable label for this attachment style.
+    pub fn label(&self) -> &'static str {
+        match self {
+            AttachmentStyle::Avoidant => "Avoidant",
+            AttachmentStyle::Secure => "Secure",
+            AttachmentStyle::Fearful => "Fearful",
+            AttachmentStyle::Anxious => "Anxious",
+        }
+    }
+
+    /// Get a brief description of this attachment style's behavioral tendencies.
+    pub fn description(&self) -> &'static str {
+        match self {
+            AttachmentStyle::Avoidant => "Maintains emotional distance, fears intimacy, slow to trust",
+            AttachmentStyle::Secure => "Comfortable with closeness and independence, balanced relationships",
+            AttachmentStyle::Fearful => "Craves connection but fears it, push-pull dynamics, self-sabotages",
+            AttachmentStyle::Anxious => "Seeks reassurance, fears abandonment, quick to attach",
+        }
+    }
+
+    /// Get volatility modifier for relationship stability.
+    /// Fearful attachment creates the most volatile relationships.
+    pub fn volatility_modifier(&self) -> f32 {
+        match self {
+            AttachmentStyle::Avoidant => 0.8,  // Low volatility - keeps distance
+            AttachmentStyle::Secure => 1.0,   // Baseline stability
+            AttachmentStyle::Fearful => 1.8,  // High volatility - push-pull dynamics
+            AttachmentStyle::Anxious => 1.4,  // Moderate volatility
+        }
+    }
+
+    /// Check if this attachment style has high avoidance component.
+    pub fn is_avoidant(&self) -> bool {
+        matches!(self, AttachmentStyle::Avoidant | AttachmentStyle::Fearful)
+    }
+
+    /// Check if this attachment style has high anxiety component.
+    pub fn is_anxious(&self) -> bool {
+        matches!(self, AttachmentStyle::Anxious | AttachmentStyle::Fearful)
     }
 }
 
@@ -775,6 +944,99 @@ pub struct AbstractNpc {
     pub seed: u64,
     /// Social attachment style.
     pub attachment_style: AttachmentStyle,
+    /// Procedurally generated lifepath (job history, milestones, relationship origins).
+    #[serde(default)]
+    pub lifepath: crate::lifepath::Lifepath,
+}
+
+impl AbstractNpc {
+    /// Create a new NPC with a procedurally generated lifepath.
+    ///
+    /// The lifepath is deterministically generated from the NPC's seed, age, and traits.
+    /// This includes job history, district moves, milestones, and education level.
+    pub fn with_generated_lifepath(
+        id: NpcId,
+        age: u32,
+        traits: Traits,
+        seed: u64,
+        attachment_style: AttachmentStyle,
+        household_id: u64,
+    ) -> Self {
+        use crate::lifepath;
+        
+        // Generate lifepath
+        let lifepath = lifepath::generate_lifepath(id, age, &traits, seed);
+        
+        // Derive current job and district from lifepath
+        let job = lifepath.current_job_title();
+        let district = lifepath.current_district();
+        
+        Self {
+            id,
+            age,
+            job,
+            district,
+            household_id,
+            traits,
+            seed,
+            attachment_style,
+            lifepath,
+        }
+    }
+    
+    /// Create a basic NPC without lifepath generation (for backwards compatibility).
+    pub fn new_basic(
+        id: NpcId,
+        age: u32,
+        job: String,
+        district: String,
+        household_id: u64,
+        traits: Traits,
+        seed: u64,
+        attachment_style: AttachmentStyle,
+    ) -> Self {
+        Self {
+            id,
+            age,
+            job,
+            district,
+            household_id,
+            traits,
+            seed,
+            attachment_style,
+            lifepath: crate::lifepath::Lifepath::default(),
+        }
+    }
+    
+    /// Get the NPC's current job sector from lifepath.
+    pub fn current_job_sector(&self) -> crate::population::JobSector {
+        self.lifepath.current_job()
+    }
+    
+    /// Check if NPC has ever worked in a specific job sector.
+    pub fn has_worked_in(&self, sector: crate::population::JobSector) -> bool {
+        self.lifepath.has_worked_in(sector)
+    }
+    
+    /// Check if NPC has ever lived in a specific district.
+    pub fn has_lived_in(&self, district: &str) -> bool {
+        self.lifepath.has_lived_in(district)
+    }
+    
+    /// Get how this NPC originally met another NPC.
+    pub fn relationship_origin_with(&self, other_id: NpcId) -> Option<crate::lifepath::RelationshipOrigin> {
+        self.lifepath.relationship_origin(other_id).copied()
+    }
+    
+    /// Check if NPC has achieved a specific life milestone.
+    pub fn has_milestone(&self, milestone: &str) -> bool {
+        self.lifepath.has_milestone(milestone)
+    }
+    
+    /// Get NPC's career mobility (number of job changes).
+    pub fn career_mobility(&self) -> usize {
+        self.lifepath.career_mobility_count()
+    }
 }
 
 /// Timestamp (in simulation ticks, deterministic).
@@ -1386,13 +1648,13 @@ mod tests {
     #[test]
     fn test_player_behavior_bias_uses_traits() {
         let mut world = WorldState::new(WorldSeed(7), NpcId(1));
-        let player = AbstractNpc {
-            id: NpcId(1),
-            age: 25,
-            job: "Artist".to_string(),
-            district: "Downtown".to_string(),
-            household_id: 1,
-            traits: Traits {
+        let player = AbstractNpc::new_basic(
+            NpcId(1),
+            25,
+            "Artist".to_string(),
+            "Downtown".to_string(),
+            1,
+            Traits {
                 stability: 40.0,
                 confidence: 55.0,
                 sociability: 80.0,
@@ -1401,9 +1663,9 @@ mod tests {
                 ambition: 30.0,
                 charm: 75.0,
             },
-            seed: 123,
-            attachment_style: AttachmentStyle::Anxious,
-        };
+            123,
+            AttachmentStyle::Anxious,
+        );
         world.npcs.insert(player.id, player);
         world.player_stats.mood = 5.0;
 
@@ -1576,5 +1838,95 @@ mod tests {
 
         assert!(broken_heart.is_recovering());
         assert!(!friend.is_recovering());
+    }
+
+    // ==================== AttachmentStyle Helper Tests ====================
+
+    #[test]
+    fn test_attachment_style_as_trait_value() {
+        assert_eq!(AttachmentStyle::Avoidant.as_trait_value(), 12.5);
+        assert_eq!(AttachmentStyle::Secure.as_trait_value(), 37.5);
+        assert_eq!(AttachmentStyle::Fearful.as_trait_value(), 62.5);
+        assert_eq!(AttachmentStyle::Anxious.as_trait_value(), 87.5);
+    }
+
+    #[test]
+    fn test_attachment_style_as_trait_modifier() {
+        // Avoidant: 12.5/50 = 0.25
+        assert!((AttachmentStyle::Avoidant.as_trait_modifier() - 0.25).abs() < 0.01);
+        // Secure: 37.5/50 = 0.75
+        assert!((AttachmentStyle::Secure.as_trait_modifier() - 0.75).abs() < 0.01);
+        // Fearful: 62.5/50 = 1.25
+        assert!((AttachmentStyle::Fearful.as_trait_modifier() - 1.25).abs() < 0.01);
+        // Anxious: 87.5/50 = 1.75
+        assert!((AttachmentStyle::Anxious.as_trait_modifier() - 1.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_attachment_style_from_trait_value() {
+        // Avoidant: 0-25
+        assert_eq!(AttachmentStyle::from_trait_value(10.0), AttachmentStyle::Avoidant);
+        assert_eq!(AttachmentStyle::from_trait_value(24.9), AttachmentStyle::Avoidant);
+        // Secure: 25-50
+        assert_eq!(AttachmentStyle::from_trait_value(25.0), AttachmentStyle::Secure);
+        assert_eq!(AttachmentStyle::from_trait_value(40.0), AttachmentStyle::Secure);
+        assert_eq!(AttachmentStyle::from_trait_value(49.9), AttachmentStyle::Secure);
+        // Fearful: 50-75
+        assert_eq!(AttachmentStyle::from_trait_value(50.0), AttachmentStyle::Fearful);
+        assert_eq!(AttachmentStyle::from_trait_value(62.5), AttachmentStyle::Fearful);
+        assert_eq!(AttachmentStyle::from_trait_value(74.9), AttachmentStyle::Fearful);
+        // Anxious: 75-100
+        assert_eq!(AttachmentStyle::from_trait_value(75.0), AttachmentStyle::Anxious);
+        assert_eq!(AttachmentStyle::from_trait_value(100.0), AttachmentStyle::Anxious);
+    }
+
+    #[test]
+    fn test_attachment_style_relationship_modifiers() {
+        // Social need: Anxious > Fearful > Secure > Avoidant
+        assert!(AttachmentStyle::Anxious.social_need_modifier() > AttachmentStyle::Fearful.social_need_modifier());
+        assert!(AttachmentStyle::Fearful.social_need_modifier() > AttachmentStyle::Secure.social_need_modifier());
+        assert!(AttachmentStyle::Secure.social_need_modifier() > AttachmentStyle::Avoidant.social_need_modifier());
+
+        // Affection rate: Anxious fastest, Avoidant slowest
+        assert!(AttachmentStyle::Anxious.affection_rate_modifier() > AttachmentStyle::Fearful.affection_rate_modifier());
+        assert!(AttachmentStyle::Fearful.affection_rate_modifier() > AttachmentStyle::Secure.affection_rate_modifier());
+        assert!(AttachmentStyle::Secure.affection_rate_modifier() > AttachmentStyle::Avoidant.affection_rate_modifier());
+
+        // Jealousy: Fearful highest, then Anxious
+        assert!(AttachmentStyle::Fearful.jealousy_modifier() > AttachmentStyle::Anxious.jealousy_modifier());
+        assert!(AttachmentStyle::Anxious.jealousy_modifier() > AttachmentStyle::Secure.jealousy_modifier());
+
+        // Betrayal damage: Fearful highest, then Avoidant
+        assert!(AttachmentStyle::Fearful.betrayal_damage_modifier() > AttachmentStyle::Avoidant.betrayal_damage_modifier());
+        assert!(AttachmentStyle::Avoidant.betrayal_damage_modifier() > AttachmentStyle::Secure.betrayal_damage_modifier());
+
+        // Affection cap: Avoidant < Fearful < Secure/Anxious
+        assert!(AttachmentStyle::Avoidant.affection_cap() < AttachmentStyle::Fearful.affection_cap());
+        assert!(AttachmentStyle::Fearful.affection_cap() < AttachmentStyle::Secure.affection_cap());
+
+        // Volatility: Fearful highest
+        assert!(AttachmentStyle::Fearful.volatility_modifier() > AttachmentStyle::Anxious.volatility_modifier());
+        assert!(AttachmentStyle::Anxious.volatility_modifier() > AttachmentStyle::Secure.volatility_modifier());
+
+        // Trust rate: Fearful slowest due to fear of intimacy
+        assert!(AttachmentStyle::Fearful.trust_rate_modifier() < AttachmentStyle::Avoidant.trust_rate_modifier());
+    }
+
+    #[test]
+    fn test_attachment_style_component_checks() {
+        // is_avoidant: Avoidant and Fearful
+        assert!(AttachmentStyle::Avoidant.is_avoidant());
+        assert!(AttachmentStyle::Fearful.is_avoidant());
+        assert!(!AttachmentStyle::Secure.is_avoidant());
+        assert!(!AttachmentStyle::Anxious.is_avoidant());
+
+        // is_anxious: Anxious and Fearful
+        assert!(AttachmentStyle::Anxious.is_anxious());
+        assert!(AttachmentStyle::Fearful.is_anxious());
+        assert!(!AttachmentStyle::Secure.is_anxious());
+        assert!(!AttachmentStyle::Avoidant.is_anxious());
+
+        // Fearful is both anxious AND avoidant
+        assert!(AttachmentStyle::Fearful.is_avoidant() && AttachmentStyle::Fearful.is_anxious());
     }
 }

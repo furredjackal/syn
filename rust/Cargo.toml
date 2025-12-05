@@ -9,6 +9,9 @@ members = [
     "syn_content",
     "syn_storage",
     "syn_storylets",
+    "syn_game",
+    "syn_executor",
+    "syn_editor",
 ]
 resolver = "2"
 
@@ -49,6 +52,10 @@ unimplemented = "warn"
 # Time handling
 chrono = { version = "=0.4.34", default-features = false, features = ["clock", "serde"] }
 time = { version = "0.3.36", features = ["macros", "serde"] }
+
+# Fyrox game engine - using latest stable release
+fyrox = { version = "0.36", default-features = true }
+fyroxed_base = { version = "0.36" }
 
 # Bleeding-edge stable crates
 rustc-hash = "2.0"          # FxHashMap - fastest stable hasher

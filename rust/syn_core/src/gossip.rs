@@ -736,21 +736,21 @@ mod tests {
     use crate::types::{AttachmentStyle, Traits};
 
     fn test_npc(id: u64, sociability: f32, empathy: f32) -> AbstractNpc {
-        AbstractNpc {
-            id: NpcId(id),
-            age: 30,
-            job: "Worker".to_string(),
-            district: "Downtown".to_string(),
-            household_id: id,
-            traits: Traits {
+        AbstractNpc::new_basic(
+            NpcId(id),
+            30,
+            "Worker".to_string(),
+            "Downtown".to_string(),
+            id,
+            Traits {
                 sociability,
                 empathy,
                 impulsivity: 50.0,
                 ..Default::default()
             },
-            seed: id,
-            attachment_style: AttachmentStyle::Secure,
-        }
+            id,
+            AttachmentStyle::Secure,
+        )
     }
 
     #[test]
