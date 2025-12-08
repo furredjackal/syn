@@ -670,16 +670,16 @@ mod tests {
         let mut rel = Relationship::default();
         rel.affection = 1.5;
         world.set_relationship(NpcId(1), NpcId(2), rel);
-        let npc = AbstractNpc::new_basic(
-            NpcId(2),
-            30,
-            "Tester".into(),
-            "Downtown".into(),
-            10,
-            Traits::default(),
-            777,
-            AttachmentStyle::Secure,
-        );
+        let npc = AbstractNpc {
+            id: NpcId(2),
+            age: 30,
+            job: "Tester".into(),
+            district: "Downtown".into(),
+            household_id: 10,
+            traits: Traits::default(),
+            seed: 777,
+            attachment_style: AttachmentStyle::Secure,
+        };
         world.npcs.insert(npc.id, npc);
         world.game_time.advance_ticks(12);
         world.memory_entries.push(crate::types::MemoryEntryRecord {
@@ -980,16 +980,16 @@ mod tests {
         let mut rel = Relationship::default();
         rel.affection = 2.0;
         world.set_relationship(NpcId(1), NpcId(2), rel);
-        let npc = AbstractNpc::new_basic(
-            NpcId(2),
-            22,
-            "Engineer".into(),
-            "Downtown".into(),
-            10,
-            Traits::default(),
-            7,
-            AttachmentStyle::Secure,
-        );
+        let npc = AbstractNpc {
+            id: NpcId(2),
+            age: 22,
+            job: "Engineer".into(),
+            district: "Downtown".into(),
+            household_id: 10,
+            traits: Traits::default(),
+            seed: 7,
+            attachment_style: AttachmentStyle::Secure,
+        };
         world.npcs.insert(npc.id, npc.clone());
 
         // Prototypes

@@ -410,7 +410,6 @@ pub fn instantiate_simulated_npc_from_prototype(
         traits: Default::default(),
         seed,
         attachment_style: Default::default(),
-        lifepath: Default::default(),
     };
 
     let mut sim = SimulatedNpc::new(abstract_npc);
@@ -460,7 +459,7 @@ pub fn evaluate_npc_behavior(world: &WorldState, npc: &mut NpcInstance) {
     };
 
     let needs = compute_needs_from_state(stats, &proto.personality, rel_ref_opt);
-    let intents = compute_behavior_intents(&needs, &proto.personality, world.heat_multiplier());
+    let intents = compute_behavior_intents(&needs, &proto.personality);
     let best = choose_best_intent(&intents);
 
     // Target heuristics
@@ -1056,7 +1055,6 @@ fn storage_to_core_npc(stored: &StorageNpc) -> AbstractNpc {
         traits: Default::default(),
         seed: stored.seed,
         attachment_style: Default::default(),
-        lifepath: Default::default(),
     }
 }
 

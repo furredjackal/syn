@@ -168,16 +168,16 @@ fn bench_npc_lookup(c: &mut Criterion) {
         let mut npcs: FxHashMap<NpcId, AbstractNpc> = FxHashMap::default();
         
         for i in 0..pop_size {
-            npcs.insert(NpcId(i), AbstractNpc::new_basic(
-                NpcId(i),
-                25,
-                "Worker".to_string(),
-                "Downtown".to_string(),
-                i / 4,
-                Traits::default(),
-                i,
-                AttachmentStyle::default(),
-            ));
+            npcs.insert(NpcId(i), AbstractNpc {
+                id: NpcId(i),
+                age: 25,
+                job: "Worker".to_string(),
+                district: "Downtown".to_string(),
+                household_id: i / 4,
+                traits: Traits::default(),
+                seed: i,
+                attachment_style: AttachmentStyle::default(),
+            });
         }
         
         group.bench_with_input(

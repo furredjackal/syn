@@ -181,11 +181,9 @@ pub fn compute_needs_from_state(
 }
 
 /// Pure function: compute candidate BehaviorIntent values from needs + personality.
-/// The `heat_multiplier` (typically 0.5..2.0) biases risky behaviors at high heat.
 pub fn compute_behavior_intents(
     needs: &NeedVector,
     personality: &PersonalityVector,
-    heat_multiplier: f32,
 ) -> Vec<BehaviorIntent> {
     let mut intents = Vec::new();
 
@@ -194,57 +192,45 @@ pub fn compute_behavior_intents(
     let volatility = personality.volatility;
     let conscientious = personality.conscientiousness;
 
-    // Heat affects risk-taking: high heat → NPCs pursue riskier behaviors
-    // - SeekAutonomy and SeekRecognition are boosted (confrontation, showing off)
-    // - SeekSecurity and SeekComfort are dampened (survival instincts override at extremes)
-    let risk_boost = heat_multiplier.clamp(0.5, 2.5);
-    let safety_dampen = (2.0 - heat_multiplier).clamp(0.5, 1.5);
-
     // SeekSocial: high social need, warm, mood-driven.
-    // Slightly boosted at high heat (people reach out in crises)
-    let social_u = needs.social * (1.0 + warmth.max(0.0) * 0.5) * (0.8 + risk_boost * 0.2);
+    let social_u = needs.social * (1.0 + warmth.max(0.0) * 0.5);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekSocial,
         utility: social_u,
     });
 
     // SeekSecurity: security need boosted by conscientiousness.
-    // Dampened at high heat (panic overrides rational safety-seeking)
-    let sec_u = needs.security * (1.0 + conscientious * 0.5) * safety_dampen;
+    let sec_u = needs.security * (1.0 + conscientious * 0.5);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekSecurity,
         utility: sec_u,
     });
 
     // SeekRecognition: recognition need boosted by dominance.
-    // Strongly boosted at high heat (people act out, show off, confront)
-    let rec_u = needs.recognition * (1.0 + dominance.max(0.0) * 0.7) * risk_boost;
+    let rec_u = needs.recognition * (1.0 + dominance.max(0.0) * 0.7);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekRecognition,
         utility: rec_u,
     });
 
     // SeekComfort: comfort need boosted by low conscientiousness (avoidant).
-    // Dampened at high heat (adrenaline overrides comfort-seeking)
-    let comfort_u = needs.comfort * (1.0 + (1.0 - conscientious) * 0.5) * safety_dampen;
+    let comfort_u = needs.comfort * (1.0 + (1.0 - conscientious) * 0.5);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekComfort,
         utility: comfort_u,
     });
 
     // SeekAutonomy: autonomy need boosted by dominance + volatility.
-    // Strongly boosted at high heat (NPCs assert themselves, start conflicts)
-    let auto_u = needs.autonomy * (1.0 + dominance.max(0.0) * 0.5 + volatility.max(0.0) * 0.5) * risk_boost;
+    let auto_u = needs.autonomy * (1.0 + dominance.max(0.0) * 0.5 + volatility.max(0.0) * 0.5);
     intents.push(BehaviorIntent {
         kind: BehaviorKind::SeekAutonomy,
         utility: auto_u,
     });
 
-    // Idle: baseline, dampened at high heat (less passive behavior)
-    let idle_u = 0.1 * safety_dampen;
+    // Idle: baseline.
     intents.push(BehaviorIntent {
         kind: BehaviorKind::Idle,
-        utility: idle_u,
+        utility: 0.1,
     });
 
     intents

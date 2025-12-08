@@ -479,15 +479,6 @@ fn apply_attachment_effects(rng: &mut DeterministicRng, attachment: &AttachmentS
             stats.charisma -= rng.gen_range_f32(3.0, 8.0);
             stats.intelligence += rng.gen_range_f32(0.0, 5.0); // Intellectual focus
         }
-        AttachmentStyle::Fearful => {
-            // Fearful combines anxious (mood) and avoidant (social withdrawal) traits
-            stats.mood -= rng.gen_range_f32(2.0, 5.0); // Higher baseline anxiety
-            stats.charisma -= rng.gen_range_f32(2.0, 6.0); // Social withdrawal
-            stats.wisdom += rng.gen_range_f32(0.0, 3.0); // Some self-awareness
-            if let Some(ref mut e) = stats.energy {
-                *e -= rng.gen_range_f32(2.0, 8.0); // Emotionally draining
-            }
-        }
     }
 }
 
@@ -539,12 +530,6 @@ fn generate_personality(
         AttachmentStyle::Avoidant => {
             personality.warmth -= 0.2;
             personality.dominance += 0.1;
-        }
-        AttachmentStyle::Fearful => {
-            // Fearful: high volatility (anxious) + low warmth (avoidant)
-            personality.volatility += 0.35; // Most volatile - push-pull dynamics
-            personality.warmth -= 0.1;      // Wants connection but fears it
-            personality.dominance -= 0.15;  // Tends toward submission/withdrawal
         }
     }
     
