@@ -208,25 +208,6 @@ class EventCardComponent extends PositionComponent
     }
   }
 
-  void _addChoiceHighlight(ChoiceButtonComponent button) {
-    final highlightFill = _ChoiceHighlightOverlay(
-      size: button.size,
-      paint: Paint()
-        ..color = SynColors.primaryCyan.withValues(alpha: 0.08)
-        ..style = PaintingStyle.fill,
-    );
-    final highlightStroke = _ChoiceHighlightOverlay(
-      size: button.size,
-      paint: Paint()
-        ..color = SynColors.primaryCyan.withValues(alpha: 0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0,
-    );
-    button
-      ..add(highlightFill)
-      ..add(highlightStroke);
-  }
-
   void _applyChoiceHighlights() {
     for (var i = 0; i < _choiceButtons.length; i++) {
       final button = _choiceButtons[i];
@@ -295,23 +276,6 @@ class EventCardComponent extends PositionComponent
   @override
   void update(double dt) {
     super.update(dt);
-  }
-}
-
-class _ChoiceHighlightOverlay extends PositionComponent {
-  _ChoiceHighlightOverlay({
-    required Vector2 size,
-    required this.paint,
-  }) : super(size: size, anchor: Anchor.topLeft);
-
-  final Paint paint;
-
-  @override
-  void render(Canvas canvas) {
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(size.toRect(), const Radius.circular(10)),
-      paint,
-    );
   }
 }
 
