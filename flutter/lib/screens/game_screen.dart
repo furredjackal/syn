@@ -7,13 +7,31 @@ import '../ui/widgets/persona_container.dart';
 import '../ui/widgets/magnetic_dock.dart';
 import '../dev_tools/inspector_panel.dart';
 import '../dev_tools/quake_console.dart';
+import 'splash_screen.dart';
+import 'main_menu_screen.dart';
+import 'character_creation_screen.dart';
+import 'end_of_life_screen.dart';
+import '../overlays/settings_overlay.dart';
+import '../overlays/save_load_overlay.dart';
+import '../panels/memory_journal_panel.dart';
+import '../panels/detailed_stats_panel.dart';
+import '../panels/inventory_panel.dart';
+
+/// Game phase enum to track which UI to display
+enum GamePhase {
+  splash,
+  mainMenu,
+  characterCreation,
+  gameplay,
+  endOfLife,
+}
 
 /// Phase 1 Hybrid UI: Flame background + Flutter UI overlay
 /// Phase 2 Dev Tools: Runtime inspector and debug console
 ///
 /// Architecture:
 /// - Layer 1 (Bottom): Flame GameWidget (SynGame for now, will be SynVisualsGame)
-/// - Layer 2 (Top): Flutter widgets (HUD, Docks, Event Cards)
+/// - Layer 2 (Top): Flutter widgets (HUD, Docks, Event Cards, Main Menu)
 /// - Layer 3 (Dev Tools): Inspector Panel and Quake Console (toggleable)
 /// - Style: Persona 5 aesthetic with skewed containers and high contrast
 class GameScreen extends StatefulWidget {
@@ -27,6 +45,40 @@ class _GameScreenState extends State<GameScreen> {
   late final SynGame _game;
   bool _showInspector = false;
   bool _showConsole = false;
+  bool _showSettingsOverlay = false;
+  bool _showSaveLoadOverlay = false;
+  bool _showMemoryJournal = false;
+  bool _showDetailedStats = false;
+  bool _showInventory = false;
+  String _saveLoadMode = 'load'; // 'save' or 'load'
+  GamePhase _currentPhase = GamePhase.splash;
+
+  // Mock data for panels
+  Map<String, dynamic> _lifeSummary = {};
+  List<MemoryEntry> _memories = [];
+  Map<String, Map<String, double>> _stats = {
+    'core': {'Health': 80, 'Energy': 65, 'Mood': 75},
+    'social': {'Charisma': 55, 'Empathy': 70, 'Influence': 45},
+    'skills': {'Intelligence': 80, 'Creativity': 90, 'Athletic': 40},
+  };
+  List<InventoryItem> _inventory = [];
+  List<SaveSlotData> _saveSlots = List.generate(
+    6,
+    (i) => i == 0
+        ? SaveSlotData(
+            name: 'Auto Save',
+            age: 25,
+            day: 42,
+            timestamp: '2024-01-15 14:32',
+          )
+        : SaveSlotData.empty(),
+  );
+
+  // Audio settings state
+  bool _audioEnabled = true;
+  bool _sfxEnabled = true;
+  double _musicVolume = 0.7;
+  double _sfxVolume = 0.8;
 
   @override
   void initState() {
@@ -37,22 +89,29 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Layer 1 (Bottom): Flame GameWidget Background
-          // TODO: Replace SynGame with SynVisualsGame once city background is implemented
-          Positioned.fill(
-            child: GameWidget(
-              game: _game,
+          if (_currentPhase == GamePhase.gameplay)
+            Positioned.fill(
+              child: GameWidget(
+                game: _game,
+              ),
             ),
-          ),
 
-          // Layer 2 (Top): Flutter UI Overlay
-          _buildFlutterUILayer(),
+          // Layer 2 (Top): Flutter UI based on phase
+          _buildPhaseUI(),
+
+          // Overlays (conditional)
+          if (_showSettingsOverlay) _buildSettingsOverlay(),
+          if (_showSaveLoadOverlay) _buildSaveLoadOverlay(),
+          if (_showMemoryJournal) _buildMemoryJournalPanel(),
+          if (_showDetailedStats) _buildDetailedStatsPanel(),
+          if (_showInventory) _buildInventoryPanel(),
 
           // Layer 3 (Dev Tools): Inspector Panel (Right)
-          if (_showInspector)
+          if (_showInspector && _currentPhase == GamePhase.gameplay)
             Positioned(
               top: 0,
               right: 0,
@@ -68,7 +127,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
 
           // Layer 3 (Dev Tools): Quake Console (Top)
-          if (_showConsole)
+          if (_showConsole && _currentPhase == GamePhase.gameplay)
             Positioned(
               top: 0,
               left: 0,
@@ -85,17 +144,69 @@ class _GameScreenState extends State<GameScreen> {
                   .fadeIn(duration: 200.ms),
             ),
 
-          // Dev Tools Toggle Buttons (Bottom Right)
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: _buildDevToolsButtons()
-                .animate()
-                .fadeIn(delay: 600.ms, duration: 400.ms),
-          ),
+          // Dev Tools Toggle Buttons (Bottom Right) - Only in gameplay
+          if (_currentPhase == GamePhase.gameplay)
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: _buildDevToolsButtons()
+                  .animate()
+                  .fadeIn(delay: 600.ms, duration: 400.ms),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _buildPhaseUI() {
+    switch (_currentPhase) {
+      case GamePhase.splash:
+        return SplashScreen(
+          onFinish: () => setState(() => _currentPhase = GamePhase.mainMenu),
+        );
+      case GamePhase.mainMenu:
+        return MainMenuScreen(
+          onStartGame: () {
+            setState(() => _currentPhase = GamePhase.characterCreation);
+            _game.showCharacterCreation();
+          },
+          onSettings: () => setState(() => _showSettingsOverlay = true),
+          onDataLoad: () => setState(() {
+            _saveLoadMode = 'load';
+            _showSaveLoadOverlay = true;
+          }),
+          onDataSave: () => setState(() {
+            _saveLoadMode = 'save';
+            _showSaveLoadOverlay = true;
+          }),
+          onReturnToTitle: () => setState(() => _currentPhase = GamePhase.splash),
+        );
+      case GamePhase.characterCreation:
+        return CharacterCreationScreen(
+          onComplete: ({
+            required String name,
+            required String archetype,
+            required bool sfwMode,
+            required String difficulty,
+          }) {
+            debugPrint('[CharacterCreation] Name: $name, Archetype: $archetype');
+            setState(() => _currentPhase = GamePhase.gameplay);
+            // TODO: Pass character data to Rust simulation
+          },
+        );
+      case GamePhase.gameplay:
+        return _buildGameplayUI();
+      case GamePhase.endOfLife:
+        return EndOfLifeScreen(
+          lifeSummary: _lifeSummary,
+          onRestart: () {
+            setState(() => _currentPhase = GamePhase.characterCreation);
+          },
+          onReturnToTitle: () {
+            setState(() => _currentPhase = GamePhase.mainMenu);
+          },
+        );
+    }
   }
 
   void _handleConsoleCommand(String command) {
@@ -110,7 +221,7 @@ class _GameScreenState extends State<GameScreen> {
     // - 'timeskip <days>' -> Advance simulation time
   }
 
-  Widget _buildFlutterUILayer() {
+  Widget _buildGameplayUI() {
     return Stack(
       children: [
         // Top Bar: DAY and MOOD indicators
@@ -210,13 +321,25 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDockIcon(Icons.bar_chart, 'Stats'),
+            _buildDockIcon(
+              Icons.bar_chart,
+              'Stats',
+              () => setState(() => _showDetailedStats = true),
+            ),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.inventory_2, 'Inventory'),
+            _buildDockIcon(
+              Icons.inventory_2,
+              'Inventory',
+              () => setState(() => _showInventory = true),
+            ),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.calendar_today, 'Calendar'),
+            _buildDockIcon(Icons.calendar_today, 'Calendar', () {}),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.settings, 'Settings'),
+            _buildDockIcon(
+              Icons.settings,
+              'Settings',
+              () => setState(() => _showSettingsOverlay = true),
+            ),
           ],
         ),
       ),
@@ -231,32 +354,39 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDockIcon(Icons.people, 'Relations'),
+            _buildDockIcon(Icons.people, 'Relations', () {}),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.map, 'Map'),
+            _buildDockIcon(Icons.map, 'Map', () {}),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.book, 'Journal'),
+            _buildDockIcon(Icons.book, 'Journal', () {}),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.menu_book, 'Memories'),
+            _buildDockIcon(
+              Icons.menu_book,
+              'Memories',
+              () => setState(() => _showMemoryJournal = true),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDockIcon(IconData icon, String label) {
-    return Tooltip(
-      message: label,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.cyanAccent.withValues(alpha: 0.1),
-          border: Border.all(color: Colors.cyanAccent, width: 1),
-        ),
-        child: Icon(
-          icon,
-          color: Colors.cyanAccent,
-          size: 28,
+  Widget _buildDockIcon(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Tooltip(
+        message: label,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.cyanAccent.withValues(alpha: 0.1),
+            border: Border.all(color: Colors.cyanAccent, width: 1),
+          ),
+          child: Icon(
+            icon,
+            color: Colors.cyanAccent,
+            size: 28,
+          ),
         ),
       ),
     );
@@ -387,6 +517,63 @@ class _GameScreenState extends State<GameScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Overlay builders
+  Widget _buildSettingsOverlay() {
+    return SettingsOverlay(
+      onClose: () => setState(() => _showSettingsOverlay = false),
+      audioEnabled: _audioEnabled,
+      sfxEnabled: _sfxEnabled,
+      musicVolume: _musicVolume,
+      sfxVolume: _sfxVolume,
+      onAudioToggle: (value) => setState(() => _audioEnabled = value),
+      onSfxToggle: (value) => setState(() => _sfxEnabled = value),
+      onMusicVolumeChange: (value) => setState(() => _musicVolume = value),
+      onSfxVolumeChange: (value) => setState(() => _sfxVolume = value),
+    );
+  }
+
+  Widget _buildSaveLoadOverlay() {
+    return SaveLoadOverlay(
+      onClose: () => setState(() => _showSaveLoadOverlay = false),
+      onSave: (index, name) {
+        debugPrint('[SaveLoad] Saving to slot $index with name: $name');
+        // TODO: Implement actual save logic
+        setState(() => _showSaveLoadOverlay = false);
+      },
+      onLoad: (index) {
+        debugPrint('[SaveLoad] Loading from slot $index');
+        // TODO: Implement actual load logic
+        setState(() => _showSaveLoadOverlay = false);
+      },
+      saveSlots: _saveSlots,
+      mode: _saveLoadMode,
+    );
+  }
+
+  Widget _buildMemoryJournalPanel() {
+    return MemoryJournalPanel(
+      onClose: () => setState(() => _showMemoryJournal = false),
+      memories: _memories,
+    );
+  }
+
+  Widget _buildDetailedStatsPanel() {
+    return DetailedStatsPanel(
+      onClose: () => setState(() => _showDetailedStats = false),
+      stats: _stats,
+    );
+  }
+
+  Widget _buildInventoryPanel() {
+    return InventoryPanel(
+      onClose: () => setState(() => _showInventory = false),
+      items: _inventory,
+      onItemSelect: (item) {
+        debugPrint('[Inventory] Selected: ${item.name}');
+      },
     );
   }
 }

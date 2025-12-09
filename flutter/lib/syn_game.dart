@@ -22,6 +22,9 @@ import 'components/screens/save_load_component.dart';
 import 'components/screens/settings_screen_component.dart';
 import 'components/screens/splash_screen_component.dart';
 import 'components/screens/world_map_component.dart';
+import 'components/ui/system/background_layer_component.dart';
+import 'components/ui/effects/particle_system_component.dart'
+    as effects;
 
 class SynGame extends FlameGame
     with HasKeyboardHandlerComponents, MouseMovementDetector {
@@ -40,6 +43,16 @@ class SynGame extends FlameGame
   Future<void> onLoad() async {
     await super.onLoad();
     camera.viewport = FixedResolutionViewport(resolution: Vector2(1280, 720));
+
+    // Add cyberpunk visual background (Tier 1 visuals)
+    final background = BackgroundLayerComponent()
+      ..priority = -10; // Behind everything
+    add(background);
+
+    // Add floating data particles
+    final particles = effects.ParticleSystemComponent()
+      ..priority = -5; // Above background, below UI
+    add(particles);
 
     _router = RouterComponent(
       initialRoute: 'splash',
