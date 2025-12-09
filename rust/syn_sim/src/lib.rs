@@ -1,3 +1,6 @@
+//! Canonical simulation entrypoint: `tick_simulation`.
+//! Legacy (deprecated): `tick_world`.
+
 mod npc_registry;
 pub mod relationship_drift;
 pub mod post_life;
@@ -1133,6 +1136,10 @@ fn tick_npc_tier2(world: &mut WorldState, npc: &mut NpcInstance, tick: u64) {
 
 /// Advance the simulation by `ticks` ticks (hours).
 /// Each tick advances GameTime and ticks NPCs in tier-specific cadences.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `tick_simulation` + WorldSimState instead; this legacy entrypoint uses the older, less efficient LOD system and will be removed."
+)]
 pub fn tick_world(world: &mut WorldState, sim: &mut SimState, ticks: u32) {
     let mut tick_ctx = TickContext::default();
     for _ in 0..ticks {
@@ -1263,5 +1270,18 @@ pub fn tick_simulation_n(
         results.push(tick_simulation(world, sim_state, config));
     }
     results
+}
+
+/// Canonical helper to advance the simulation by N ticks using the modern pipeline.
+/// Replaces `tick_world` for all new tests and tools.
+pub fn advance_simulation_ticks(
+    world: &mut WorldState,
+    sim_state: &mut WorldSimState,
+    config: &SimulationTickConfig,
+    ticks: u32,
+) {
+    for _ in 0..ticks {
+        tick_simulation(world, sim_state, config);
+    }
 }
 
