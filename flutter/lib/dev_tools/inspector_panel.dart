@@ -28,11 +28,22 @@ class InspectorPanel extends StatefulWidget {
 
 class _InspectorPanelState extends State<InspectorPanel> {
   List<InspectableMixin> _inspectableComponents = [];
+  int? _selectedIndex;
 
   @override
   void initState() {
     super.initState();
     _discoverInspectableComponents();
+    // Periodically refresh to catch newly added components
+    Future.delayed(const Duration(seconds: 1), _schedulePeriodicRefresh);
+  }
+
+  /// Schedule periodic component discovery to catch runtime additions
+  void _schedulePeriodicRefresh() {
+    if (mounted) {
+      _discoverInspectableComponents();
+      Future.delayed(const Duration(seconds: 2), _schedulePeriodicRefresh);
+    }
   }
 
   /// Query the game world for all components that use InspectableMixin
@@ -40,23 +51,46 @@ class _InspectorPanelState extends State<InspectorPanel> {
     final components = <InspectableMixin>[];
     
     // Recursively search through the component tree
-    void _searchComponents(Iterable<dynamic> children) {
-      for (final child in children) {
-        if (child is InspectableMixin) {
-          components.add(child);
-        }
-        // Recursively search children if the component has them
-        if (child is Component && child.children.isNotEmpty) {
-          _searchComponents(child.children);
-        }
+    void _searchComponents(Component component) {
+      // Check if this component is inspectable
+      if (component is InspectableMixin) {
+        components.add(component);
+      }
+      
+      // Recursively search children
+      for (final child in component.children) {
+        _searchComponents(child);
       }
     }
 
-    _searchComponents(widget.game.children);
+    // Start from game.world if it exists (HasWorldChildren games)
+    try {
+      final dynamic game = widget.game;
+      if (game is Component) {
+        // Try to access world property if it exists
+        try {
+          final dynamic world = (game as dynamic).world;
+          if (world is Component) {
+            _searchComponents(world);
+          }
+        } catch (_) {
+          // No world property, that's okay
+        }
+        
+        // Also search direct children of game
+        for (final child in game.children) {
+          _searchComponents(child);
+        }
+      }
+    } catch (e) {
+      debugPrint('[Inspector] Error discovering components: $e');
+    }
     
-    setState(() {
-      _inspectableComponents = components;
-    });
+    if (mounted) {
+      setState(() {
+        _inspectableComponents = components;
+      });
+    }
   }
 
   @override
@@ -164,25 +198,85 @@ class _InspectorPanelState extends State<InspectorPanel> {
 
   Widget _buildComponentTile(InspectableMixin component) {
     final properties = component.inspectableProperties;
+    final componentIndex = _inspectableComponents.indexOf(component);
+    final isSelected = _selectedIndex == componentIndex;
 
-    return ExpansionTile(
-      title: Text(
-        component.debugName,
-        style: TextStyle(
-          color: Colors.cyanAccent,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isSelected 
+              ? Colors.cyanAccent 
+              : Colors.cyanAccent.withValues(alpha: 0.2),
+          width: isSelected ? 2 : 1,
         ),
+        borderRadius: BorderRadius.circular(4),
       ),
-      iconColor: Colors.cyanAccent,
-      collapsedIconColor: Colors.cyanAccent.withValues(alpha: 0.6),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-      children: [
-        ...properties.entries.map((entry) {
-          return _buildPropertyEditor(component, entry.key, entry.value);
-        }),
-      ],
+      child: ExpansionTile(
+        title: Row(
+          children: [
+            Icon(
+              Icons.widgets,
+              size: 16,
+              color: Colors.cyanAccent.withValues(alpha: 0.8),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                component.debugName,
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${properties.length}',
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        iconColor: Colors.cyanAccent,
+        collapsedIconColor: Colors.cyanAccent.withValues(alpha: 0.6),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+        onExpansionChanged: (expanded) {
+          setState(() {
+            _selectedIndex = expanded ? componentIndex : null;
+          });
+        },
+        children: properties.isEmpty
+            ? [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'No inspectable properties',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ]
+            : [
+                ...properties.entries.map((entry) {
+                  return _buildPropertyEditor(component, entry.key, entry.value);
+                }),
+              ],
+      ),
     );
   }
 
