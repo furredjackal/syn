@@ -67,4 +67,14 @@ impl HybridStorage {
         }
         Ok(())
     }
+
+    /// Archive a journal (JSON string) to cold storage.
+    pub fn archive_journal(&self, npc_id: u64, journal_json: &str) -> Result<(), StorageError> {
+        self.cold.archive_journal(npc_id, journal_json)
+    }
+
+    /// Load an archived journal from cold storage.
+    pub fn load_archived_journal(&self, npc_id: u64) -> Result<Option<String>, StorageError> {
+        self.cold.load_archived_journal(npc_id)
+    }
 }

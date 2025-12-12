@@ -308,7 +308,7 @@ class _CharacterCreationScreenState extends State<CharacterCreationScreen> {
                       _sfwMode = value;
                     });
                   },
-                  activeColor: Colors.cyanAccent,
+                  activeThumbColor: Colors.cyanAccent,
                 ),
               ],
             ),

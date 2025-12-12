@@ -2,14 +2,25 @@
   "id": "relationship_stranger_introduction",
   "name": "A New Face",
   "description": "Someone unfamiliar catches your attention. An opportunity to make a new connection.",
-  "tags": ["social", "introduction", "new_connection", "slice_of_life"],
-  "domain": "SliceOfLife",
-  "life_stage": "YoungAdult",
+  "tags": [
+    "social",
+    "introduction",
+    "new_connection",
+    "slice_of_life"
+  ],
+  "domain": "slice_of_life",
+  "life_stage": "young_adult",
   "heat": 2,
   "weight": 1.5,
   "roles": [
-    { "name": "protagonist", "required": true },
-    { "name": "stranger", "required": true }
+    {
+      "name": "protagonist",
+      "required": true
+    },
+    {
+      "name": "stranger",
+      "required": true
+    }
   ],
   "prerequisites": {
     "relationship_prerequisites": [
@@ -17,7 +28,10 @@
         "from_role": "protagonist",
         "to_role": "stranger",
         "thresholds": [
-          { "axis": "familiarity", "max": 1.0 }
+          {
+            "axis": "familiarity",
+            "max": 1.0
+          }
         ]
       }
     ]
@@ -33,20 +47,38 @@
         "label": "Introduce yourself",
         "stat_deltas": [],
         "relationship_deltas": [
-          { "axis": "Familiarity", "delta": 2.0 },
-          { "axis": "Affection", "delta": 0.5 }
+          {
+            "axis": "Familiarity",
+            "delta": 2.0
+          },
+          {
+            "axis": "Affection",
+            "delta": 0.5
+          }
         ],
-        "memory_tags": ["first_meeting", "introduction"]
+        "memory_tags": [
+          "first_meeting",
+          "introduction"
+        ]
       },
       {
         "id": "observe_quietly",
         "label": "Observe from a distance",
         "stat_deltas": [],
         "relationship_deltas": [
-          { "axis": "Familiarity", "delta": 0.5 }
+          {
+            "axis": "Familiarity",
+            "delta": 0.5
+          }
         ],
-        "memory_tags": ["observation", "curiosity"]
+        "memory_tags": [
+          "observation",
+          "curiosity"
+        ]
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ]
 }

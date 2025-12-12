@@ -28,6 +28,15 @@ impl DuckDbColdStore {
             )",
             [],
         )?;
+        // Create journal archive table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS journal_archive (
+                npc_id BIGINT PRIMARY KEY,
+                journal_json TEXT NOT NULL,
+                archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        )?;
         Ok(Self { conn })
     }
 
@@ -64,6 +73,30 @@ impl DuckDbColdStore {
                 seed: row.get(5)?,
             };
             Ok(Some(npc))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Archive a journal (JSON string) for an NPC.
+    pub fn archive_journal(&self, npc_id: u64, journal_json: &str) -> Result<(), StorageError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO journal_archive (npc_id, journal_json)
+             VALUES (?, ?)",
+            duckdb::params![npc_id as i64, journal_json],
+        )?;
+        Ok(())
+    }
+
+    /// Load an archived journal for an NPC.
+    pub fn load_archived_journal(&self, npc_id: u64) -> Result<Option<String>, StorageError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT journal_json FROM journal_archive WHERE npc_id = ?",
+        )?;
+        let mut rows = stmt.query([npc_id as i64])?;
+        if let Some(row) = rows.next()? {
+            let json: String = row.get(0)?;
+            Ok(Some(json))
         } else {
             Ok(None)
         }

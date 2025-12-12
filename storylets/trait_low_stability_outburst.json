@@ -2,11 +2,20 @@
   "id": "trait_low_stability_outburst",
   "name": "Emotional Outburst",
   "description": "Your volatile emotions bubble to the surface. Something small has set you off.",
-  "tags": ["emotion", "conflict", "stability", "drama", "social"],
+  "tags": [
+    "emotion",
+    "conflict",
+    "stability",
+    "drama",
+    "social"
+  ],
   "prerequisites": {
     "player_prereqs": {
       "min_age": 13,
-      "mood_range": { "min": -10.0, "max": 0.0 },
+      "mood_range": {
+        "min": -10.0,
+        "max": 0.0
+      },
       "required_stats": null,
       "forbidden_stats": null
     },
@@ -22,12 +31,16 @@
       "required_black_swan_id": null
     },
     "trait_thresholds": [
-      { "trait_name": "stability", "min": null, "max": 35.0 }
+      {
+        "trait_name": "stability",
+        "min": null,
+        "max": 35.0
+      }
     ],
     "district_conditions": [],
     "digital_legacy_prereq": null
   },
-  "heat": 6.0,
+  "heat": 6,
   "weight": 1.0,
   "outcomes": {
     "base_heat_delta": 4.0,
@@ -38,11 +51,19 @@
         "label": "Let it all out",
         "description": "Scream, cry, or rage - release the pressure.",
         "stat_deltas": [
-          { "stat": "stress", "delta": -15.0 },
-          { "stat": "reputation", "delta": -5.0 }
+          {
+            "stat": "stress",
+            "delta": -15.0
+          },
+          {
+            "stat": "reputation",
+            "delta": -5.0
+          }
         ],
         "relationship_deltas": [],
-        "flags_to_set": ["had_public_outburst"],
+        "flags_to_set": [
+          "had_public_outburst"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "emotional_outburst"
@@ -52,8 +73,14 @@
         "label": "Suppress it",
         "description": "Push it down. Not here, not now.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 10.0 },
-          { "stat": "health", "delta": -5.0 }
+          {
+            "stat": "stress",
+            "delta": 10.0
+          },
+          {
+            "stat": "health",
+            "delta": -5.0
+          }
         ],
         "relationship_deltas": [],
         "flags_to_set": [],
@@ -66,10 +93,15 @@
         "label": "Reach out to someone",
         "description": "Find someone who will listen.",
         "stat_deltas": [
-          { "stat": "stress", "delta": -10.0 }
+          {
+            "stat": "stress",
+            "delta": -10.0
+          }
         ],
         "relationship_deltas": [],
-        "flags_to_set": ["sought_emotional_support"],
+        "flags_to_set": [
+          "sought_emotional_support"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "found_support"
@@ -79,5 +111,10 @@
   "roles": [],
   "cooldown_ticks": 480,
   "once_per_lifetime": false,
-  "domain": "Social"
+  "domain": "friendship",
+  "triggers": [
+    "time_tick"
+  ],
+  "life_stage": "adult",
+  "cooldowns": {}
 }

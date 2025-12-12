@@ -1,20 +1,37 @@
 {
   "id": "slice_of_life_conversation",
   "name": "Quiet Conversation",
-  "tags": ["friendship", "slice_of_life"],
+  "tags": [
+    "friendship",
+    "slice_of_life"
+  ],
   "prerequisites": {
     "min_relationship_affection": 2.0,
     "min_relationship_resentment": null,
     "stat_conditions": {},
-    "life_stages": ["Teen", "Adult", "Elder"],
+    "life_stages": [
+      "teen",
+      "adult",
+      "elder"
+    ],
     "tags": [],
-    "relationship_states": ["Friend", "CloseFriend"],
+    "relationship_states": [
+      "Friend",
+      "CloseFriend"
+    ],
     "memory_tags_required": [],
     "memory_tags_forbidden": [],
     "memory_recency_ticks": null
   },
-  "heat": 30.0,
+  "heat": 3,
   "weight": 0.6,
   "cooldown_ticks": 48,
-  "roles": []
+  "roles": [],
+  "triggers": [
+    "time_tick"
+  ],
+  "domain": "friendship",
+  "life_stage": "teen",
+  "cooldowns": {},
+  "outcomes": {}
 }

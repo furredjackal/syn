@@ -216,7 +216,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFF00E6FF),
+          activeThumbColor: const Color(0xFF00E6FF),
           activeTrackColor: const Color(0xFF00E6FF).withOpacity(0.3),
         ),
       ],

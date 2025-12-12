@@ -1,22 +1,33 @@
 {
   "id": "district_crime_wave",
   "name": "Crime Wave Fallout",
-  "tags": ["crime", "danger", "drama", "district_event"],
+  "tags": [
+    "crime",
+    "danger",
+    "drama",
+    "district_event"
+  ],
   "prerequisites": {
     "min_relationship_affection": null,
     "min_relationship_resentment": null,
     "stat_conditions": {},
-    "life_stages": ["Teen", "Adult", "Elder"],
+    "life_stages": [
+      "teen",
+      "adult",
+      "elder"
+    ],
     "tags": [],
     "relationship_states": [],
     "memory_tags_required": [],
     "memory_tags_forbidden": [],
     "memory_recency_ticks": null,
     "district_conditions": [
-      { "district": "Eastside Projects" }
+      {
+        "district": "Eastside Projects"
+      }
     ]
   },
-  "heat": 70.0,
+  "heat": 7,
   "weight": 0.8,
   "cooldown_ticks": 240,
   "roles": [],
@@ -27,13 +38,23 @@
         "label": "Stay vigilant and keep your head down",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 10.0 },
-            { "stat": "awareness", "delta": 5.0 }
+            {
+              "stat": "stress",
+              "delta": 10.0
+            },
+            {
+              "stat": "awareness",
+              "delta": 5.0
+            }
           ],
           "relationship_impacts": [],
           "memory_event_id": "crime_wave_survival",
           "emotional_intensity": -0.3,
-          "memory_tags": ["danger", "survival", "caution"],
+          "memory_tags": [
+            "danger",
+            "survival",
+            "caution"
+          ],
           "heat_spike": 5.0
         }
       },
@@ -42,17 +63,33 @@
         "label": "Help a neighbor who got robbed",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 15.0 },
-            { "stat": "reputation", "delta": 10.0 }
+            {
+              "stat": "stress",
+              "delta": 15.0
+            },
+            {
+              "stat": "reputation",
+              "delta": 10.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Affection", "delta": 2.0 },
-            { "axis": "Trust", "delta": 1.5 }
+            {
+              "axis": "Affection",
+              "delta": 2.0
+            },
+            {
+              "axis": "Trust",
+              "delta": 1.5
+            }
           ],
           "karma_delta": 5.0,
           "memory_event_id": "helped_crime_victim",
           "emotional_intensity": 0.6,
-          "memory_tags": ["heroism", "community", "compassion"],
+          "memory_tags": [
+            "heroism",
+            "community",
+            "compassion"
+          ],
           "heat_spike": 15.0
         }
       },
@@ -61,15 +98,28 @@
         "label": "Join the neighborhood watch patrol",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 20.0 },
-            { "stat": "courage", "delta": 8.0 },
-            { "stat": "reputation", "delta": 15.0 }
+            {
+              "stat": "stress",
+              "delta": 20.0
+            },
+            {
+              "stat": "courage",
+              "delta": 8.0
+            },
+            {
+              "stat": "reputation",
+              "delta": 15.0
+            }
           ],
           "relationship_impacts": [],
           "karma_delta": 10.0,
           "memory_event_id": "joined_watch_patrol",
           "emotional_intensity": 0.5,
-          "memory_tags": ["courage", "community", "protection"],
+          "memory_tags": [
+            "courage",
+            "community",
+            "protection"
+          ],
           "heat_spike": 20.0
         }
       },
@@ -78,16 +128,32 @@
         "label": "Lock the doors and wait it out",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 5.0 },
-            { "stat": "isolation", "delta": 8.0 }
+            {
+              "stat": "stress",
+              "delta": 5.0
+            },
+            {
+              "stat": "isolation",
+              "delta": 8.0
+            }
           ],
           "relationship_impacts": [],
           "memory_event_id": "crime_wave_hiding",
           "emotional_intensity": -0.4,
-          "memory_tags": ["fear", "isolation", "cowardice"],
+          "memory_tags": [
+            "fear",
+            "isolation",
+            "cowardice"
+          ],
           "heat_spike": 0.0
         }
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ],
+  "domain": "slice_of_life",
+  "life_stage": "teen",
+  "cooldowns": {}
 }

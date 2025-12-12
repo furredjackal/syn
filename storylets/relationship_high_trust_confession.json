@@ -2,14 +2,25 @@
   "id": "relationship_high_trust_confession",
   "name": "Heart-to-Heart",
   "description": "A trusted friend opens up about something they've been struggling with.",
-  "tags": ["emotional", "friendship", "trust", "conversation"],
-  "domain": "Friendship",
-  "life_stage": "YoungAdult",
+  "tags": [
+    "emotional",
+    "friendship",
+    "trust",
+    "conversation"
+  ],
+  "domain": "friendship",
+  "life_stage": "young_adult",
   "heat": 4,
   "weight": 1.0,
   "roles": [
-    { "name": "protagonist", "required": true },
-    { "name": "trusted_friend", "required": true }
+    {
+      "name": "protagonist",
+      "required": true
+    },
+    {
+      "name": "trusted_friend",
+      "required": true
+    }
   ],
   "prerequisites": {
     "relationship_prerequisites": [
@@ -17,8 +28,14 @@
         "from_role": "protagonist",
         "to_role": "trusted_friend",
         "thresholds": [
-          { "axis": "trust", "min": 5.0 },
-          { "axis": "familiarity", "min": 3.0 }
+          {
+            "axis": "trust",
+            "min": 5.0
+          },
+          {
+            "axis": "familiarity",
+            "min": 3.0
+          }
         ]
       }
     ]
@@ -34,22 +51,46 @@
         "label": "Listen and offer support",
         "stat_deltas": [],
         "relationship_deltas": [
-          { "axis": "Affection", "delta": 1.5 },
-          { "axis": "Trust", "delta": 1.0 }
+          {
+            "axis": "Affection",
+            "delta": 1.5
+          },
+          {
+            "axis": "Trust",
+            "delta": 1.0
+          }
         ],
-        "memory_tags": ["support", "emotional_support"]
+        "memory_tags": [
+          "support",
+          "emotional_support"
+        ]
       },
       {
         "id": "share_own_struggles",
         "label": "Share your own struggles too",
         "stat_deltas": [],
         "relationship_deltas": [
-          { "axis": "Affection", "delta": 2.0 },
-          { "axis": "Trust", "delta": 1.5 },
-          { "axis": "Familiarity", "delta": 0.5 }
+          {
+            "axis": "Affection",
+            "delta": 2.0
+          },
+          {
+            "axis": "Trust",
+            "delta": 1.5
+          },
+          {
+            "axis": "Familiarity",
+            "delta": 0.5
+          }
         ],
-        "memory_tags": ["mutual_vulnerability", "deepened_bond"]
+        "memory_tags": [
+          "mutual_vulnerability",
+          "deepened_bond"
+        ]
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ]
 }

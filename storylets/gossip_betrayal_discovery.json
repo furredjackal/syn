@@ -2,7 +2,14 @@
   "id": "gossip_betrayal_discovery",
   "name": "Betrayal Discovery",
   "description": "You discover that someone you trusted has been spreading rumors about you.",
-  "tags": ["betrayal", "trust", "gossip", "relationship", "conflict", "drama"],
+  "tags": [
+    "betrayal",
+    "trust",
+    "gossip",
+    "relationship",
+    "conflict",
+    "drama"
+  ],
   "prerequisites": {
     "player_prereqs": {
       "min_age": 14,
@@ -14,7 +21,9 @@
     "relationship_prereqs": [],
     "world_prereqs": {
       "required_flags": [],
-      "forbidden_flags": ["confronted_gossiper"],
+      "forbidden_flags": [
+        "confronted_gossiper"
+      ],
       "required_tick_range": null,
       "required_day_phase": null,
       "required_life_stage": null,
@@ -24,7 +33,7 @@
     "district_conditions": [],
     "digital_legacy_prereq": null
   },
-  "heat": 7.0,
+  "heat": 7,
   "weight": 1.2,
   "outcomes": {
     "base_heat_delta": 6.0,
@@ -35,14 +44,31 @@
         "label": "Cut them out of your life",
         "description": "End the relationship immediately. Trust is broken beyond repair.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 10.0 }
+          {
+            "stat": "stress",
+            "delta": 10.0
+          }
         ],
         "relationship_deltas": [
-          { "role": "betrayer", "axis": "trust", "delta": -8.0 },
-          { "role": "betrayer", "axis": "affection", "delta": -5.0 },
-          { "role": "betrayer", "axis": "resentment", "delta": 6.0 }
+          {
+            "role": "betrayer",
+            "axis": "trust",
+            "delta": -8.0
+          },
+          {
+            "role": "betrayer",
+            "axis": "affection",
+            "delta": -5.0
+          },
+          {
+            "role": "betrayer",
+            "axis": "resentment",
+            "delta": 6.0
+          }
         ],
-        "flags_to_set": ["ended_relationship_over_gossip"],
+        "flags_to_set": [
+          "ended_relationship_over_gossip"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "betrayal_cut_off"
@@ -52,12 +78,21 @@
         "label": "Demand an explanation",
         "description": "Confront them and ask why they did this.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 5.0 }
+          {
+            "stat": "stress",
+            "delta": 5.0
+          }
         ],
         "relationship_deltas": [
-          { "role": "betrayer", "axis": "trust", "delta": -3.0 }
+          {
+            "role": "betrayer",
+            "axis": "trust",
+            "delta": -3.0
+          }
         ],
-        "flags_to_set": ["confronted_betrayer"],
+        "flags_to_set": [
+          "confronted_betrayer"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "demanded_explanation"
@@ -67,14 +102,30 @@
         "label": "Choose forgiveness",
         "description": "Everyone makes mistakes. Give them another chance.",
         "stat_deltas": [
-          { "stat": "stress", "delta": -5.0 },
-          { "stat": "karma", "delta": 5.0 }
+          {
+            "stat": "stress",
+            "delta": -5.0
+          },
+          {
+            "stat": "karma",
+            "delta": 5.0
+          }
         ],
         "relationship_deltas": [
-          { "role": "betrayer", "axis": "trust", "delta": -2.0 },
-          { "role": "betrayer", "axis": "affection", "delta": 1.0 }
+          {
+            "role": "betrayer",
+            "axis": "trust",
+            "delta": -2.0
+          },
+          {
+            "role": "betrayer",
+            "axis": "affection",
+            "delta": 1.0
+          }
         ],
-        "flags_to_set": ["forgave_gossiper"],
+        "flags_to_set": [
+          "forgave_gossiper"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "forgiveness"
@@ -84,13 +135,25 @@
         "label": "Plan your revenge",
         "description": "They'll regret crossing you. Two can play this game.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 8.0 },
-          { "stat": "karma", "delta": -10.0 }
+          {
+            "stat": "stress",
+            "delta": 8.0
+          },
+          {
+            "stat": "karma",
+            "delta": -10.0
+          }
         ],
         "relationship_deltas": [
-          { "role": "betrayer", "axis": "resentment", "delta": 8.0 }
+          {
+            "role": "betrayer",
+            "axis": "resentment",
+            "delta": 8.0
+          }
         ],
-        "flags_to_set": ["planning_revenge"],
+        "flags_to_set": [
+          "planning_revenge"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "revenge_plotting"
@@ -99,18 +162,16 @@
   },
   "roles": [
     {
-      "id": "betrayer",
-      "description": "The person who betrayed your trust by spreading rumors",
-      "required_tags": ["betrayal", "gossip"],
-      "preferred_tags": ["rivalry", "jealousy"],
-      "forbidden_tags": ["loyal", "trustworthy"],
-      "relationship_requirements": {
-        "min_familiarity": 3.0,
-        "max_trust": 7.0
-      }
+      "required": true,
+      "name": "betrayer"
     }
   ],
   "cooldown_ticks": 1440,
   "once_per_lifetime": false,
-  "domain": "Conflict"
+  "domain": "conflict",
+  "triggers": [
+    "time_tick"
+  ],
+  "life_stage": "adult",
+  "cooldowns": {}
 }

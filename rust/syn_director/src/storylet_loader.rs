@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::path::Path;
 
 use crate::{
     storylet_library::tags_to_bitset, Storylet, StoryletCooldown, StoryletOutcomeSet,
@@ -47,4 +48,24 @@ impl From<StoryletSerde> for Storylet {
 pub fn parse_storylet_str(raw: &str) -> Result<Storylet, serde_json::Error> {
     let intermediate: StoryletSerde = serde_json::from_str(raw)?;
     Ok(intermediate.into())
+}
+
+/// Load the compiled storylet library from the binary file.
+/// 
+/// This function loads from `rust/syn_director/data/storylets.bin` which is
+/// generated at build time by the storyletc compiler.
+pub fn load_compiled_library() -> Result<syn_storylets::library::StoryletLibrary, String> {
+    let binary_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("data")
+        .join("storylets.bin");
+    
+    if !binary_path.exists() {
+        return Err(format!(
+            "Compiled storylet library not found at {:?}. Run build to compile storylets.",
+            binary_path
+        ));
+    }
+    
+    syn_storylets::library::StoryletLibrary::read_from_file(&binary_path)
+        .map_err(|e| format!("Failed to load compiled storylet library: {:?}", e))
 }

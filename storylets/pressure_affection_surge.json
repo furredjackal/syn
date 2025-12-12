@@ -1,16 +1,31 @@
 {
   "id": "pressure_affection_surge",
   "name": "Heartfelt Connection",
-  "tags": ["emotional", "bonding", "affection_milestone"],
+  "tags": [
+    "emotional",
+    "bonding",
+    "affection_milestone"
+  ],
   "prerequisites": {
     "min_relationship_affection": 5.0,
     "min_relationship_resentment": null,
     "stat_conditions": {},
-    "life_stages": ["Teen", "Adult", "Elder"],
+    "life_stages": [
+      "teen",
+      "adult",
+      "elder"
+    ],
     "tags": [],
-    "relationship_states": ["Friend", "CloseFriend"],
-    "memory_tags_required": ["support"],
-    "memory_tags_forbidden": ["abandonment"],
+    "relationship_states": [
+      "Friend",
+      "CloseFriend"
+    ],
+    "memory_tags_required": [
+      "support"
+    ],
+    "memory_tags_forbidden": [
+      "abandonment"
+    ],
     "memory_recency_ticks": 336,
     "relationship_prereqs": [
       {
@@ -23,13 +38,13 @@
       }
     ]
   },
-  "heat": 45.0,
+  "heat": 4,
   "weight": 0.7,
   "cooldown_ticks": 168,
   "roles": [
     {
       "name": "close_friend",
-      "npc_id": 0
+      "required": true
     }
   ],
   "outcomes": {
@@ -39,17 +54,36 @@
         "label": "Open up about something personal",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": -10.0 },
-            { "stat": "happiness", "delta": 8.0 }
+            {
+              "stat": "stress",
+              "delta": -10.0
+            },
+            {
+              "stat": "happiness",
+              "delta": 8.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Affection", "delta": 2.0 },
-            { "axis": "Trust", "delta": 1.5 },
-            { "axis": "Familiarity", "delta": 1.0 }
+            {
+              "axis": "Affection",
+              "delta": 2.0
+            },
+            {
+              "axis": "Trust",
+              "delta": 1.5
+            },
+            {
+              "axis": "Familiarity",
+              "delta": 1.0
+            }
           ],
           "memory_event_id": "vulnerable_moment",
           "emotional_intensity": 0.8,
-          "memory_tags": ["vulnerability", "trust", "deep_connection"],
+          "memory_tags": [
+            "vulnerability",
+            "trust",
+            "deep_connection"
+          ],
           "heat_spike": 15.0
         }
       },
@@ -58,16 +92,32 @@
         "label": "Tell them how much they mean to you",
         "outcome": {
           "stat_impacts": [
-            { "stat": "happiness", "delta": 5.0 },
-            { "stat": "confidence", "delta": 3.0 }
+            {
+              "stat": "happiness",
+              "delta": 5.0
+            },
+            {
+              "stat": "confidence",
+              "delta": 3.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Affection", "delta": 1.5 },
-            { "axis": "Familiarity", "delta": 0.5 }
+            {
+              "axis": "Affection",
+              "delta": 1.5
+            },
+            {
+              "axis": "Familiarity",
+              "delta": 0.5
+            }
           ],
           "memory_event_id": "appreciation_expressed",
           "emotional_intensity": 0.6,
-          "memory_tags": ["gratitude", "affirmation", "warmth"],
+          "memory_tags": [
+            "gratitude",
+            "affirmation",
+            "warmth"
+          ],
           "heat_spike": 8.0
         }
       },
@@ -76,19 +126,41 @@
         "label": "Enjoy the comfortable silence together",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": -15.0 },
-            { "stat": "peace", "delta": 10.0 }
+            {
+              "stat": "stress",
+              "delta": -15.0
+            },
+            {
+              "stat": "peace",
+              "delta": 10.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Familiarity", "delta": 1.0 },
-            { "axis": "Trust", "delta": 0.5 }
+            {
+              "axis": "Familiarity",
+              "delta": 1.0
+            },
+            {
+              "axis": "Trust",
+              "delta": 0.5
+            }
           ],
           "memory_event_id": "peaceful_moment",
           "emotional_intensity": 0.4,
-          "memory_tags": ["peace", "comfort", "presence"],
+          "memory_tags": [
+            "peace",
+            "comfort",
+            "presence"
+          ],
           "heat_spike": 0.0
         }
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ],
+  "domain": "slice_of_life",
+  "life_stage": "teen",
+  "cooldowns": {}
 }

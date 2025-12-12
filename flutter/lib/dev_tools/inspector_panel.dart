@@ -198,7 +198,7 @@ class _InspectorPanelState extends State<InspectorPanel> {
           style: TextStyle(color: Colors.white, fontSize: 13),
         ),
         value: value,
-        activeColor: Colors.cyanAccent,
+        activeThumbColor: Colors.cyanAccent,
         onChanged: (newValue) {
           setState(() {
             component.onPropertyUpdate(key, newValue);

@@ -2,7 +2,13 @@
   "id": "gossip_social_exclusion",
   "name": "Feeling Excluded",
   "description": "You notice people avoiding you. The whispers and sidelong glances make it clear - you're on the outside now.",
-  "tags": ["isolation", "social", "exclusion", "loneliness", "gossip"],
+  "tags": [
+    "isolation",
+    "social",
+    "exclusion",
+    "loneliness",
+    "gossip"
+  ],
   "prerequisites": {
     "player_prereqs": {
       "min_age": 12,
@@ -24,7 +30,7 @@
     "district_conditions": [],
     "digital_legacy_prereq": null
   },
-  "heat": 5.0,
+  "heat": 5,
   "weight": 1.0,
   "outcomes": {
     "base_heat_delta": 3.0,
@@ -35,11 +41,19 @@
         "label": "Seek out new connections",
         "description": "These people don't deserve you anyway. Time to find your real tribe.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 5.0 },
-          { "stat": "charisma", "delta": 2.0 }
+          {
+            "stat": "stress",
+            "delta": 5.0
+          },
+          {
+            "stat": "charisma",
+            "delta": 2.0
+          }
         ],
         "relationship_deltas": [],
-        "flags_to_set": ["seeking_new_circle"],
+        "flags_to_set": [
+          "seeking_new_circle"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "found_new_friends"
@@ -49,8 +63,14 @@
         "label": "Try to win them back",
         "description": "Maybe if you change, they'll accept you again.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 10.0 },
-          { "stat": "confidence", "delta": -5.0 }
+          {
+            "stat": "stress",
+            "delta": 10.0
+          },
+          {
+            "stat": "confidence",
+            "delta": -5.0
+          }
         ],
         "relationship_deltas": [],
         "flags_to_set": [],
@@ -63,11 +83,19 @@
         "label": "Embrace being alone",
         "description": "Solitude isn't so bad. You have yourself, and that's enough.",
         "stat_deltas": [
-          { "stat": "stress", "delta": -3.0 },
-          { "stat": "intelligence", "delta": 3.0 }
+          {
+            "stat": "stress",
+            "delta": -3.0
+          },
+          {
+            "stat": "intelligence",
+            "delta": 3.0
+          }
         ],
         "relationship_deltas": [],
-        "flags_to_set": ["embraced_solitude"],
+        "flags_to_set": [
+          "embraced_solitude"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "embraced_solitude"
@@ -77,11 +105,19 @@
         "label": "Call them out publicly",
         "description": "Make them acknowledge what they're doing. Shame them for their cruelty.",
         "stat_deltas": [
-          { "stat": "stress", "delta": 15.0 },
-          { "stat": "confidence", "delta": 5.0 }
+          {
+            "stat": "stress",
+            "delta": 15.0
+          },
+          {
+            "stat": "confidence",
+            "delta": 5.0
+          }
         ],
         "relationship_deltas": [],
-        "flags_to_set": ["confronted_exclusion"],
+        "flags_to_set": [
+          "confronted_exclusion"
+        ],
         "flags_to_clear": [],
         "follow_up_storylet_id": null,
         "memory_tag": "called_out_exclusion"
@@ -91,5 +127,10 @@
   "roles": [],
   "cooldown_ticks": 480,
   "once_per_lifetime": false,
-  "domain": "Social"
+  "domain": "friendship",
+  "triggers": [
+    "time_tick"
+  ],
+  "life_stage": "adult",
+  "cooldowns": {}
 }

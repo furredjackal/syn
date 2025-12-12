@@ -1,15 +1,18 @@
 /// Integration test for StoryletSource and library loading in syn_director.
 ///
 /// This test demonstrates:
-/// 1. Creating a compiled storylet library in memory
-/// 2. Loading it via the StoryletSource trait
+/// 1. Compiling real storylet JSON files into a library
+/// 2. Loading the compiled binary library
 /// 3. Querying storylets by various indexes
 /// 4. Serializing and deserializing the library to/from disk
 
 use syn_director::StoryletSource;
 use syn_storylets::library::{CompiledStorylet, StoryletLibrary, StoryletKey};
 use syn_storylets::{Cooldowns, Outcome, Prerequisites, StoryDomain, LifeStage, StoryletId, Tag, RoleSlot};
+use syn_storylets::compiler::StoryletCompiler;
+use syn_storylets::validation::default_storylet_validator;
 use tempfile::TempDir;
+use std::path::PathBuf;
 
 /// Helper to create a test storylet with various metadata.
 fn create_test_storylet(
@@ -186,4 +189,108 @@ fn test_storylet_library_persistence() {
 
     let tag2_stories = source.candidates_for_tag(&Tag::new("tag2"));
     assert_eq!(tag2_stories.len(), 2);
+}
+
+#[test]
+fn test_compile_real_storylets() {
+    // Locate the real storylets directory
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest_dir.parent().unwrap().parent().unwrap();
+    let storylets_dir = project_root.join("storylets");
+    
+    if !storylets_dir.exists() {
+        eprintln!("Warning: storylets directory not found at {:?}, skipping test", storylets_dir);
+        return;
+    }
+    
+    // Compile storylets from the real JSON files
+    let validator = default_storylet_validator();
+    let compiler = StoryletCompiler::new(validator);
+    
+    let library = compiler.compile_from_dir(&storylets_dir)
+        .expect("Failed to compile real storylets");
+    
+    // Verify the library has content
+    assert!(library.total_count > 0, "Expected at least one storylet in the library");
+    
+    println!("Compiled {} storylets from {:?}", library.total_count, storylets_dir);
+    println!("  - {} unique tags", library.tag_index.len());
+    println!("  - {} life stages", library.life_stage_index.len());
+    println!("  - {} domains", library.domain_index.len());
+    
+    // Test querying through StoryletSource trait
+    let source: &dyn StoryletSource = &library;
+    
+    // Test iteration
+    let all_storylets: Vec<_> = source.iter_all_storylets().collect();
+    assert_eq!(all_storylets.len() as u32, library.total_count);
+    
+    // Test tag queries for common tags
+    for storylet in &all_storylets {
+        for tag in &storylet.tags {
+            let candidates = source.candidates_for_tag(tag);
+            assert!(!candidates.is_empty(), "Tag {:?} should have candidates", tag);
+            assert!(candidates.contains(&storylet.key), 
+                "Storylet {:?} should be in candidates for its own tag {:?}", storylet.id, tag);
+        }
+    }
+    
+    // Test domain queries
+    for domain in [StoryDomain::Romance, StoryDomain::Career, StoryDomain::Family, 
+                   StoryDomain::Conflict, StoryDomain::Trauma, StoryDomain::SliceOfLife] {
+        let candidates = source.candidates_for_domain(domain);
+        println!("  Domain {:?}: {} storylets", domain, candidates.len());
+    }
+    
+    // Test life stage queries
+    for stage in [LifeStage::Teen, LifeStage::Adult, LifeStage::Elder] {
+        let candidates = source.candidates_for_life_stage(stage);
+        println!("  Life stage {:?}: {} storylets", stage, candidates.len());
+    }
+}
+
+#[test]
+fn test_binary_persistence_with_real_storylets() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest_dir.parent().unwrap().parent().unwrap();
+    let storylets_dir = project_root.join("storylets");
+    
+    if !storylets_dir.exists() {
+        eprintln!("Warning: storylets directory not found, skipping test");
+        return;
+    }
+    
+    // Compile from source
+    let validator = default_storylet_validator();
+    let compiler = StoryletCompiler::new(validator);
+    let library = compiler.compile_from_dir(&storylets_dir)
+        .expect("Failed to compile storylets");
+    
+    let original_count = library.total_count;
+    
+    // Write to binary
+    let temp_dir = TempDir::new().unwrap();
+    let binary_path = temp_dir.path().join("storylets.bin");
+    
+    library.write_to_file(&binary_path)
+        .expect("Failed to write binary library");
+    
+    // Read from binary
+    let loaded = StoryletLibrary::read_from_file(&binary_path)
+        .expect("Failed to read binary library");
+    
+    // Verify it matches
+    assert_eq!(loaded.total_count, original_count);
+    assert_eq!(loaded.tag_index.len(), library.tag_index.len());
+    assert_eq!(loaded.domain_index.len(), library.domain_index.len());
+    assert_eq!(loaded.life_stage_index.len(), library.life_stage_index.len());
+    
+    // Verify query results match
+    let source_original: &dyn StoryletSource = &library;
+    let source_loaded: &dyn StoryletSource = &loaded;
+    
+    let tag = Tag::new("romance");
+    let orig_candidates = source_original.candidates_for_tag(&tag);
+    let loaded_candidates = source_loaded.candidates_for_tag(&tag);
+    assert_eq!(orig_candidates.len(), loaded_candidates.len());
 }

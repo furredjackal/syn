@@ -1,22 +1,33 @@
 {
   "id": "district_economic_crash",
   "name": "Economic Collapse",
-  "tags": ["poverty", "crisis", "unemployment", "district_event"],
+  "tags": [
+    "poverty",
+    "crisis",
+    "unemployment",
+    "district_event"
+  ],
   "prerequisites": {
     "min_relationship_affection": null,
     "min_relationship_resentment": null,
     "stat_conditions": {},
-    "life_stages": ["YoungAdult", "Adult", "Elder"],
+    "life_stages": [
+      "young_adult",
+      "adult",
+      "elder"
+    ],
     "tags": [],
     "relationship_states": [],
     "memory_tags_required": [],
     "memory_tags_forbidden": [],
     "memory_recency_ticks": null,
     "district_conditions": [
-      { "district": "Industrial Park" }
+      {
+        "district": "Industrial Park"
+      }
     ]
   },
-  "heat": 65.0,
+  "heat": 6,
   "weight": 0.75,
   "cooldown_ticks": 336,
   "roles": [],
@@ -27,13 +38,23 @@
         "label": "Start an urgent job search",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 20.0 },
-            { "stat": "determination", "delta": 10.0 }
+            {
+              "stat": "stress",
+              "delta": 20.0
+            },
+            {
+              "stat": "determination",
+              "delta": 10.0
+            }
           ],
           "relationship_impacts": [],
           "memory_event_id": "economic_job_hunt",
           "emotional_intensity": -0.5,
-          "memory_tags": ["desperation", "resilience", "job_search"],
+          "memory_tags": [
+            "desperation",
+            "resilience",
+            "job_search"
+          ],
           "heat_spike": 10.0
         }
       },
@@ -42,15 +63,28 @@
         "label": "Seek help from community resources",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 5.0 },
-            { "stat": "humility", "delta": 5.0 }
+            {
+              "stat": "stress",
+              "delta": 5.0
+            },
+            {
+              "stat": "humility",
+              "delta": 5.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Familiarity", "delta": 1.0 }
+            {
+              "axis": "Familiarity",
+              "delta": 1.0
+            }
           ],
           "memory_event_id": "sought_community_aid",
           "emotional_intensity": 0.2,
-          "memory_tags": ["vulnerability", "community", "support"],
+          "memory_tags": [
+            "vulnerability",
+            "community",
+            "support"
+          ],
           "heat_spike": 5.0
         }
       },
@@ -59,14 +93,27 @@
         "label": "Start a side hustle to make ends meet",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 15.0 },
-            { "stat": "entrepreneurship", "delta": 12.0 },
-            { "stat": "wealth", "delta": 3.0 }
+            {
+              "stat": "stress",
+              "delta": 15.0
+            },
+            {
+              "stat": "entrepreneurship",
+              "delta": 12.0
+            },
+            {
+              "stat": "wealth",
+              "delta": 3.0
+            }
           ],
           "relationship_impacts": [],
           "memory_event_id": "economic_side_hustle",
           "emotional_intensity": 0.4,
-          "memory_tags": ["hustle", "creativity", "survival"],
+          "memory_tags": [
+            "hustle",
+            "creativity",
+            "survival"
+          ],
           "heat_spike": 12.0
         }
       },
@@ -75,18 +122,37 @@
         "label": "Consider relocating to a better area",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 25.0 },
-            { "stat": "adaptability", "delta": 8.0 }
+            {
+              "stat": "stress",
+              "delta": 25.0
+            },
+            {
+              "stat": "adaptability",
+              "delta": 8.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Familiarity", "delta": -2.0 }
+            {
+              "axis": "Familiarity",
+              "delta": -2.0
+            }
           ],
           "memory_event_id": "considered_relocation",
           "emotional_intensity": -0.6,
-          "memory_tags": ["uncertainty", "change", "displacement"],
+          "memory_tags": [
+            "uncertainty",
+            "change",
+            "displacement"
+          ],
           "heat_spike": 18.0
         }
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ],
+  "domain": "slice_of_life",
+  "life_stage": "young_adult",
+  "cooldowns": {}
 }

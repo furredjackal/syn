@@ -2,14 +2,25 @@
   "id": "relationship_rival_confrontation",
   "name": "Boiling Point",
   "description": "A long-simmering rivalry finally erupts into direct confrontation.",
-  "tags": ["conflict", "rivalry", "confrontation", "drama"],
-  "domain": "Conflict",
-  "life_stage": "Adult",
+  "tags": [
+    "conflict",
+    "rivalry",
+    "confrontation",
+    "drama"
+  ],
+  "domain": "conflict",
+  "life_stage": "adult",
   "heat": 7,
   "weight": 1.2,
   "roles": [
-    { "name": "protagonist", "required": true },
-    { "name": "rival", "required": true }
+    {
+      "name": "protagonist",
+      "required": true
+    },
+    {
+      "name": "rival",
+      "required": true
+    }
   ],
   "prerequisites": {
     "relationship_prerequisites": [
@@ -17,8 +28,14 @@
         "from_role": "protagonist",
         "to_role": "rival",
         "thresholds": [
-          { "axis": "resentment", "min": 4.0 },
-          { "axis": "familiarity", "min": 2.0 }
+          {
+            "axis": "resentment",
+            "min": 4.0
+          },
+          {
+            "axis": "familiarity",
+            "min": 2.0
+          }
         ]
       }
     ]
@@ -33,36 +50,72 @@
         "id": "confront_directly",
         "label": "Confront them head-on",
         "stat_deltas": [
-          { "stat": "mood", "delta": -2.0 }
+          {
+            "stat": "mood",
+            "delta": -2.0
+          }
         ],
         "relationship_deltas": [
-          { "axis": "Resentment", "delta": 2.0 },
-          { "axis": "Familiarity", "delta": 0.5 }
+          {
+            "axis": "Resentment",
+            "delta": 2.0
+          },
+          {
+            "axis": "Familiarity",
+            "delta": 0.5
+          }
         ],
-        "memory_tags": ["confrontation", "rivalry_escalated"]
+        "memory_tags": [
+          "confrontation",
+          "rivalry_escalated"
+        ]
       },
       {
         "id": "rise_above",
         "label": "Take the high road",
         "stat_deltas": [
-          { "stat": "mood", "delta": -1.0 },
-          { "stat": "reputation", "delta": 1.0 }
+          {
+            "stat": "mood",
+            "delta": -1.0
+          },
+          {
+            "stat": "reputation",
+            "delta": 1.0
+          }
         ],
         "relationship_deltas": [
-          { "axis": "Resentment", "delta": -0.5 }
+          {
+            "axis": "Resentment",
+            "delta": -0.5
+          }
         ],
-        "memory_tags": ["composure", "rivalry_defused"]
+        "memory_tags": [
+          "composure",
+          "rivalry_defused"
+        ]
       },
       {
         "id": "seek_reconciliation",
         "label": "Try to understand their perspective",
         "stat_deltas": [],
         "relationship_deltas": [
-          { "axis": "Resentment", "delta": -2.0 },
-          { "axis": "Trust", "delta": 0.5 }
+          {
+            "axis": "Resentment",
+            "delta": -2.0
+          },
+          {
+            "axis": "Trust",
+            "delta": 0.5
+          }
         ],
-        "memory_tags": ["reconciliation_attempt", "empathy"]
+        "memory_tags": [
+          "reconciliation_attempt",
+          "empathy"
+        ]
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ]
 }

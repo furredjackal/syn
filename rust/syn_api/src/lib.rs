@@ -1,20 +1,48 @@
-//! syn_api: FFI aggregation layer for Flutter via flutter_rust_bridge.
-//!
-//! Exposes the entire SYN simulation engine to Flutter through a typed, async-friendly API.
-//! This is the "public interface" of the Rust backend.
-//!
+mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
+// syn_api: FFI aggregation layer for Flutter via flutter_rust_bridge.
+//
+// Exposes the entire SYN simulation engine to Flutter through a typed, async-friendly API.
+// This is the "public interface" of the Rust backend.
+//
 //! ## Architecture
 //!
 //! - [`GameEngine`]: Main game state manager combining world, simulator, director, and memory
 //! - [`GameRuntime`]: Shared runtime state for the director loop
 //! - API functions prefixed with `engine_*` are `#[frb(sync)]` for Flutter Rust Bridge
 //!
+//! ## Primary API Functions (Flutter Core)
+//!
+//! Flutter should primarily use these functions for FRB cohesion:
+//!
+//! ### World Management
+//! - [`init_world(seed)`]: Initialize new world
+//! - [`load_world(seed)`]: Load saved world
+//! - [`step_world(ticks)`]: Advance simulation
+//! - [`get_game_state_snapshot()`]: Get unified game state
+//!
+//! ### Storylets & Events
+//! - [`get_current_storylet()`]: Get current event card
+//! - [`get_available_choices()`]: Get choices for current event
+//! - [`api_choose_option(storylet_id, choice_id, ticks)`]: Make choice and advance
+//!
+//! ### Player Data
+//! - [`get_player_stats()`]: Get stats snapshot
+//! - [`get_player_mood()`]: Get mood value
+//! - [`get_player_karma()`]: Get karma value
+//! - [`get_relationship_network()`]: Get relationships for network view
+//! - [`get_memory_journal()`]: Get memory entries for journal view
+//! - [`get_life_stage_summary()`]: Get digital legacy for end-of-life view
+//!
 //! ## DTOs
 //!
 //! All DTOs (Data Transfer Objects) are serializable structs for Dart interop:
+//! - [`ApiGameStateSnapshot`]: Unified game state
 //! - [`ApiStatsSnapshot`]: Player stats
 //! - [`ApiRelationshipSnapshot`]: Player relationships with bands and roles
+//! - [`ApiMemoryJournalEntry`]: Memory journal entries
 //! - [`ApiDigitalLegacySnapshot`]: PostLife digital imprint data
+//! - [`ApiDirectorEventView`]: Current storylet/event
+//! - [`ApiDirectorChoiceView`]: Available choices
 //! - [`ApiDistrictSnapshot`]: District economic/crime data
 //! - [`ApiPlayerSkillsSnapshot`]: Player skill progression
 
@@ -1026,9 +1054,13 @@ pub struct ApiCityStats {
 
 // ==================== Director Loop API ====================
 
-/// Replace the shared runtime (primarily for tests).
+/// Test-only helper to replace the shared runtime state.
+///
+/// **NOT EXPOSED TO FLUTTER.** This function is only available in test builds
+/// and is used to inject custom world/sim/storylet state for unit testing.
 ///
 /// Replaces the global `RUNTIME` state with the provided components.
+#[cfg(test)]
 pub fn api_reset_runtime(world: WorldState, sim: SimState, storylets: StoryletLibrary) {
     let mut guard = RUNTIME.lock().expect("GameRuntime poisoned");
     *guard = GameRuntime {
@@ -1082,25 +1114,133 @@ pub fn api_choose_option(
     Some(ApiDirectorEventView::from(view))
 }
 
+// ==================== Core World Management API ====================
+
+/// Unified game state snapshot for Flutter UI.
+///
+/// Contains all necessary data for UI rendering in a single struct.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiGameStateSnapshot {
+    /// Current simulation tick.
+    pub current_tick: u64,
+    /// Player age in years.
+    pub player_age_years: u32,
+    /// Player life stage.
+    pub life_stage: String,
+    /// Player stats snapshot.
+    pub stats: ApiStatsSnapshot,
+    /// Player relationships snapshot.
+    pub relationships: ApiRelationshipSnapshot,
+    /// Current narrative heat.
+    pub narrative_heat: f32,
+    /// Heat level label.
+    pub heat_level: String,
+    /// Heat trend (-1.0 to +1.0).
+    pub heat_trend: f32,
+    /// Current event/storylet if any.
+    pub current_event: Option<ApiDirectorEventView>,
+    /// Karma value.
+    pub karma: f32,
+    /// Karma band label.
+    pub karma_band: String,
+    /// Mood band label.
+    pub mood_band: String,
+    /// Life stage visibility info.
+    pub life_stage_info: ApiLifeStageInfo,
+}
+
+/// Memory journal entry for UI display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiMemoryJournalEntry {
+    /// Memory identifier.
+    pub id: String,
+    /// Event identifier.
+    pub event_id: String,
+    /// NPC ID who has this memory.
+    pub npc_id: i64,
+    /// Simulation tick when created.
+    pub sim_tick: u64,
+    /// Emotional intensity (-1.0 to +1.0).
+    pub emotional_intensity: f32,
+    /// Optional description text.
+    pub description: Option<String>,
+    /// Memory tags for categorization.
+    pub tags: Vec<String>,
+}
+
 // ==================== Frb Wrapper (Async Support) ====================
 
 /// Global engine instance (protected by Mutex for thread safety).
 static ENGINE: Mutex<Option<GameEngine>> = Mutex::new(None);
 
-/// Initialize the game engine.
+/// Initialize the game engine with a world seed.
+/// This is the primary initialization function Flutter should call.
 #[frb(sync)]
-pub fn init_engine(seed: u64) {
+pub fn init_world(seed: u64) {
     let mut engine = ENGINE.lock().unwrap();
     *engine = Some(GameEngine::new(seed));
 }
 
-/// Tick the engine (thread-safe).
+/// Alias for backwards compatibility.
 #[frb(sync)]
-pub fn engine_tick() {
+pub fn init_engine(seed: u64) {
+    init_world(seed);
+}
+
+/// Load a saved world state (placeholder for save/load system).
+/// Currently reinitializes with the same seed.
+#[frb(sync)]
+pub fn load_world(seed: u64) -> bool {
+    init_world(seed);
+    true
+}
+
+/// Advance the simulation by a specified number of ticks.
+/// This is the primary time-step function Flutter should call.
+#[frb(sync)]
+pub fn step_world(ticks: u32) {
     let mut engine = ENGINE.lock().unwrap();
     if let Some(ref mut e) = *engine {
-        e.tick();
+        for _ in 0..ticks {
+            e.tick();
+        }
     }
+}
+
+/// Tick the engine by 1 tick (thread-safe).
+#[frb(sync)]
+pub fn engine_tick() {
+    step_world(1);
+}
+
+/// Advance the simulation by multiple ticks.
+#[frb(sync)]
+pub fn engine_tick_many(count: u32) {
+    step_world(count);
+}
+
+/// Get unified game state snapshot for UI.
+/// This is the primary state accessor Flutter should call.
+#[frb(sync)]
+pub fn get_game_state_snapshot() -> Option<ApiGameStateSnapshot> {
+    let engine = ENGINE.lock().unwrap();
+    engine.as_ref().map(|e| {
+        ApiGameStateSnapshot {
+            current_tick: e.current_tick(),
+            player_age_years: e.player_age(),
+            life_stage: e.player_life_stage(),
+            stats: e.player_stats(),
+            relationships: e.player_relationships(),
+            narrative_heat: e.narrative_heat(),
+            heat_level: e.narrative_heat_level(),
+            heat_trend: e.narrative_heat_trend(),
+            current_event: api_get_current_event(),
+            karma: e.player_karma(),
+            karma_band: e.player_karma_band(),
+            mood_band: e.get_mood_band(),
+            life_stage_info: e.life_stage_info(),
+        }
+    })
 }
 
 /// Get player age.
@@ -1110,14 +1250,40 @@ pub fn engine_player_age() -> u32 {
     engine.as_ref().map(|e| e.player_age()).unwrap_or(0)
 }
 
-/// Get player mood.
+/// Get player stats snapshot (primary accessor for UI).
 #[frb(sync)]
-pub fn engine_player_mood() -> f32 {
+pub fn get_player_stats() -> ApiStatsSnapshot {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| e.player_stats())
+        .unwrap_or(ApiStatsSnapshot {
+            stats: vec![],
+            mood_band: "Unknown".to_string(),
+        })
+}
+
+/// Get player mood value.
+#[frb(sync)]
+pub fn get_player_mood() -> f32 {
     let engine = ENGINE.lock().unwrap();
     engine
         .as_ref()
         .map(|e| e.world.player_stats.get(StatKind::Mood))
         .unwrap_or(0.0)
+}
+
+/// Get player karma value.
+#[frb(sync)]
+pub fn get_player_karma() -> f32 {
+    let engine = ENGINE.lock().unwrap();
+    engine.as_ref().map(|e| e.player_karma()).unwrap_or(0.0)
+}
+
+/// Backwards compatibility alias.
+#[frb(sync)]
+pub fn engine_player_mood() -> f32 {
+    get_player_mood()
 }
 
 /// Get player relationships snapshot via the global engine.
@@ -1130,6 +1296,60 @@ pub fn engine_player_relationships() -> ApiRelationshipSnapshot {
         .unwrap_or(ApiRelationshipSnapshot {
             relationships: vec![],
         })
+}
+
+/// Get current storylet/event card for UI display.
+/// Returns the next eligible storylet, or None if no events are available.
+#[frb(sync)]
+pub fn get_current_storylet() -> Option<ApiDirectorEventView> {
+    api_get_current_event()
+}
+
+/// Get available choices for the current event.
+/// Returns empty vector if no event is active.
+#[frb(sync)]
+pub fn get_available_choices() -> Vec<ApiDirectorChoiceView> {
+    api_get_current_event()
+        .map(|event| event.choices)
+        .unwrap_or_default()
+}
+
+/// Get player memory journal entries.
+/// Returns all memories for the player character.
+#[frb(sync)]
+pub fn get_memory_journal() -> Vec<ApiMemoryJournalEntry> {
+    let engine = ENGINE.lock().unwrap();
+    engine
+        .as_ref()
+        .map(|e| {
+            e.get_npc_memories(e.world.player_id.0)
+                .into_iter()
+                .map(|mem| ApiMemoryJournalEntry {
+                    id: mem.id,
+                    event_id: mem.event_id,
+                    npc_id: e.world.player_id.0 as i64,
+                    sim_tick: mem.sim_tick,
+                    emotional_intensity: mem.emotional_intensity,
+                    description: None, // MemoryDto doesn't have description
+                    tags: vec![], // MemoryDto doesn't have tags
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Get relationship network slice for visualization.
+/// Returns player relationships with extended metadata.
+#[frb(sync)]
+pub fn get_relationship_network() -> ApiRelationshipSnapshot {
+    engine_player_relationships()
+}
+
+/// Get life-stage summary for end-of-life/digital legacy screen.
+/// Returns digital legacy snapshot if in Digital stage.
+#[frb(sync)]
+pub fn get_life_stage_summary() -> ApiDigitalLegacySnapshot {
+    engine_get_digital_legacy()
 }
 
 /// Get current narrative heat value.

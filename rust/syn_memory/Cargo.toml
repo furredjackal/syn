@@ -8,4 +8,13 @@ workspace = true
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 syn_core = { path = "../syn_core" }
+syn_storage = { path = "../syn_storage", optional = true }
+
+[features]
+default = ["storage"]
+storage = ["syn_storage"]
+
+[dev-dependencies]
+tempfile = "3.8"

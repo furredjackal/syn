@@ -2,12 +2,24 @@
 //!
 //! Records player choices, event outcomes, and emotional impacts.
 //! Memories are used by the Event Director to trigger echos and narrative chains.
+//!
+//! ## Cold Storage Integration
+//!
+//! When the `storage` feature is enabled (default), journals can be archived
+//! to cold storage via HybridStorage, enabling long-term memory persistence
+//! for dormant NPCs.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use syn_core::npc_behavior::BehaviorKind;
 pub use syn_core::relationships::RelationshipDelta;
 pub use syn_core::{NpcId, SimTick, StatDelta};
+
+#[cfg(feature = "storage")]
+use syn_storage::HybridStorage;
+
+#[cfg(feature = "storage")]
+use syn_storage::storage_error::StorageError;
 
 /// A single memory entry recording an event and its impact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -154,6 +166,96 @@ impl MemorySystem {
         MemorySystem {
             journals: HashMap::new(),
         }
+    }
+
+    /// Archive a journal to cold storage (requires `storage` feature).
+    ///
+    /// This serializes the journal as JSON and stores it in the cold tier
+    /// using the NPC's ID as the key. Useful for archiving memories of
+    /// dormant NPCs to free up RAM.
+    #[cfg(feature = "storage")]
+    pub fn archive_journal(
+        &self,
+        npc_id: NpcId,
+        storage: &HybridStorage,
+    ) -> Result<(), StorageError> {
+        if let Some(journal) = self.journals.get(&npc_id) {
+            let json = serde_json::to_string(journal)
+                .map_err(|e| StorageError::Unknown(format!("JSON serialization failed: {}", e)))?;
+            
+            // Store in cold tier using DuckDB journal archive
+            storage.archive_journal(npc_id.0, &json)?;
+        }
+        Ok(())
+    }
+
+    /// Load an archived journal from cold storage (requires `storage` feature).
+    ///
+    /// Retrieves a serialized journal from the cold tier and deserializes it
+    /// into memory. Returns None if no archived journal exists for this NPC.
+    #[cfg(feature = "storage")]
+    pub fn load_archived_journal(
+        &mut self,
+        npc_id: NpcId,
+        storage: &HybridStorage,
+    ) -> Result<Option<Journal>, StorageError> {
+        if let Some(json_str) = storage.load_archived_journal(npc_id.0)? {
+            let journal: Journal = serde_json::from_str(&json_str)
+                .map_err(|e| StorageError::Unknown(format!("JSON deserialization failed: {}", e)))?;
+            self.journals.insert(npc_id, journal.clone());
+            Ok(Some(journal))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Prune old memories from a journal, keeping only recent ones.
+    ///
+    /// Archives the full journal before pruning if storage is provided.
+    /// Keeps memories from the last `days_to_keep` days.
+    #[cfg(feature = "storage")]
+    pub fn prune_old_memories(
+        &mut self,
+        npc_id: NpcId,
+        current_tick: SimTick,
+        days_to_keep: u32,
+        storage: Option<&HybridStorage>,
+    ) -> Result<usize, StorageError> {
+        // Archive before pruning if storage provided
+        if let Some(store) = storage {
+            self.archive_journal(npc_id, store)?;
+        }
+
+        let cutoff_tick = SimTick::new(
+            current_tick.0.saturating_sub(days_to_keep as u64 * 24)
+        );
+
+        if let Some(journal) = self.journals.get_mut(&npc_id) {
+            let original_count = journal.entries.len();
+            journal.entries.retain(|e| e.sim_tick.0 >= cutoff_tick.0);
+            let pruned = original_count - journal.entries.len();
+            return Ok(pruned);
+        }
+        Ok(0)
+    }
+
+    /// Prune old memories (non-storage variant).
+    pub fn prune_old_memories_no_archive(
+        &mut self,
+        npc_id: NpcId,
+        current_tick: SimTick,
+        days_to_keep: u32,
+    ) -> usize {
+        let cutoff_tick = SimTick::new(
+            current_tick.0.saturating_sub(days_to_keep as u64 * 24)
+        );
+
+        if let Some(journal) = self.journals.get_mut(&npc_id) {
+            let original_count = journal.entries.len();
+            journal.entries.retain(|e| e.sim_tick.0 >= cutoff_tick.0);
+            return original_count - journal.entries.len();
+        }
+        0
     }
 
     /// Get or create a journal for an NPC.
@@ -387,5 +489,40 @@ mod tests {
 
         memory_sys.record_memory(entry);
         assert!(memory_sys.get_journal(NpcId(1)).is_some());
+    }
+
+    #[test]
+    fn test_prune_old_memories_no_archive() {
+        let mut memory_sys = MemorySystem::new();
+        let npc_id = NpcId(1);
+
+        // Add memories spanning 14 days
+        for day in 0..14 {
+            let entry = MemoryEntry::new(
+                format!("mem_{}", day),
+                "event_daily".to_string(),
+                npc_id,
+                SimTick(day * 24),
+                0.5,
+            );
+            memory_sys.record_memory(entry);
+        }
+
+        let journal = memory_sys.get_journal(npc_id).unwrap();
+        assert_eq!(journal.entries.len(), 14);
+
+        // Prune to keep only last 7 days
+        // Current is day 13 (tick 312), cutoff is 312 - 168 = 144
+        // Days 0-5 (ticks 0, 24, 48, 72, 96, 120) are removed (< 144)
+        // Days 6-13 (ticks 144, 168, ..., 312) are kept (>= 144)
+        let pruned = memory_sys.prune_old_memories_no_archive(
+            npc_id,
+            SimTick(13 * 24), // current is day 13 at tick 312
+            7,
+        );
+
+        assert_eq!(pruned, 6); // Removes days 0-5 (6 entries)
+        let journal = memory_sys.get_journal(npc_id).unwrap();
+        assert_eq!(journal.entries.len(), 8); // Keeps days 6-13 (8 entries)
     }
 }

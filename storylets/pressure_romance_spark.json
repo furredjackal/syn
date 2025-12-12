@@ -1,16 +1,30 @@
 {
   "id": "pressure_romance_spark",
   "name": "Sparks Fly",
-  "tags": ["romance", "attraction", "chemistry"],
+  "tags": [
+    "romance",
+    "attraction",
+    "chemistry"
+  ],
   "prerequisites": {
     "min_relationship_affection": 3.0,
     "min_relationship_resentment": null,
     "stat_conditions": {},
-    "life_stages": ["Teen", "Adult"],
+    "life_stages": [
+      "teen",
+      "adult"
+    ],
     "tags": [],
-    "relationship_states": ["Friend", "CloseFriend", "Acquaintance"],
+    "relationship_states": [
+      "Friend",
+      "CloseFriend",
+      "Acquaintance"
+    ],
     "memory_tags_required": [],
-    "memory_tags_forbidden": ["rejection", "heartbreak"],
+    "memory_tags_forbidden": [
+      "rejection",
+      "heartbreak"
+    ],
     "memory_recency_ticks": null,
     "relationship_prereqs": [
       {
@@ -31,13 +45,13 @@
       }
     ]
   },
-  "heat": 60.0,
+  "heat": 6,
   "weight": 0.75,
   "cooldown_ticks": 240,
   "roles": [
     {
       "name": "romantic_interest",
-      "npc_id": 0
+      "required": true
     }
   ],
   "outcomes": {
@@ -47,17 +61,37 @@
         "label": "Confess your feelings",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 20.0 },
-            { "stat": "courage", "delta": 10.0 }
+            {
+              "stat": "stress",
+              "delta": 20.0
+            },
+            {
+              "stat": "courage",
+              "delta": 10.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Attraction", "delta": 2.0 },
-            { "axis": "Affection", "delta": 1.5 },
-            { "axis": "Familiarity", "delta": 1.0 }
+            {
+              "axis": "Attraction",
+              "delta": 2.0
+            },
+            {
+              "axis": "Affection",
+              "delta": 1.5
+            },
+            {
+              "axis": "Familiarity",
+              "delta": 1.0
+            }
           ],
           "memory_event_id": "romantic_confession",
           "emotional_intensity": 0.9,
-          "memory_tags": ["confession", "vulnerability", "romance", "brave"],
+          "memory_tags": [
+            "confession",
+            "vulnerability",
+            "romance",
+            "brave"
+          ],
           "heat_spike": 25.0
         }
       },
@@ -66,16 +100,32 @@
         "label": "Flirt subtly and gauge their reaction",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 5.0 },
-            { "stat": "charm", "delta": 5.0 }
+            {
+              "stat": "stress",
+              "delta": 5.0
+            },
+            {
+              "stat": "charm",
+              "delta": 5.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Attraction", "delta": 1.0 },
-            { "axis": "Familiarity", "delta": 0.5 }
+            {
+              "axis": "Attraction",
+              "delta": 1.0
+            },
+            {
+              "axis": "Familiarity",
+              "delta": 0.5
+            }
           ],
           "memory_event_id": "playful_flirtation",
           "emotional_intensity": 0.5,
-          "memory_tags": ["flirtation", "playful", "chemistry"],
+          "memory_tags": [
+            "flirtation",
+            "playful",
+            "chemistry"
+          ],
           "heat_spike": 10.0
         }
       },
@@ -84,17 +134,37 @@
         "label": "Create an intimate moment",
         "outcome": {
           "stat_impacts": [
-            { "stat": "happiness", "delta": 15.0 },
-            { "stat": "stress", "delta": -5.0 }
+            {
+              "stat": "happiness",
+              "delta": 15.0
+            },
+            {
+              "stat": "stress",
+              "delta": -5.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Attraction", "delta": 1.5 },
-            { "axis": "Affection", "delta": 1.0 },
-            { "axis": "Trust", "delta": 0.5 }
+            {
+              "axis": "Attraction",
+              "delta": 1.5
+            },
+            {
+              "axis": "Affection",
+              "delta": 1.0
+            },
+            {
+              "axis": "Trust",
+              "delta": 0.5
+            }
           ],
           "memory_event_id": "intimate_moment",
           "emotional_intensity": 0.7,
-          "memory_tags": ["intimacy", "connection", "romance", "tender"],
+          "memory_tags": [
+            "intimacy",
+            "connection",
+            "romance",
+            "tender"
+          ],
           "heat_spike": 18.0
         }
       },
@@ -103,18 +173,37 @@
         "label": "Keep your feelings hidden",
         "outcome": {
           "stat_impacts": [
-            { "stat": "stress", "delta": 10.0 },
-            { "stat": "loneliness", "delta": 8.0 }
+            {
+              "stat": "stress",
+              "delta": 10.0
+            },
+            {
+              "stat": "loneliness",
+              "delta": 8.0
+            }
           ],
           "relationship_impacts": [
-            { "axis": "Familiarity", "delta": 0.5 }
+            {
+              "axis": "Familiarity",
+              "delta": 0.5
+            }
           ],
           "memory_event_id": "unspoken_feelings",
           "emotional_intensity": -0.3,
-          "memory_tags": ["longing", "restraint", "hidden_feelings"],
+          "memory_tags": [
+            "longing",
+            "restraint",
+            "hidden_feelings"
+          ],
           "heat_spike": 0.0
         }
       }
     ]
-  }
+  },
+  "triggers": [
+    "time_tick"
+  ],
+  "domain": "romance",
+  "life_stage": "teen",
+  "cooldowns": {}
 }
