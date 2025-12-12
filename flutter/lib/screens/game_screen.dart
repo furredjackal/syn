@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../models/game_phase.dart';
 import '../syn_game.dart';
 import '../ui/widgets/persona_container.dart';
 import '../ui/widgets/magnetic_dock.dart';
@@ -21,15 +22,6 @@ import '../ui/overlays/event_canvas_overlay.dart';
 import '../ui/overlays/relationship_network_overlay.dart';
 import '../ui/overlays/possession_overlay.dart';
 
-/// Game phase enum to track which UI to display
-enum GamePhase {
-  splash,
-  mainMenu,
-  characterCreation,
-  gameplay,
-  endOfLife,
-}
-
 /// Phase 1 Hybrid UI: Flame background + Flutter UI overlay
 /// Phase 2 Dev Tools: Runtime inspector and debug console
 ///
@@ -39,14 +31,16 @@ enum GamePhase {
 /// - Layer 3 (Dev Tools): Inspector Panel and Quake Console (toggleable)
 /// - Style: Persona 5 aesthetic with skewed containers and high contrast
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final SynGame synGame;
+
+  const GameScreen({super.key, required this.synGame});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  late final SynGame _game;
+  late GamePhase _phase;
   bool _showInspector = false;
   bool _showConsole = false;
   bool _showSettingsOverlay = false;
@@ -59,7 +53,6 @@ class _GameScreenState extends State<GameScreen> {
   bool _showRelationshipNetwork = false;
   bool _showPossession = false;
   String _saveLoadMode = 'load'; // 'save' or 'load'
-  GamePhase _currentPhase = GamePhase.splash;
   StoryletEvent? _currentEvent;
 
   // Mock data for panels
@@ -92,7 +85,36 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _game = SynGame();
+    _phase = GamePhase.mainMenu;
+  }
+
+  void _setPhase(GamePhase phase) => setState(() => _phase = phase);
+
+  void _handleNewGameRequested() {
+    _setPhase(GamePhase.characterCreation);
+  }
+
+  void _handleLoadRequested() {
+    // later: load from backend
+    _setPhase(GamePhase.gameplay);
+  }
+
+  void _handleSettingsRequested() {
+    // for now, just log; later can show a settings overlay
+    debugPrint('Settings requested');
+  }
+
+  void _handleQuitRequested() {
+    debugPrint('Quit requested (not implemented)');
+  }
+
+  void _handleCharacterCreated() {
+    // later: call backend to create new game
+    _setPhase(GamePhase.gameplay);
+  }
+
+  void _handleRestartRequested() {
+    _setPhase(GamePhase.mainMenu);
   }
 
   @override
@@ -102,15 +124,27 @@ class _GameScreenState extends State<GameScreen> {
       body: Stack(
         children: [
           // Layer 1 (Bottom): Flame GameWidget Background
-          if (_currentPhase == GamePhase.gameplay)
-            Positioned.fill(
-              child: GameWidget(
-                game: _game,
-              ),
+          Positioned.fill(
+            child: GameWidget(
+              game: widget.synGame,
+              overlayBuilderMap: {
+                'text_input': (context, game) =>
+                    buildTextInputOverlay(context, game as SynGame),
+                'pause_menu': (context, game) =>
+                    buildPauseMenuOverlay(context, game as SynGame),
+                'confirm_dialog': (context, game) =>
+                    buildConfirmDialogOverlay(context, game as SynGame),
+                'loading': (context, game) => buildLoadingOverlay(context),
+                'settings_form': (context, game) =>
+                    buildSettingsFormOverlay(context, game as SynGame),
+                'debug_console': (context, game) =>
+                    buildDebugConsoleOverlay(context, game as SynGame),
+              },
             ),
+          ),
 
           // Layer 2 (Top): Flutter UI based on phase
-          _buildPhaseUI(),
+          Positioned.fill(child: _buildPhaseUi()),
 
           // Overlays (conditional)
           if (_showSettingsOverlay) _buildSettingsOverlay(),
@@ -124,12 +158,12 @@ class _GameScreenState extends State<GameScreen> {
           if (_showPossession) _buildPossessionOverlay(),
 
           // Layer 3 (Dev Tools): Inspector Panel (Right)
-          if (_showInspector && _currentPhase == GamePhase.gameplay)
+          if (_showInspector && _phase == GamePhase.gameplay)
             Positioned(
               top: 0,
               right: 0,
               bottom: 0,
-              child: InspectorPanel(game: _game)
+              child: InspectorPanel(game: widget.synGame)
                   .animate()
                   .slideX(
                     begin: 1,
@@ -140,7 +174,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
 
           // Layer 3 (Dev Tools): Quake Console (Top)
-          if (_showConsole && _currentPhase == GamePhase.gameplay)
+          if (_showConsole && _phase == GamePhase.gameplay)
             Positioned(
               top: 0,
               left: 0,
@@ -158,7 +192,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
 
           // Dev Tools Toggle Buttons (Bottom Right) - Only in gameplay
-          if (_currentPhase == GamePhase.gameplay)
+          if (_phase == GamePhase.gameplay)
             Positioned(
               bottom: 20,
               right: 20,
@@ -171,53 +205,38 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildPhaseUI() {
-    switch (_currentPhase) {
+  Widget _buildPhaseUi() {
+    switch (_phase) {
       case GamePhase.splash:
         return SplashScreen(
-          onFinish: () => setState(() => _currentPhase = GamePhase.mainMenu),
+          onFinish: () => _setPhase(GamePhase.mainMenu),
         );
       case GamePhase.mainMenu:
         return MainMenuScreen(
-          onStartGame: () {
-            setState(() => _currentPhase = GamePhase.characterCreation);
-            _game.showCharacterCreation();
-          },
-          onSettings: () => setState(() => _showSettingsOverlay = true),
-          onDataLoad: () => setState(() {
-            _saveLoadMode = 'load';
-            _showSaveLoadOverlay = true;
-          }),
-          onDataSave: () => setState(() {
-            _saveLoadMode = 'save';
-            _showSaveLoadOverlay = true;
-          }),
-          onReturnToTitle: () => setState(() => _currentPhase = GamePhase.splash),
+          onNewGame: _handleNewGameRequested,
+          onLoadGame: _handleLoadRequested,
+          onSettings: _handleSettingsRequested,
+          onQuit: _handleQuitRequested,
         );
       case GamePhase.characterCreation:
         return CharacterCreationScreen(
-          onComplete: ({
-            required String name,
-            required String archetype,
-            required bool sfwMode,
-            required String difficulty,
-          }) {
-            debugPrint('[CharacterCreation] Name: $name, Archetype: $archetype');
-            setState(() => _currentPhase = GamePhase.gameplay);
-            // TODO: Pass character data to Rust simulation
-          },
+          onBack: () => _setPhase(GamePhase.mainMenu),
+          onStart: (_) => _handleCharacterCreated(),
         );
       case GamePhase.gameplay:
-        return _buildGameplayUI();
+        return _buildGameplayUi();
       case GamePhase.endOfLife:
         return EndOfLifeScreen(
           lifeSummary: _lifeSummary,
-          onRestart: () {
-            setState(() => _currentPhase = GamePhase.characterCreation);
-          },
-          onReturnToTitle: () {
-            setState(() => _currentPhase = GamePhase.mainMenu);
-          },
+          onRestart: () => _setPhase(GamePhase.characterCreation),
+          onReturnToTitle: () => _setPhase(GamePhase.mainMenu),
+        );
+      case GamePhase.postLife:
+        return Center(
+          child: Text(
+            'Post-Life WIP',
+            style: TextStyle(color: Colors.white, fontSize: 32),
+          ),
         );
     }
   }
@@ -234,7 +253,7 @@ class _GameScreenState extends State<GameScreen> {
     // - 'timeskip <days>' -> Advance simulation time
   }
 
-  Widget _buildGameplayUI() {
+  Widget _buildGameplayUi() {
     return Stack(
       children: [
         // Top Bar: DAY and MOOD indicators

@@ -12,21 +12,17 @@ import '../ui/widgets/persona_container.dart';
 /// - Status sidebar panel (right)
 /// - Keyboard navigation support
 class MainMenuScreen extends StatefulWidget {
-  final VoidCallback onStartGame;
+  final VoidCallback onNewGame;
+  final VoidCallback onLoadGame;
   final VoidCallback onSettings;
-  final VoidCallback? onTutorial;
-  final VoidCallback? onDataLoad;
-  final VoidCallback? onDataSave;
-  final VoidCallback? onReturnToTitle;
+  final VoidCallback onQuit;
 
   const MainMenuScreen({
     super.key,
-    required this.onStartGame,
+    required this.onNewGame,
+    required this.onLoadGame,
     required this.onSettings,
-    this.onTutorial,
-    this.onDataLoad,
-    this.onDataSave,
-    this.onReturnToTitle,
+    required this.onQuit,
   });
 
   @override
@@ -37,12 +33,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
 
   final List<String> _menuLabels = [
-    'STORY',
-    'TUTORIAL',
+    'NEW GAME',
+    'LOAD GAME',
     'SETTINGS',
-    'DATA LOAD',
-    'DATA SAVE',
-    'RETURN TO TITLE',
+    'QUIT',
   ];
 
   @override
@@ -277,39 +271,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   void _triggerAction(int index) {
     switch (index) {
-      case 0: // STORY
-        widget.onStartGame();
+      case 0: // NEW GAME
+        widget.onNewGame();
         break;
-      case 1: // TUTORIAL
-        if (widget.onTutorial != null) {
-          widget.onTutorial!();
-        } else {
-          debugPrint('[Menu] Tutorial coming soon');
-        }
+      case 1: // LOAD GAME
+        widget.onLoadGame();
         break;
       case 2: // SETTINGS
         widget.onSettings();
         break;
-      case 3: // DATA LOAD
-        if (widget.onDataLoad != null) {
-          widget.onDataLoad!();
-        } else {
-          debugPrint('[Menu] Data Load coming soon');
-        }
-        break;
-      case 4: // DATA SAVE
-        if (widget.onDataSave != null) {
-          widget.onDataSave!();
-        } else {
-          debugPrint('[Menu] Data Save coming soon');
-        }
-        break;
-      case 5: // RETURN TO TITLE
-        if (widget.onReturnToTitle != null) {
-          widget.onReturnToTitle!();
-        } else {
-          debugPrint('[Menu] Return to Title coming soon');
-        }
+      case 3: // QUIT
+        widget.onQuit();
         break;
     }
   }
