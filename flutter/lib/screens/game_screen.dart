@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../models/game_phase.dart';
+import '../models/game_state.dart' as game_model;
+import '../bridge/game_backend.dart';
+import '../bridge/bridge_generated/lib.dart';
 import '../syn_game.dart';
 import '../ui/widgets/persona_container.dart';
 import '../ui/widgets/magnetic_dock.dart';
@@ -12,6 +15,12 @@ import 'splash_screen.dart';
 import 'main_menu_screen.dart';
 import 'character_creation_screen.dart';
 import 'end_of_life_screen.dart';
+import '../overlays/text_input_overlay.dart';
+import '../overlays/pause_menu_overlay.dart';
+import '../overlays/confirmation_dialog_overlay.dart';
+import '../overlays/loading_screen_overlay.dart';
+import '../overlays/settings_form_overlay.dart';
+import '../overlays/debug_console_overlay.dart';
 import '../overlays/settings_overlay.dart';
 import '../overlays/save_load_overlay.dart';
 import '../panels/memory_journal_panel.dart';
@@ -40,6 +49,9 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
+  late GameBackend _backend;
+  game_model.GameState? _gameState;
+
   late GamePhase _phase;
   bool _showInspector = false;
   bool _showConsole = false;
@@ -53,7 +65,6 @@ class _GameScreenState extends State<GameScreen> {
   bool _showRelationshipNetwork = false;
   bool _showPossession = false;
   String _saveLoadMode = 'load'; // 'save' or 'load'
-  StoryletEvent? _currentEvent;
 
   // Mock data for panels
   Map<String, dynamic> _lifeSummary = {};
@@ -86,9 +97,37 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _phase = GamePhase.mainMenu;
+
+    // Initialize GameBackend asynchronously
+    Future.microtask(() async {
+      _backend = await GameBackend.create();
+      // Optionally pre-load an existing state here.
+      setState(() {});
+    });
   }
 
   void _setPhase(GamePhase phase) => setState(() => _phase = phase);
+
+  String _getMoodLabel(int mood) {
+    if (mood >= 7) return 'ECSTATIC';
+    if (mood >= 4) return 'HAPPY';
+    if (mood >= 1) return 'CONTENT';
+    if (mood >= -1) return 'NEUTRAL';
+    if (mood >= -4) return 'SAD';
+    if (mood >= -7) return 'DEPRESSED';
+    return 'MISERABLE';
+  }
+
+  Future<void> _handleEventChoiceSelected(String storyletId, String choiceId) async {
+    debugPrint('[GameScreen] Choice selected: $choiceId for event: $storyletId');
+    
+    // Call backend to process choice (0 ticks = process immediately)
+    final newState = await _backend.chooseOption(storyletId, choiceId, 0);
+    
+    setState(() {
+      _gameState = newState;
+    });
+  }
 
   void _handleNewGameRequested() {
     _setPhase(GamePhase.characterCreation);
@@ -108,13 +147,33 @@ class _GameScreenState extends State<GameScreen> {
     debugPrint('Quit requested (not implemented)');
   }
 
-  void _handleCharacterCreated() {
-    // later: call backend to create new game
-    _setPhase(GamePhase.gameplay);
-  }
+  Future<void> _handleCharacterCreated({
+    required String name,
+    required String archetype,
+    required bool sfwMode,
+    required String difficulty,
+  }) async {
+    // Create API config from character creation data
+    final apiConfig = ApiPlayerConfig(
+      name: name,
+      pronouns: null, // Not collected in current UI
+      archetype: archetype,
+      difficulty: difficulty,
+      sfwMode: sfwMode,
+    );
 
-  void _handleRestartRequested() {
-    _setPhase(GamePhase.mainMenu);
+    // Generate seed from current timestamp for deterministic simulation
+    final seed = DateTime.now().microsecondsSinceEpoch;
+
+    // Initialize new game via Rust backend
+    final newState = await _backend.newGame(seed, apiConfig);
+
+    setState(() {
+      _gameState = newState;
+      _phase = GamePhase.gameplay;
+    });
+
+    debugPrint('[GameScreen] New game created with seed $seed');
   }
 
   @override
@@ -220,8 +279,20 @@ class _GameScreenState extends State<GameScreen> {
         );
       case GamePhase.characterCreation:
         return CharacterCreationScreen(
-          onBack: () => _setPhase(GamePhase.mainMenu),
-          onStart: (_) => _handleCharacterCreated(),
+          onComplete: ({
+            required String name,
+            required String archetype,
+            required bool sfwMode,
+            required String difficulty,
+          }) {
+            debugPrint('[CharacterCreation] Name: $name, Archetype: $archetype');
+            _handleCharacterCreated(
+              name: name,
+              archetype: archetype,
+              sfwMode: sfwMode,
+              difficulty: difficulty,
+            );
+          },
         );
       case GamePhase.gameplay:
         return _buildGameplayUi();
@@ -254,6 +325,11 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildGameplayUi() {
+    // Show loading indicator while game state is being initialized
+    if (_gameState == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Stack(
       children: [
         // Top Bar: DAY and MOOD indicators
@@ -285,17 +361,12 @@ class _GameScreenState extends State<GameScreen> {
           ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
         ),
 
-        // Center: Placeholder Event Card
-        Align(
-          alignment: Alignment.center,
-          child: _buildEventCard()
-              .animate()
-              .scale(
-                begin: const Offset(0.8, 0.8),
-                duration: 500.ms,
-                curve: Curves.easeOutExpo,
-              )
-              .fadeIn(delay: 400.ms, duration: 400.ms),
+        // Center: Event Canvas (displays current storylet)
+        Center(
+          child: EventCanvasOverlay(
+            gameState: _gameState!,
+            onChoiceSelected: _handleEventChoiceSelected,
+          ),
         ),
       ],
     );
@@ -313,7 +384,7 @@ class _GameScreenState extends State<GameScreen> {
               vertical: 12,
             ),
             child: Text(
-              'DAY: 1',
+              'YEAR: ${_gameState!.year} | AGE: ${_gameState!.age}',
               style: TextStyle(
                 color: Colors.cyanAccent,
                 fontSize: 20,
@@ -331,7 +402,7 @@ class _GameScreenState extends State<GameScreen> {
               vertical: 12,
             ),
             child: Text(
-              'MOOD: NEUTRAL',
+              'MOOD: ${_getMoodLabel(_gameState!.mood)}',
               style: TextStyle(
                 color: Colors.cyanAccent,
                 fontSize: 20,
@@ -430,78 +501,6 @@ class _GameScreenState extends State<GameScreen> {
             icon,
             color: Colors.cyanAccent,
             size: 28,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventCard() {
-    // Placeholder button to trigger test event
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          // Mock event for testing the event canvas overlay
-          setState(() {
-            _currentEvent = const StoryletEvent(
-              id: 'test_event_1',
-              title: 'A NEW DAY BEGINS',
-              description:
-                  'You wake up to the sound of rain tapping against your window. '
-                  'The neon signs outside flicker through the morning fog. '
-                  'Your phone buzzes with a new message from an unknown number.',
-              choices: [
-                EventChoice(
-                  text: 'Check the message immediately',
-                  consequence: 'Curiosity may reveal something important',
-                  statImpacts: {'Stress': 5, 'Knowledge': 10},
-                ),
-                EventChoice(
-                  text: 'Ignore it and start your day',
-                  consequence: 'Some mysteries are better left alone',
-                  statImpacts: {'Peace': 5, 'Health': 5},
-                ),
-                EventChoice(
-                  text: 'Block the number and go back to sleep',
-                  consequence: 'You choose comfort over curiosity',
-                  statImpacts: {'Energy': 10, 'Mood': 5},
-                ),
-              ],
-            );
-            _showEventCanvas = true;
-          });
-        },
-        child: PersonaContainer(
-          color: Colors.black.withValues(alpha: 0.95),
-          child: Container(
-            width: 500,
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  'TRIGGER TEST EVENT',
-                  style: TextStyle(
-                    color: Colors.cyanAccent,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 3,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Click to test the new Event Canvas overlay system',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 16,
-                    height: 1.6,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -625,17 +624,24 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildEventCanvasOverlay() {
+    // If no game state yet, show nothing
+    if (_gameState == null) {
+      return const SizedBox.shrink();
+    }
+
     return EventCanvasOverlay(
-      event: _currentEvent,
-      onChoiceSelect: (choiceIndex) {
-        debugPrint('[EventCanvas] Selected choice: $choiceIndex');
-        // TODO: Send choice to Rust backend
+      gameState: _gameState!,
+      onChoiceSelected: (String storyletId, String choiceId) async {
+        debugPrint('[EventCanvas] Selected choice: $choiceId for event: $storyletId');
+        
+        // Call Rust backend to process choice
+        final updatedState = await _backend.chooseOption(storyletId, choiceId, 24);
+        
         setState(() {
+          _gameState = updatedState;
           _showEventCanvas = false;
-          _currentEvent = null;
         });
       },
-      onDismiss: () => setState(() => _showEventCanvas = false),
     );
   }
 

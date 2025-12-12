@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../widgets/persona_container.dart';
+import 'package:syn/models/game_state.dart';
 
 /// Event Canvas Overlay - displays storylet events (Floating Canvas system)
 ///
 /// Props:
-/// - event: Current event data
-/// - onChoiceSelect: Callback when a choice is made
-/// - onDismiss: Callback to dismiss the event
+/// - gameState: Live game state from Rust backend
+/// - onChoiceSelected: Callback when a choice is made (storyletId, choiceId)
 class EventCanvasOverlay extends StatefulWidget {
-  final StoryletEvent? event;
-  final Function(int choiceIndex)? onChoiceSelect;
-  final VoidCallback? onDismiss;
+  final GameState gameState;
+  final Future<void> Function(String storyletId, String choiceId) onChoiceSelected;
 
   const EventCanvasOverlay({
     super.key,
-    this.event,
-    this.onChoiceSelect,
-    this.onDismiss,
+    required this.gameState,
+    required this.onChoiceSelected,
   });
 
   @override
@@ -29,7 +27,33 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.event == null) return const SizedBox.shrink();
+    final currentEvent = widget.gameState.currentEvent;
+
+    // Show minimal message if no active event
+    if (currentEvent == null) {
+      return Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: PersonaContainer(
+            color: Colors.black.withValues(alpha: 0.95),
+            borderColor: Colors.cyanAccent,
+            borderWidth: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Text(
+                'NO ACTIVE EVENT',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -55,7 +79,7 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                 children: [
                   // Event Title
                   Text(
-                    widget.event!.title,
+                    currentEvent.title,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 32,
@@ -76,7 +100,7 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        widget.event!.description,
+                        currentEvent.description,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 16,
@@ -95,11 +119,12 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: List.generate(
-                      widget.event!.choices.length,
+                      currentEvent.choices.length,
                       (index) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildChoiceButton(
-                          choice: widget.event!.choices[index],
+                          eventId: currentEvent.id,
+                          choice: currentEvent.choices[index],
                           index: index,
                           isSelected: index == _selectedChoiceIndex,
                         )
@@ -122,7 +147,8 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
   }
 
   Widget _buildChoiceButton({
-    required EventChoice choice,
+    required String eventId,
+    required GameChoice choice,
     required int index,
     required bool isSelected,
   }) {
@@ -135,7 +161,8 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
       },
       child: GestureDetector(
         onTap: () {
-          widget.onChoiceSelect?.call(index);
+          // Call backend with storylet ID and choice text (used as ID)
+          widget.onChoiceSelected(eventId, choice.text);
         },
         child: PersonaContainer(
           color: isSelected ? Colors.white : Colors.black,
@@ -176,25 +203,12 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                           letterSpacing: 0.5,
                         ),
                       ),
-                      if (choice.consequence.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          choice.consequence,
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.black.withValues(alpha: 0.6)
-                                : Colors.white.withValues(alpha: 0.5),
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
 
                 // Stat impacts (if any)
-                if (choice.statImpacts.isNotEmpty)
+                if (choice.statChanges.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(left: 16),
                     padding: const EdgeInsets.symmetric(
@@ -208,7 +222,7 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      choice.statImpacts.entries
+                      choice.statChanges.entries
                           .map((e) => '${e.key}: ${e.value > 0 ? '+' : ''}${e.value}')
                           .join(', '),
                       style: TextStyle(
@@ -229,30 +243,4 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
   }
 }
 
-/// Data model for storylet events
-class StoryletEvent {
-  final String id;
-  final String title;
-  final String description;
-  final List<EventChoice> choices;
-
-  const StoryletEvent({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.choices,
-  });
-}
-
-/// Data model for event choices
-class EventChoice {
-  final String text;
-  final String consequence;
-  final Map<String, int> statImpacts;
-
-  const EventChoice({
-    required this.text,
-    this.consequence = '',
-    this.statImpacts = const {},
-  });
-}
+// Data models moved to game_state.dart (GameEvent and GameChoice)

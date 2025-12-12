@@ -47,6 +47,9 @@
 
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 
+/// FRB v2 API entrypoint module - exposes functions for flutter_rust_bridge codegen
+pub mod api;
+
 use flutter_rust_bridge::frb;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -1569,6 +1572,227 @@ pub fn engine_init_with_character(
 pub fn get_difficulty_modifiers(difficulty: String) -> Option<(f32, f32)> {
     let diff = Difficulty::from_str(&difficulty)?;
     Some((diff.negative_modifier(), diff.positive_modifier()))
+}
+
+// ==================== Simplified Frontend API ====================
+
+/// Simplified player configuration from Flutter character creation screen.
+///
+/// Minimal config struct that mirrors what the UI collects without
+/// exposing internal complexity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiPlayerConfig {
+    /// Player's chosen name.
+    pub name: String,
+    /// Optional pronouns (for future use).
+    pub pronouns: Option<String>,
+    /// Character archetype (STORYTELLER, ANALYST, DREAMER, CHALLENGER).
+    pub archetype: String,
+    /// Difficulty setting (FORGIVING, BALANCED, HARSH).
+    pub difficulty: String,
+    /// Whether SFW mode is enabled.
+    pub sfw_mode: bool,
+}
+
+/// Simplified game state snapshot for Flutter UI.
+///
+/// Thin wrapper around existing types, focused on what the UI needs
+/// for day-to-day rendering without exposing full engine complexity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiSimpleGameState {
+    /// Current in-game day (derived from ticks).
+    pub current_day: u32,
+    /// Current tick.
+    pub current_tick: u64,
+    /// Player age in years.
+    pub player_age: u32,
+    /// Player life stage label.
+    pub life_stage: String,
+    /// Core player stats (health, energy, mood, etc.).
+    pub stats: ApiStatsSnapshot,
+    /// Current mood label.
+    pub mood: String,
+    /// Current karma value.
+    pub karma: f32,
+    /// Current event if any (simplified view).
+    pub current_event: Option<ApiDirectorEventView>,
+    /// Placeholder for relationships (minimal for now).
+    pub relationships: Vec<ApiSimpleRelationship>,
+    /// Placeholder for recent memories (minimal for now).
+    pub recent_memories: Vec<String>,
+}
+
+/// Simplified relationship view for UI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiSimpleRelationship {
+    /// Target NPC ID.
+    pub npc_id: i64,
+    /// NPC name (placeholder).
+    pub name: String,
+    /// Simplified relationship strength (-1.0 to 1.0).
+    pub strength: f32,
+}
+
+/// Build initial game state from player config.
+///
+/// Uses existing character generation logic to create a new game state
+/// representing "day 1, just started" after character creation.
+fn build_initial_game_state_from_player(
+    seed: u64,
+    config: &ApiPlayerConfig,
+) -> Option<ApiSimpleGameState> {
+    // Parse archetype and difficulty
+    let archetype_enum = CharacterArchetype::from_str(&config.archetype)?;
+    let difficulty_enum = Difficulty::from_str(&config.difficulty)?;
+
+    // Generate character using existing logic
+    let char_config = CharacterGenConfig {
+        name: config.name.clone(),
+        archetype: archetype_enum,
+        difficulty: difficulty_enum,
+        sfw_mode: config.sfw_mode,
+    };
+
+    let gen = generate_character(seed, &char_config);
+
+    // Create initial game state
+    let stats_snapshot = ApiStatsSnapshot {
+        stats: ALL_STAT_KINDS
+            .iter()
+            .map(|kind| ApiStat {
+                kind: format!("{:?}", kind),
+                value: gen.stats.get(*kind),
+            })
+            .collect(),
+        mood_band: format!("{:?}", gen.stats.mood_band()),
+    };
+
+    Some(ApiSimpleGameState {
+        current_day: 1,
+        current_tick: 0,
+        player_age: 0,
+        life_stage: "PreSim".to_string(),
+        stats: stats_snapshot,
+        mood: format!("{:?}", gen.stats.mood_band()),
+        karma: gen.karma.0,
+        current_event: None,
+        relationships: vec![], // TODO: Initial relationships
+        recent_memories: vec![], // TODO: Initial memories
+    })
+}
+
+/// Helper function to build ApiSimpleGameState from current ENGINE state.
+/// Used by engine_step and engine_choose_option to return consistent snapshots.
+/// Only uses existing public API functions, not direct GameEngine methods.
+fn build_simple_game_state_snapshot() -> Option<ApiSimpleGameState> {
+    let engine = ENGINE.lock().unwrap();
+    let e = engine.as_ref()?;
+
+    // Convert full game state to simplified view
+    let stats_snapshot = ApiStatsSnapshot {
+        stats: ALL_STAT_KINDS
+            .iter()
+            .map(|kind| ApiStat {
+                kind: format!("{:?}", kind),
+                value: e.world.player_stats.get(*kind),
+            })
+            .collect(),
+        mood_band: format!("{:?}", e.world.player_stats.mood_band()),
+    };
+
+    // Get current event if any - uses existing public API
+    let current_event = get_current_storylet();
+
+    // Build simplified relationships (top 5 by strength)
+    let relationships: Vec<ApiSimpleRelationship> = e
+        .world
+        .relationships
+        .iter()
+        .filter(|(&(actor, _), _)| actor == e.world.player_id)
+        .take(5)
+        .map(|(&(_, target), rel)| ApiSimpleRelationship {
+            npc_id: target.0 as i64,
+            name: format!("NPC_{}", target.0), // TODO: Get actual names
+            strength: (rel.affection + rel.trust) / 20.0, // Simplified -1 to 1
+        })
+        .collect();
+
+    // Build recent memories (last 5) - uses existing public API
+    let recent_memories: Vec<String> = get_memory_journal()
+        .iter()
+        .rev()
+        .take(5)
+        .map(|m| m.description.clone().unwrap_or_else(|| format!("Event_{}", m.event_id)))
+        .collect();
+
+    Some(ApiSimpleGameState {
+        current_day: (e.world.current_tick.0 / 24) as u32, // Assuming 24 ticks per day
+        current_tick: e.world.current_tick.0,
+        player_age: e.world.player_age,
+        life_stage: format!("{:?}", e.world.player_life_stage),
+        stats: stats_snapshot,
+        mood: format!("{:?}", e.world.player_stats.mood_band()),
+        karma: e.world.player_karma.0,
+        current_event,
+        relationships,
+        recent_memories,
+    })
+}
+
+/// Initialize a new game with player config.
+///
+/// Combines character generation and world initialization into a single call.
+/// Returns the initial game state snapshot for UI rendering.
+#[frb(sync)]
+pub fn engine_new_game(seed: u64, config: ApiPlayerConfig) -> Option<ApiSimpleGameState> {
+    // Initialize engine with generated character
+    let success = engine_init_with_character(
+        seed,
+        config.name,
+        config.archetype,
+        config.difficulty,
+        config.sfw_mode,
+    );
+
+    if !success {
+        return None;
+    }
+
+    // Return initial state snapshot
+    build_simple_game_state_snapshot()
+}
+
+/// Advance simulation by specified ticks and return updated state.
+///
+/// This is the main game loop function Flutter should call to progress time.
+#[frb(sync)]
+pub fn engine_step(ticks: u32) -> Option<ApiSimpleGameState> {
+    // Advance simulation using existing API
+    step_world(ticks);
+
+    // Return updated state snapshot
+    build_simple_game_state_snapshot()
+}
+
+/// Make a choice in the current event and advance simulation.
+///
+/// Applies the choice outcome and progresses time by the specified ticks.
+/// 
+/// # Arguments
+/// * `storylet_id` - ID of the current storylet/event
+/// * `choice_id` - ID of the selected choice
+/// * `ticks` - Number of ticks to advance after applying the choice
+#[frb(sync)]
+pub fn engine_choose_option(
+    storylet_id: String,
+    choice_id: String,
+    ticks: u32,
+) -> Option<ApiSimpleGameState> {
+    // Apply choice using existing API
+    api_choose_option(storylet_id, choice_id, ticks);
+
+    // Return updated state snapshot
+    build_simple_game_state_snapshot()
 }
 
 // ==================== District API ====================

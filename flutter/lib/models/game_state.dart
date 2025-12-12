@@ -1,3 +1,5 @@
+import 'package:syn/bridge/bridge_generated/lib.dart';
+
 /// Game event choice
 class GameChoice {
   final String text;
@@ -34,6 +36,26 @@ class GameEvent {
     this.tags = const [],
     this.deltas = const {},
   });
+
+  /// Create GameEvent from ApiDirectorEventView.
+  factory GameEvent.fromApi(ApiDirectorEventView api) {
+    return GameEvent(
+      id: api.storyletId,
+      title: api.title,
+      description: api.title, // Use title as description for now
+      choices: api.choices
+          .asMap()
+          .entries
+          .map((entry) => GameChoice(
+                text: entry.value.label,
+                statChanges: {},
+                keyboardShortcut: entry.key + 1,
+              ))
+          .toList(),
+      lifeStage: '', // Not available in API
+      age: 0, // Not available in API
+    );
+  }
 }
 
 /// Relationship data
@@ -57,6 +79,44 @@ class RelationshipData {
     required this.resentment,
     required this.state,
   });
+
+  /// Create from ApiSimpleRelationship (simplified version).
+  factory RelationshipData.fromApiSimple(ApiSimpleRelationship api) {
+    final strength = api.strength; // -1.0 to 1.0
+    return RelationshipData(
+      npcId: api.npcId.toString(),
+      npcName: api.name,
+      affection: strength * 10, // Scale to -10..10
+      trust: strength * 10,
+      attraction: 0.0,
+      familiarity: strength.abs() * 10,
+      resentment: strength < 0 ? -strength * 10 : 0.0,
+      state: _deriveState(strength),
+    );
+  }
+
+  /// Create from ApiRelationship (full 5-axis version).
+  factory RelationshipData.fromApiFull(ApiRelationship api) {
+    return RelationshipData(
+      npcId: api.actorId.toString(),
+      npcName: 'NPC_${api.targetId}', // TODO: Get actual name from elsewhere
+      affection: api.affection,
+      trust: api.trust,
+      attraction: api.attraction,
+      familiarity: api.familiarity,
+      resentment: api.resentment,
+      state: api.roleLabel,
+    );
+  }
+
+  /// Derive relationship state label from simplified strength value.
+  static String _deriveState(double strength) {
+    if (strength < -0.7) return 'Enemy';
+    if (strength < -0.3) return 'Rival';
+    if (strength < 0.3) return 'Stranger';
+    if (strength < 0.7) return 'Friend';
+    return 'CloseFriend';
+  }
 }
 
 /// Memory journal entry
@@ -129,6 +189,135 @@ class GameState {
 
   GameState() {
     _initializeDefaults();
+  }
+
+  /// Create GameState from ApiSimpleGameState (used by most operations).
+  factory GameState.fromApiSimple(ApiSimpleGameState api) {
+    final state = GameState();
+    
+    // Time and age
+    state.age = api.playerAge;
+    state.lifeStage = api.lifeStage;
+    state.year = api.currentDay ~/ 365;
+    
+    // Parse stats from the stats list
+    for (final stat in api.stats.stats) {
+      final value = stat.value.toInt();
+      switch (stat.kind.toLowerCase()) {
+        case 'health':
+          state.health = value;
+          break;
+        case 'mood':
+          state.mood = value;
+          break;
+        case 'wealth':
+          state.wealth = value;
+          break;
+        case 'charisma':
+          state.charisma = value;
+          break;
+        case 'intelligence':
+          state.intelligence = value;
+          break;
+        case 'wisdom':
+          state.wisdom = value;
+          break;
+        case 'strength':
+          state.strength = value;
+          break;
+        case 'stability':
+          state.stability = value;
+          break;
+      }
+    }
+    
+    // Karma
+    state.karma = api.karma.toInt();
+    
+    // Current event
+    if (api.currentEvent != null) {
+      state.currentEvent = GameEvent.fromApi(api.currentEvent!);
+    }
+    
+    // Relationships
+    state.relationships = api.relationships
+        .map((rel) => RelationshipData.fromApiSimple(rel))
+        .toList();
+    
+    // Memories
+    state.memories = api.recentMemories
+        .asMap()
+        .entries
+        .map((entry) => MemoryEntry(
+              id: 'mem_${entry.key}',
+              eventTitle: 'Memory ${entry.key + 1}',
+              description: entry.value,
+              timestamp: DateTime.now().subtract(Duration(days: entry.key)),
+              emotionalIntensity: 0.5,
+              tags: [],
+            ))
+        .toList();
+    
+    return state;
+  }
+
+  /// Create GameState from ApiGameStateSnapshot (comprehensive version).
+  factory GameState.fromApiFull(ApiGameStateSnapshot api) {
+    final state = GameState();
+    
+    // Time and age
+    state.age = api.playerAgeYears;
+    state.lifeStage = api.lifeStage;
+    state.year = api.currentTick.toInt() ~/ (24 * 365);
+    
+    // Parse stats from the stats list
+    for (final stat in api.stats.stats) {
+      final value = stat.value.toInt();
+      switch (stat.kind.toLowerCase()) {
+        case 'health':
+          state.health = value;
+          break;
+        case 'mood':
+          state.mood = value;
+          break;
+        case 'wealth':
+          state.wealth = value;
+          break;
+        case 'charisma':
+          state.charisma = value;
+          break;
+        case 'intelligence':
+          state.intelligence = value;
+          break;
+        case 'wisdom':
+          state.wisdom = value;
+          break;
+        case 'strength':
+          state.strength = value;
+          break;
+        case 'stability':
+          state.stability = value;
+          break;
+      }
+    }
+    
+    // Karma
+    state.karma = api.karma.toInt();
+    
+    // Narrative heat
+    state.narrativeHeat = api.narrativeHeat;
+    
+    // Current event
+    if (api.currentEvent != null) {
+      state.currentEvent = GameEvent.fromApi(api.currentEvent!);
+    }
+    
+    // Relationships - use full relationship data
+    state.relationships = api.relationships.relationships
+        .map((rel) => RelationshipData.fromApiFull(rel))
+        .toList();
+    
+    return state;
   }
 
   void _initializeDefaults() {
