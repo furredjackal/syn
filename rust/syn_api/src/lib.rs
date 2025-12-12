@@ -1,12 +1,11 @@
-mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
-// syn_api: FFI aggregation layer for Flutter via flutter_rust_bridge.
-//
-// Exposes the entire SYN simulation engine to Flutter through a typed, async-friendly API.
-// This is the "public interface" of the Rust backend.
-//
+//! syn_api: FFI aggregation layer for Flutter via flutter_rust_bridge.
+//!
+//! Exposes the entire SYN simulation engine to Flutter through a typed, async-friendly API.
+//! This is the "public interface" of the Rust backend.
+//!
 //! ## Architecture
 //!
-//! - [`GameEngine`]: Main game state manager combining world, simulator, director, and memory
+//! - [`GameEngine`]: Main game state manager combining world, simulation, director, and memory
 //! - [`GameRuntime`]: Shared runtime state for the director loop
 //! - API functions prefixed with `engine_*` are `#[frb(sync)]` for Flutter Rust Bridge
 //!
@@ -46,6 +45,8 @@ mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be
 //! - [`ApiDistrictSnapshot`]: District economic/crime data
 //! - [`ApiPlayerSkillsSnapshot`]: Player skill progression
 
+mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
+
 use flutter_rust_bridge::frb;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -80,13 +81,15 @@ pub use syn_director::{
 };
 pub use syn_memory::{Journal, MemoryEntry, MemorySystem};
 pub use syn_query::{ClusterQuery, NpcQuery, RelationshipQuery, StatQuery};
+// Note: LodTier and Simulator are deprecated - use NpcTier and tick_simulation instead
+#[allow(deprecated)]
 pub use syn_sim::{LodTier, Simulator};
 
-/// Main game engine combining world state, simulator, storylets, and memory system.
+/// Main game engine combining world state, simulation, storylets, and memory system.
 ///
 /// This struct is the central hub for all game logic. It manages:
 /// - The [`WorldState`] containing all simulation data
-/// - The [`Simulator`] for LOD-based NPC tick processing
+/// - The tier-based simulation system (`SimState` + `WorldSimState`)
 /// - The [`EventDirector`] for storylet selection
 /// - The [`MemorySystem`] for NPC memories
 ///
@@ -100,8 +103,10 @@ pub use syn_sim::{LodTier, Simulator};
 pub struct GameEngine {
     /// The current world state (player, NPCs, relationships, time, etc.).
     world: WorldState,
-    /// The LOD-based simulator for tick processing.
-    simulator: Simulator,
+    /// The simulation state machine (new tier-based system).
+    sim_state: syn_sim::SimState,
+    /// World simulation state tracking NPC tiers and update timestamps.
+    world_sim: syn_sim::WorldSimState,
     /// The event director for storylet selection.
     director: EventDirector,
     /// The memory system tracking NPC memories.
@@ -251,7 +256,8 @@ impl GameEngine {
 
         GameEngine {
             world,
-            simulator: Simulator::new(seed),
+            sim_state: syn_sim::SimState::new(),
+            world_sim: syn_sim::WorldSimState::new(),
             director,
             memory: MemorySystem::new(),
         }
@@ -407,7 +413,10 @@ impl GameEngine {
     /// Advance the simulation by one tick.
     pub fn tick(&mut self) {
         let previous_stage = self.world.player_life_stage;
-        self.simulator.tick(&mut self.world);
+        
+        // Use new tick_simulation pipeline
+        let config = syn_sim::SimulationTickConfig::default();
+        syn_sim::tick_simulation(&mut self.world, &mut self.world_sim, &config);
 
         // Auto-create digital imprint if we just entered Digital stage
         if previous_stage != self.world.player_life_stage
@@ -422,15 +431,31 @@ impl GameEngine {
 
     /// Advance the simulation by N ticks.
     pub fn tick_many(&mut self, count: u32) {
+        let config = syn_sim::SimulationTickConfig::default();
         for _ in 0..count {
-            self.simulator.tick(&mut self.world);
+            syn_sim::tick_simulation(&mut self.world, &mut self.world_sim, &config);
+            
+            // Handle PostLife drift after each tick
+            syn_sim::post_life::tick_postlife_drift(&mut self.world);
         }
     }
 
-    /// Get LOD tier counts (high, medium, low).
+    /// Get LOD tier counts (Tier0, Tier1, Tier2).
     pub fn lod_counts(&self) -> (u32, u32, u32) {
-        let (h, m, l) = self.simulator.count_by_lod();
-        (h as u32, m as u32, l as u32)
+        // Count NPCs by tier from WorldSimState
+        let mut tier0 = 0u32;
+        let mut tier1 = 0u32;
+        let mut tier2 = 0u32;
+        
+        for npc_id in self.world.npcs.keys() {
+            match self.world_sim.npc_tier(*npc_id) {
+                syn_sim::NpcTier::Tier0 => tier0 += 1,
+                syn_sim::NpcTier::Tier1 => tier1 += 1,
+                syn_sim::NpcTier::Tier2 => tier2 += 1,
+            }
+        }
+        
+        (tier0, tier1, tier2)
     }
 
     // ==================== NPC Management ====================
@@ -448,7 +473,8 @@ impl GameEngine {
             attachment_style: AttachmentStyle::Secure,
         };
         self.world.npcs.insert(NpcId(npc_id), npc.clone());
-        self.simulator.instantiate_npc(npc);
+        // Set initial tier to Tier2 (background simulation)
+        self.world_sim.set_npc_tier(NpcId(npc_id), syn_sim::NpcTier::Tier2);
     }
 
     /// Get NPC by ID.
@@ -1056,11 +1082,11 @@ pub struct ApiCityStats {
 
 /// Test-only helper to replace the shared runtime state.
 ///
-/// **NOT EXPOSED TO FLUTTER.** This function is only available in test builds
-/// and is used to inject custom world/sim/storylet state for unit testing.
+/// **NOT EXPOSED TO FLUTTER.** This function is hidden from documentation
+/// and is used to inject custom world/sim/storylet state for integration testing.
 ///
 /// Replaces the global `RUNTIME` state with the provided components.
-#[cfg(test)]
+#[doc(hidden)]
 pub fn api_reset_runtime(world: WorldState, sim: SimState, storylets: StoryletLibrary) {
     let mut guard = RUNTIME.lock().expect("GameRuntime poisoned");
     *guard = GameRuntime {

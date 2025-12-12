@@ -10,28 +10,21 @@ import 'package:flutter/painting.dart'
 import 'theme/theme.dart';
 import 'ui/ui_signal_bus.dart';
 import 'models/game_state.dart';
-import 'components/screens/character_creation_component.dart';
-import 'components/screens/debug_console_component.dart';
-import 'components/screens/detailed_stat_component.dart';
-import 'components/screens/end_of_life_component.dart';
-import 'components/screens/main_menu_component.dart';
-import 'components/screens/memory_journal_component.dart';
-import 'components/screens/possession_screen_component.dart';
-import 'components/screens/relationship_network_component.dart';
-import 'components/screens/save_load_component.dart';
-import 'components/screens/settings_screen_component.dart';
-import 'components/screens/splash_screen_component.dart';
-import 'components/screens/world_map_component.dart';
 import 'components/ui/system/background_layer_component.dart';
 import 'components/ui/effects/particle_system_component.dart'
     as effects;
 
+/// SynGame - Flame layer for visual effects only
+///
+/// Hybrid Architecture:
+/// - This handles ONLY the Flame background visuals (particles, background layers)
+/// - All UI is handled by Flutter widgets in lib/screens/game_screen.dart
+/// - No more RouterComponent - navigation is handled by GamePhase in GameScreen
 class SynGame extends FlameGame
     with HasKeyboardHandlerComponents, MouseMovementDetector {
   SynGame({GameState? initialGameState})
       : gameState = initialGameState ?? GameState();
 
-  late final RouterComponent _router;
   final GameState gameState;
   final SynUiTheme uiTheme = SynUiTheme.defaultTheme;
   final UiSignalBus uiSignals = UiSignalBus();
@@ -54,24 +47,7 @@ class SynGame extends FlameGame
       ..priority = -5; // Above background, below UI
     add(particles);
 
-    _router = RouterComponent(
-      initialRoute: 'splash',
-      routes: {
-        'splash': Route(() => SplashScreenComponent()),
-        'menu': Route(() => MainMenuComponent()),
-        'character_creation': Route(() => CharacterCreationComponent()),
-        'detailed_stat': Route(() => DetailedStatComponent()),
-        'relationship_network': Route(() => RelationshipNetworkComponent()),
-        'memory_journal': Route(() => MemoryJournalComponent()),
-        'possession': Route(() => PossessionScreenComponent()),
-        'world_map': Route(() => WorldMapComponent()),
-        'save_load': Route(() => SaveLoadComponent()),
-        'end_of_life': Route(() => EndOfLifeComponent()),
-        'debug_console': Route(() => DebugConsoleComponent()),
-        'settings': Route(() => SettingsScreenComponent()),
-      },
-    );
-    add(_router);
+    // No more RouterComponent - UI is handled by Flutter GameScreen
   }
 
   @override
@@ -93,104 +69,86 @@ class SynGame extends FlameGame
     }
   }
 
+  // Navigation methods are now deprecated - UI is handled by Flutter GameScreen
+  // These are kept as stubs for compatibility with old code
+  
+  @deprecated
   void showSplash() {
-    _router.pushReplacementNamed('splash');
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   void showMainMenu() {
-    unawaited(_navigateToMenu());
+    // No-op: Navigation handled by GameScreen
   }
 
-  Future<void> _navigateToMenu() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('menu');
-    });
-  }
-
+  @deprecated
   void showCharacterCreation() {
-    unawaited(_navigateToCharacterCreation());
+    // No-op: Navigation handled by GameScreen
   }
 
-  Future<void> _navigateToCharacterCreation() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('character_creation');
-    });
-  }
-
-  // TODO: startGameplay is deprecated - gameplay now handled by Flutter GameScreen
-  // The new hybrid architecture uses lib/screens/game_screen.dart instead
+  @deprecated
   Future<void> startGameplay() async {
-    // No-op: Gameplay is now handled by the Flutter layer GameScreen
-    // This method is kept for compatibility but does nothing
+    // No-op: Gameplay is now handled by Flutter GameScreen
   }
 
-  // TODO: startGameplayWithCharacter is deprecated - gameplay now handled by Flutter GameScreen
+  @deprecated
   Future<void> startGameplayWithCharacter({
     required String name,
     required String archetype,
     required bool sfwMode,
     required String difficulty,
   }) async {
-    await _runWithLoadingOverlay(() async {
-      gameState.setPlayerName(name);
-      gameState.setArchetype(archetype);
-      gameState.sfwMode = sfwMode;
-      gameState.setDifficulty(difficulty);
-      // No-op: Gameplay is now handled by the Flutter layer GameScreen
-      // Character state is saved but no route transition occurs
-    });
+    // Save character data to game state (still needed for backend)
+    gameState.setPlayerName(name);
+    gameState.setArchetype(archetype);
+    gameState.sfwMode = sfwMode;
+    gameState.setDifficulty(difficulty);
   }
 
+  @deprecated
   void returnToTitle() {
-    showMainMenu();
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   void showSettings() {
-    _router.pushNamed('settings');
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showMemoryJournal() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('memory_journal');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showDetailedStats() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('detailed_stat');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showRelationshipNetwork() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('relationship_network');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showWorldMap() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('world_map');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showPossessions() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('possession');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   Future<void> showSaveLoad() async {
-    await _performSceneTransition(() async {
-      _router.pushReplacementNamed('save_load');
-    });
+    // No-op: Navigation handled by GameScreen
   }
 
+  @deprecated
   void closeSettings() {
-    if (_router.currentRoute.name == 'settings') {
-      if (_router.canPop()) {
-        _router.pop();
-      }
-    }
+    // No-op: Navigation handled by GameScreen
   }
 
   void showComingSoon(String label) {
@@ -218,22 +176,6 @@ class SynGame extends FlameGame
   // Placeholder handlers for Flutter overlays.
   void handleTextInput(String value) {}
   void executeDebugCommand(String command) {}
-
-  Future<void> _runWithLoadingOverlay(Future<void> Function() action) async {
-    overlays.add('loading');
-    pauseEngine();
-    try {
-      await action();
-    } finally {
-      overlays.remove('loading');
-      resumeEngine();
-    }
-  }
-
-  Future<void> _performSceneTransition(Future<void> Function() change) async {
-    // Previously used a Flutter overlay; now this runs inline to keep overlays to the core set.
-    await change();
-  }
 
   void showConfirmationDialog({
     required String title,
@@ -281,7 +223,7 @@ class SynGame extends FlameGame
       onConfirm: () {
         overlays.remove('pause_menu');
         resumeEngine();
-        unawaited(_navigateToMenu());
+        // No-op: Navigation handled by Flutter GameScreen
       },
     );
   }

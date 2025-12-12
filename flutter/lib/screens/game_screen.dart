@@ -16,6 +16,10 @@ import '../overlays/save_load_overlay.dart';
 import '../panels/memory_journal_panel.dart';
 import '../panels/detailed_stats_panel.dart';
 import '../panels/inventory_panel.dart';
+import '../ui/overlays/world_map_overlay.dart';
+import '../ui/overlays/event_canvas_overlay.dart';
+import '../ui/overlays/relationship_network_overlay.dart';
+import '../ui/overlays/possession_overlay.dart';
 
 /// Game phase enum to track which UI to display
 enum GamePhase {
@@ -50,8 +54,13 @@ class _GameScreenState extends State<GameScreen> {
   bool _showMemoryJournal = false;
   bool _showDetailedStats = false;
   bool _showInventory = false;
+  bool _showWorldMap = false;
+  bool _showEventCanvas = false;
+  bool _showRelationshipNetwork = false;
+  bool _showPossession = false;
   String _saveLoadMode = 'load'; // 'save' or 'load'
   GamePhase _currentPhase = GamePhase.splash;
+  StoryletEvent? _currentEvent;
 
   // Mock data for panels
   Map<String, dynamic> _lifeSummary = {};
@@ -109,6 +118,10 @@ class _GameScreenState extends State<GameScreen> {
           if (_showMemoryJournal) _buildMemoryJournalPanel(),
           if (_showDetailedStats) _buildDetailedStatsPanel(),
           if (_showInventory) _buildInventoryPanel(),
+          if (_showWorldMap) _buildWorldMapOverlay(),
+          if (_showEventCanvas) _buildEventCanvasOverlay(),
+          if (_showRelationshipNetwork) _buildRelationshipNetworkOverlay(),
+          if (_showPossession) _buildPossessionOverlay(),
 
           // Layer 3 (Dev Tools): Inspector Panel (Right)
           if (_showInspector && _currentPhase == GamePhase.gameplay)
@@ -354,16 +367,28 @@ class _GameScreenState extends State<GameScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDockIcon(Icons.people, 'Relations', () {}),
-            const SizedBox(height: 16),
-            _buildDockIcon(Icons.map, 'Map', () {}),
-            const SizedBox(height: 16),
-            _buildDockIcon(Icons.book, 'Journal', () {}),
+            _buildDockIcon(
+              Icons.people,
+              'Relations',
+              () => setState(() => _showRelationshipNetwork = true),
+            ),
             const SizedBox(height: 16),
             _buildDockIcon(
-              Icons.menu_book,
-              'Memories',
+              Icons.map,
+              'Map',
+              () => setState(() => _showWorldMap = true),
+            ),
+            const SizedBox(height: 16),
+            _buildDockIcon(
+              Icons.book,
+              'Journal',
               () => setState(() => _showMemoryJournal = true),
+            ),
+            const SizedBox(height: 16),
+            _buildDockIcon(
+              Icons.sync_alt,
+              'Possession',
+              () => setState(() => _showPossession = true),
             ),
           ],
         ),
@@ -393,79 +418,70 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildEventCard() {
-    return PersonaContainer(
-      color: Colors.black.withValues(alpha: 0.95),
-      child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Event Card Header
-            Text(
-              'A NEW DAY BEGINS',
-              style: TextStyle(
-                color: Colors.cyanAccent,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 2,
-              color: Colors.cyanAccent,
-            ),
-            const SizedBox(height: 16),
-            
-            // Event Description
-            Text(
-              'Welcome to SYN: Simulate Your Narrative. This is a placeholder event card. '
-              'Events will be driven by the Rust simulation layer through the Event Director.',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Choice Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildChoiceButton('CONTINUE', Colors.cyanAccent),
-                const SizedBox(width: 12),
-                _buildChoiceButton('SKIP', Colors.grey),
+    // Placeholder button to trigger test event
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          // Mock event for testing the event canvas overlay
+          setState(() {
+            _currentEvent = const StoryletEvent(
+              id: 'test_event_1',
+              title: 'A NEW DAY BEGINS',
+              description:
+                  'You wake up to the sound of rain tapping against your window. '
+                  'The neon signs outside flicker through the morning fog. '
+                  'Your phone buzzes with a new message from an unknown number.',
+              choices: [
+                EventChoice(
+                  text: 'Check the message immediately',
+                  consequence: 'Curiosity may reveal something important',
+                  statImpacts: {'Stress': 5, 'Knowledge': 10},
+                ),
+                EventChoice(
+                  text: 'Ignore it and start your day',
+                  consequence: 'Some mysteries are better left alone',
+                  statImpacts: {'Peace': 5, 'Health': 5},
+                ),
+                EventChoice(
+                  text: 'Block the number and go back to sleep',
+                  consequence: 'You choose comfort over curiosity',
+                  statImpacts: {'Energy': 10, 'Mood': 5},
+                ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChoiceButton(String label, Color accentColor) {
-    return PersonaContainer(
-      color: Colors.black,
-      skew: -0.1,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: accentColor, width: 2),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 12,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
+            );
+            _showEventCanvas = true;
+          });
+        },
+        child: PersonaContainer(
+          color: Colors.black.withValues(alpha: 0.95),
+          child: Container(
+            width: 500,
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'TRIGGER TEST EVENT',
+                  style: TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Click to test the new Event Canvas overlay system',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 16,
+                    height: 1.6,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ),
@@ -574,6 +590,52 @@ class _GameScreenState extends State<GameScreen> {
       onItemSelect: (item) {
         debugPrint('[Inventory] Selected: ${item.name}');
       },
+    );
+  }
+
+  Widget _buildWorldMapOverlay() {
+    return WorldMapOverlay(
+      onClose: () => setState(() => _showWorldMap = false),
+      onRegionSelect: (regionId) {
+        debugPrint('[WorldMap] Selected region: $regionId');
+        // TODO: Implement region navigation
+        setState(() => _showWorldMap = false);
+      },
+      regions: const [], // Use default placeholder regions
+    );
+  }
+
+  Widget _buildEventCanvasOverlay() {
+    return EventCanvasOverlay(
+      event: _currentEvent,
+      onChoiceSelect: (choiceIndex) {
+        debugPrint('[EventCanvas] Selected choice: $choiceIndex');
+        // TODO: Send choice to Rust backend
+        setState(() {
+          _showEventCanvas = false;
+          _currentEvent = null;
+        });
+      },
+      onDismiss: () => setState(() => _showEventCanvas = false),
+    );
+  }
+
+  Widget _buildRelationshipNetworkOverlay() {
+    return RelationshipNetworkOverlay(
+      onClose: () => setState(() => _showRelationshipNetwork = false),
+      relationships: const [], // Use default placeholder data
+    );
+  }
+
+  Widget _buildPossessionOverlay() {
+    return PossessionOverlay(
+      onClose: () => setState(() => _showPossession = false),
+      onHostSelect: (hostId) {
+        debugPrint('[Possession] Selected host: $hostId');
+        // TODO: Implement possession logic with Rust backend
+        setState(() => _showPossession = false);
+      },
+      hosts: const [], // Use default placeholder hosts
     );
   }
 }

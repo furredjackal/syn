@@ -1,5 +1,18 @@
-//! Canonical simulation entrypoint: `tick_simulation`.
-//! Legacy (deprecated): `tick_world`.
+//! # SYN Simulation Engine
+//!
+//! **Canonical simulation entrypoint:** `tick_simulation` + `WorldSimState` + `SimState`.
+//!
+//! **Legacy (deprecated):** `Simulator` + `tick()` / `tick_world()`.
+//!
+//! The new tier-based simulation system uses:
+//! - [`WorldSimState`]: Tracks NPC tiers and update timestamps
+//! - [`SimState`]: Core simulation state machine
+//! - [`SimulationTickConfig`]: Configuration for tick behavior
+//! - [`tick_simulation`]: Main simulation tick function
+//! - [`tick_simulation_n`]: Advance multiple ticks
+//! - [`advance_simulation_ticks`]: Helper for N-tick advances
+//!
+//! The legacy `Simulator` struct and related types are deprecated and will be removed.
 
 mod npc_registry;
 pub mod relationship_drift;
@@ -37,12 +50,24 @@ use syn_storage::{HybridStorage};
 use syn_storage::storage_error::StorageError;
 
 /// Simulation engine: advances world state by one tick.
+///
+/// **DEPRECATED:** Use `tick_simulation` + `WorldSimState` instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `tick_simulation` + `WorldSimState` instead; this legacy struct will be removed."
+)]
 pub struct Simulator {
     rng: DeterministicRng,
     active_npcs: HashMap<NpcId, SimulatedNpc>,
 }
 
 /// Legacy LOD tiers used by Simulator.
+///
+/// **DEPRECATED:** Use `NpcTier` instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `NpcTier` (Tier0/Tier1/Tier2) instead; this legacy enum will be removed."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LodTier {
     High,
@@ -51,6 +76,12 @@ pub enum LodTier {
 }
 
 /// Legacy NpcLod used alongside new tiers for compatibility.
+///
+/// **DEPRECATED:** Use `NpcTier` instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `NpcTier` instead; this legacy enum will be removed."
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcLod {
     Tier2Active,
@@ -232,7 +263,12 @@ fn update_narrative_heat(
         .decay_toward(config.base_decay_toward, config.decay_per_tick);
 }
 
+#[allow(deprecated)]
 impl Simulator {
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use `WorldSimState::new()` + `SimState::new()` + `tick_simulation` instead."
+    )]
     pub fn new(seed: u64) -> Self {
         Simulator {
             rng: DeterministicRng::new(seed),
@@ -304,6 +340,12 @@ impl Simulator {
     }
 
     /// Main simulation loop: advance world state by one tick.
+    ///
+    /// **DEPRECATED:** Use `tick_simulation(world, sim_state, config)` instead.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use `tick_simulation(world, sim_state, config)` instead; this method will be removed."
+    )]
     pub fn tick(&mut self, world: &mut WorldState) {
         // Advance world clock
         let mut tick_ctx = TickContext::default();
@@ -597,6 +639,12 @@ pub fn tick_simulated_npc_coarse(npc: &mut SimulatedNpc, _world: &mut WorldState
 }
 
 /// LOD-aware ticking over a registry of NPCs.
+///
+/// **DEPRECATED:** Use `tick_simulation` with `WorldSimState` instead.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use `tick_simulation` + `WorldSimState` instead; this function will be removed."
+)]
 pub fn tick_npcs_lod(
     world: &mut WorldState,
     registry: &mut crate::npc_registry::NpcRegistry,

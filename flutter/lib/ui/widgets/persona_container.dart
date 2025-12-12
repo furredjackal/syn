@@ -17,11 +17,21 @@ class PersonaContainer extends StatelessWidget {
   /// Default is -0.15 for the signature Persona aesthetic.
   final double skew;
 
+  /// The border color of the container.
+  /// Default is cyan accent.
+  final Color borderColor;
+
+  /// The border width of the container.
+  /// Default is 2.0.
+  final double borderWidth;
+
   const PersonaContainer({
     super.key,
     required this.child,
     this.color = Colors.black,
     this.skew = -0.15,
+    this.borderColor = Colors.cyanAccent,
+    this.borderWidth = 2.0,
   });
 
   @override
@@ -32,8 +42,8 @@ class PersonaContainer extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           border: Border.all(
-            color: Colors.cyanAccent,
-            width: 2.0,
+            color: borderColor,
+            width: borderWidth,
           ),
           boxShadow: [
             BoxShadow(

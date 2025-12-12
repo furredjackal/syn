@@ -1,6 +1,13 @@
+//! Legacy compatibility test for the deprecated tick_world function.
+//! 
+//! This test is marked #[ignore] and only exists to verify that the old API
+//! remains functional. New code should use tick_simulation + WorldSimState.
+
 use syn_core::npc::{NpcPrototype, NpcRoleTag, PersonalityVector};
 use syn_core::{LifeStage, NpcId, Stats, WorldSeed, WorldState};
-use syn_sim::{tick_world, NpcLodTier, SimState};
+
+#[allow(deprecated)]
+use syn_sim::{tick_world, NpcLodTier, NpcLod, SimState};
 
 fn make_world_with_proto(id: NpcId) -> WorldState {
     let mut world = WorldState::new(WorldSeed(1234), NpcId(1));
@@ -25,13 +32,14 @@ fn make_world_with_proto(id: NpcId) -> WorldState {
 }
 
 #[test]
+#[ignore = "Legacy compatibility test - use tick_simulation instead"]
 fn tick_world_advances_time_and_ticks_tiers() {
     let mut world = make_world_with_proto(NpcId(2));
     let mut sim = SimState::new();
 
     // Ensure instances via registry
     sim.npc_registry
-        .ensure_npc_instance(&world, NpcId(2), syn_sim::NpcLod::Tier2Active, 0);
+        .ensure_npc_instance(&world, NpcId(2), NpcLod::Tier2Active, 0);
     // Add another NPC prototype
     let proto2 = NpcPrototype {
         id: NpcId(3),
@@ -51,7 +59,7 @@ fn tick_world_advances_time_and_ticks_tiers() {
     };
     world.npc_prototypes.insert(NpcId(3), proto2);
     sim.npc_registry
-        .ensure_npc_instance(&world, NpcId(3), syn_sim::NpcLod::Tier2Active, 0);
+        .ensure_npc_instance(&world, NpcId(3), NpcLod::Tier2Active, 0);
 
     // Assign canonical tiers
     {

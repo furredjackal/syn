@@ -1,5 +1,5 @@
 use syn_core::{NpcId, Relationship, RelationshipState, WorldSeed, WorldState};
-use syn_sim::Simulator;
+use syn_sim::{NpcTier, SimulationTickConfig, WorldSimState, tick_simulation};
 
 #[test]
 fn narrative_heat_rises_with_extremes() {
@@ -20,8 +20,10 @@ fn narrative_heat_rises_with_extremes() {
         },
     );
 
-    let mut simulator = Simulator::new(1);
-    simulator.instantiate_npc(syn_core::AbstractNpc {
+    let mut world_sim = WorldSimState::new();
+    
+    // Register NPC in Tier2 (active)
+    let npc = syn_core::AbstractNpc {
         id: NpcId(1),
         age: 20,
         job: "Test".into(),
@@ -30,11 +32,15 @@ fn narrative_heat_rises_with_extremes() {
         traits: syn_core::Traits::default(),
         seed: 1,
         attachment_style: syn_core::AttachmentStyle::Secure,
-    });
+    };
+    world.npcs.insert(npc.id, npc);
+    world_sim.set_npc_tier(NpcId(1), NpcTier::Tier2);
 
+    let config = SimulationTickConfig::default();
+    
     // Run a few ticks to accumulate heat updates.
     for _ in 0..5 {
-        simulator.tick(&mut world);
+        tick_simulation(&mut world, &mut world_sim, &config);
     }
 
     assert!(world.narrative_heat.value() > 10.0);

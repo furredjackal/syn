@@ -48,7 +48,7 @@ class BaseButtonComponent extends PositionComponent
       final strokeOverlay = RectangleComponent(
         size: size,
         paint: Paint()
-          ..color = _strokeColor!
+          ..color = _strokeColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = _strokeWidth,
       );
