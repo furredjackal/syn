@@ -45,9 +45,7 @@
 //! - [`ApiDistrictSnapshot`]: District economic/crime data
 //! - [`ApiPlayerSkillsSnapshot`]: Player skill progression
 
-// mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
-// Note: Uncomment the line above after running flutter_rust_bridge_codegen generate
-// The codegen tool will create this file automatically
+mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
 
 /// FRB v2 API entrypoint module - exposes functions for flutter_rust_bridge codegen
 pub mod api;
@@ -1553,13 +1551,6 @@ pub fn engine_init_with_character(
     let mut engine = ENGINE.lock().unwrap();
     let mut game_engine = GameEngine::new(world_seed);
     
-    // Apply generated stats to player
-    game_engine.world.player_stats = gen.stats;
-    game_engine.world.player_karma = gen.karma;
-    game_engine.world.player_life_stage = LifeStage::PreSim; // Start at beginning (age 0-5)
-    game_engine.world.player_age_years = 0;
-    game_engine.world.player_age = 0;
-    
     // Store attachment style (stored on player NPC)
     if let Some(player_npc) = game_engine.world.npcs.get_mut(&game_engine.world.player_id) {
         player_npc.attachment_style = gen.attachment_style;
@@ -1690,6 +1681,9 @@ fn build_simple_game_state_snapshot() -> Option<ApiSimpleGameState> {
     let engine = ENGINE.lock().unwrap();
     let e = engine.as_ref()?;
 
+    // Debug: verify player_age is initialized correctly
+    debug_assert!(e.world.player_age >= 6, "Player age should be at least 6, got {}", e.world.player_age);
+
     // Convert full game state to simplified view
     let stats_snapshot = ApiStatsSnapshot {
         stats: ALL_STAT_KINDS
@@ -1701,9 +1695,6 @@ fn build_simple_game_state_snapshot() -> Option<ApiSimpleGameState> {
             .collect(),
         mood_band: format!("{:?}", e.world.player_stats.mood_band()),
     };
-
-    // Get current event if any - uses existing public API
-    let current_event = get_current_storylet();
 
     // Build simplified relationships (top 5 by strength)
     let relationships: Vec<ApiSimpleRelationship> = e
@@ -1719,12 +1710,13 @@ fn build_simple_game_state_snapshot() -> Option<ApiSimpleGameState> {
         })
         .collect();
 
-    // Build recent memories (last 5) - uses existing public API
-    let recent_memories: Vec<String> = get_memory_journal()
+    // Build recent memories (last 5) - get directly from engine to avoid re-locking
+    let recent_memories: Vec<String> = e
+        .get_npc_memories(e.world.player_id.0)
         .iter()
         .rev()
         .take(5)
-        .map(|m| m.description.clone().unwrap_or_else(|| format!("Event_{}", m.event_id)))
+        .map(|m| format!("Event_{}", m.event_id))
         .collect();
 
     Some(ApiSimpleGameState {
@@ -1735,7 +1727,7 @@ fn build_simple_game_state_snapshot() -> Option<ApiSimpleGameState> {
         stats: stats_snapshot,
         mood: format!("{:?}", e.world.player_stats.mood_band()),
         karma: e.world.player_karma.0,
-        current_event,
+        current_event: None, // Don't call get_current_storylet - it would lock RUNTIME
         relationships,
         recent_memories,
     })

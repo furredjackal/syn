@@ -1037,11 +1037,43 @@ impl SimState {
     }
 }
 
+/// Atomic counter for unique storage instance IDs within a process
+static STORAGE_INSTANCE_COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 fn init_default_storage() -> Result<HybridStorage, StorageError> {
     let data_dir = Path::new("data");
     let _ = fs::create_dir_all(data_dir);
-    let hot_path = data_dir.join("hot.redb");
+    
+    // Use PID + instance counter for unique database per SimState
+    let pid = std::process::id();
+    let instance = STORAGE_INSTANCE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let hot_path = data_dir.join(format!("hot_{}_{}.redb", pid, instance));
     let cold_path = data_dir.join("world.duckdb");
+    
+    // Clean up old hot databases (keep only the 5 most recent by mtime)
+    if let Ok(entries) = fs::read_dir(data_dir) {
+        let mut hot_files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                name.starts_with("hot_") && name.ends_with(".redb")
+            })
+            .filter_map(|e| {
+                e.metadata()
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .map(|time| (e.path(), time))
+            })
+            .collect();
+        
+        hot_files.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by modified time, newest first
+        
+        // Remove all but the 5 most recent
+        for (path, _) in hot_files.iter().skip(5) {
+            let _ = fs::remove_file(path);
+        }
+    }
+    
     HybridStorage::new(
         hot_path.to_string_lossy().as_ref(),
         cold_path.to_string_lossy().as_ref(),

@@ -1,5 +1,6 @@
 # Rust
 target/
+/rust/syn_api/data/
 Cargo.lock
 **/*.rs.bk
 *.pdb
@@ -16,6 +17,7 @@ assets/
 docs/
 linux/
 flutter/pubspec.lock
+flutter/data/
 
 # Platform-specific
 *.dll
@@ -44,3 +46,4 @@ Thumbs.db
 .gitignore
 .junie/guidelines.md
 .github/copilot-instructions.md
+

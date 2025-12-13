@@ -148,15 +148,20 @@ class GameState {
   String lifeStage = 'Child';
   int year = 0;
 
-  // Stats (0-100 scale)
+  // Stats (0-100 scale) - mapped from Rust's 11 StatKinds
   int health = 75;
-  int mood = 0; // -10 to +10
+  int mood = 0; // -10 to +10 (MoodBand)
   int wealth = 50;
   int charisma = 50;
   int intelligence = 50;
   int wisdom = 50;
   int strength = 50;
   int stability = 50;
+  int appearance = 50;
+  int reputation = 50;
+  int curiosity = 50;
+  int energy = 75;
+  int libido = 50;
 
   // Karma
   int karma = 0;
@@ -200,7 +205,14 @@ class GameState {
     state.lifeStage = api.lifeStage;
     state.year = api.currentDay ~/ 365;
     
-    // Parse stats from the stats list
+    // Debug assertion: ensure age is correctly set for new games
+    assert(state.age >= 0, 'Player age should be non-negative');
+    if (api.currentDay == 0 || api.currentDay == 1) {
+      // New game should have player starting at age 6
+      assert(state.age >= 6, 'New game should start with age >= 6, got ${state.age}');
+    }
+    
+    // Parse stats from the stats list (all 11 Rust StatKinds)
     for (final stat in api.stats.stats) {
       final value = stat.value.toInt();
       switch (stat.kind.toLowerCase()) {
@@ -227,6 +239,21 @@ class GameState {
           break;
         case 'stability':
           state.stability = value;
+          break;
+        case 'appearance':
+          state.appearance = value;
+          break;
+        case 'reputation':
+          state.reputation = value;
+          break;
+        case 'curiosity':
+          state.curiosity = value;
+          break;
+        case 'energy':
+          state.energy = value;
+          break;
+        case 'libido':
+          state.libido = value;
           break;
       }
     }

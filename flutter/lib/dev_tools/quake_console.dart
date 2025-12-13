@@ -25,9 +25,10 @@ class QuakeConsoleController extends ChangeNotifier {
     ]);
   }
 
-  /// Add a log entry to the console
-  void addLog(String message) {
-    _logs.add(message);
+  /// Add a log entry to the console with optional log level
+  void addLog(String message, {String? level}) {
+    final prefix = level != null ? '[$level] ' : '';
+    _logs.add('$prefix$message');
     
     // Cap at max lines, drop oldest
     while (_logs.length > _maxLogLines) {
@@ -36,6 +37,15 @@ class QuakeConsoleController extends ChangeNotifier {
     
     notifyListeners();
   }
+
+  /// Add info log
+  void info(String message) => addLog(message, level: 'INFO');
+
+  /// Add warning log
+  void warn(String message) => addLog(message, level: 'WARN');
+
+  /// Add error log
+  void error(String message) => addLog(message, level: 'ERR ');
 
   /// Clear all logs
   void clear() {
@@ -210,6 +220,90 @@ class _QuakeConsoleState extends State<QuakeConsole> {
     return cursorAtEnd || _textController.text.isEmpty;
   }
 
+  /// Build a log entry with rich text formatting for log levels and command highlighting
+  Widget _buildLogEntry(String log) {
+    // Define colors for log levels
+    const infoColor = Colors.cyanAccent;
+    const warnColor = Colors.amber;
+    const errorColor = Colors.redAccent;
+    const commandColor = Colors.yellowAccent;
+
+    final baseStyle = TextStyle(
+      fontSize: 13,
+      fontFamily: 'monospace',
+      height: 1.4,
+    );
+
+    // Parse log level prefix
+    Color textColor = infoColor;
+    String displayText = log;
+
+    if (log.startsWith('[INFO]')) {
+      textColor = infoColor;
+    } else if (log.startsWith('[WARN]')) {
+      textColor = warnColor;
+    } else if (log.startsWith('[ERR ]')) {
+      textColor = errorColor;
+    }
+
+    // Check if this is a command line (starts with >)
+    if (log.startsWith('>')) {
+      final parts = log.substring(1).trim().split(RegExp(r'\s+'));
+      if (parts.isNotEmpty) {
+        final command = parts[0];
+        final rest = parts.skip(1).join(' ');
+
+        return Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '> ',
+                style: baseStyle.copyWith(color: infoColor, fontWeight: FontWeight.bold),
+              ),
+              TextSpan(
+                text: command,
+                style: baseStyle.copyWith(color: commandColor, fontWeight: FontWeight.bold),
+              ),
+              if (rest.isNotEmpty)
+                TextSpan(
+                  text: ' $rest',
+                  style: baseStyle.copyWith(color: infoColor),
+                ),
+            ],
+          ),
+        );
+      }
+    }
+
+    // Check for log level prefixes and colorize them
+    if (log.startsWith('[INFO]') || log.startsWith('[WARN]') || log.startsWith('[ERR ]')) {
+      final levelEnd = log.indexOf(']') + 1;
+      final level = log.substring(0, levelEnd);
+      final message = log.substring(levelEnd);
+
+      return Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: level,
+              style: baseStyle.copyWith(color: textColor, fontWeight: FontWeight.bold),
+            ),
+            TextSpan(
+              text: message,
+              style: baseStyle.copyWith(color: infoColor),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Default rendering
+    return Text(
+      displayText,
+      style: baseStyle.copyWith(color: textColor),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Focus(
@@ -275,11 +369,11 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.95),
                   border: Border(
-                    bottom: BorderSide(color: Colors.green, width: 2),
+                    bottom: BorderSide(color: Colors.cyanAccent, width: 2),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withValues(alpha: 0.3),
+                      color: Colors.cyanAccent.withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -287,39 +381,42 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                 ),
                 child: Column(
                   children: [
-                    // Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.15),
-                        border: Border(
-                          bottom: BorderSide(color: Colors.green, width: 1),
+                    // Header with diagonal slash edge
+                    ClipPath(
+                      clipper: _DiagonalSlashClipper(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.cyanAccent.withValues(alpha: 0.15),
+                          border: Border(
+                            bottom: BorderSide(color: Colors.cyanAccent, width: 2),
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.terminal, color: Colors.green, size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            'QUAKE CONSOLE',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'monospace',
-                              letterSpacing: 2,
+                        child: Row(
+                          children: [
+                            Icon(Icons.terminal, color: Colors.cyanAccent, size: 20),
+                            const SizedBox(width: 12),
+                            Text(
+                              'SYN CONSOLE',
+                              style: TextStyle(
+                                color: Colors.cyanAccent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace',
+                                letterSpacing: 2,
+                              ),
                             ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            'ESC/~ close | Ctrl+L clear | PgUp/PgDn scroll',
-                            style: TextStyle(
-                              color: Colors.green.withValues(alpha: 0.6),
-                              fontSize: 11,
-                              fontFamily: 'monospace',
+                            const Spacer(),
+                            Text(
+                              'ESC/~ close | Ctrl+L clear | PgUp/PgDn scroll',
+                              style: TextStyle(
+                                color: Colors.cyanAccent.withValues(alpha: 0.6),
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
 
@@ -332,15 +429,7 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                         itemBuilder: (context, index) {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              widget.controller.logs[index],
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontSize: 13,
-                                fontFamily: 'monospace',
-                                height: 1.4,
-                              ),
-                            ),
+                            child: _buildLogEntry(widget.controller.logs[index]),
                           );
                         },
                       ),
@@ -352,7 +441,7 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                       decoration: BoxDecoration(
                         color: Colors.black,
                         border: Border(
-                          top: BorderSide(color: Colors.green, width: 1),
+                          top: BorderSide(color: Colors.cyanAccent, width: 1),
                         ),
                       ),
                       child: Row(
@@ -360,7 +449,7 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                           Text(
                             '${widget.controller.prompt} ',
                             style: TextStyle(
-                              color: Colors.green,
+                              color: Colors.cyanAccent,
                               fontSize: 14,
                               fontFamily: 'monospace',
                               fontWeight: FontWeight.bold,
@@ -371,7 +460,7 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                               controller: _textController,
                               focusNode: _focusNode,
                               style: TextStyle(
-                                color: Colors.green,
+                                color: Colors.cyanAccent,
                                 fontSize: 14,
                                 fontFamily: 'monospace',
                               ),
@@ -379,16 +468,16 @@ class _QuakeConsoleState extends State<QuakeConsole> {
                                 border: InputBorder.none,
                                 hintText: 'Enter command...',
                                 hintStyle: TextStyle(
-                                  color: Colors.green.withValues(alpha: 0.4),
+                                  color: Colors.cyanAccent.withValues(alpha: 0.4),
                                   fontFamily: 'monospace',
                                 ),
                               ),
-                              cursorColor: Colors.green,
+                              cursorColor: Colors.cyanAccent,
                               onSubmitted: (_) => _submitCommand(),
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.send, color: Colors.green, size: 20),
+                            icon: Icon(Icons.send, color: Colors.cyanAccent, size: 20),
                             onPressed: _submitCommand,
                             tooltip: 'Execute Command (Enter)',
                           ),
@@ -404,7 +493,25 @@ class _QuakeConsoleState extends State<QuakeConsole> {
       ),
     );
   }
+}
 
+// Custom clipper for diagonal slash header edge
+class _DiagonalSlashClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    const slashHeight = 8.0;
+
+    path.lineTo(0, size.height - slashHeight);
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, 0);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 // Intent classes for keyboard shortcuts

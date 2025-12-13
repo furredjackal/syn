@@ -7,7 +7,7 @@ import '../models/game_state.dart' as game_model;
 import '../bridge/game_backend.dart';
 import '../bridge/bridge_generated/lib.dart';
 import '../syn_game.dart';
-import '../ui/widgets/persona_container.dart';
+import '../ui/syn_ui.dart';
 import '../ui/widgets/magnetic_dock.dart';
 import '../dev_tools/inspector_panel.dart';
 import '../dev_tools/quake_console.dart';
@@ -28,7 +28,8 @@ import '../panels/detailed_stats_panel.dart';
 import '../panels/inventory_panel.dart';
 import '../ui/overlays/world_map_overlay.dart';
 import '../ui/overlays/event_canvas_overlay.dart';
-import '../ui/overlays/relationship_network_overlay.dart';
+import '../ui/overlays/relationship_network_overlay.dart'
+    show RelationshipNetworkOverlay, CharacterRelationship;
 import '../ui/overlays/possession_overlay.dart';
 
 /// Phase 1 Hybrid UI: Flame background + Flutter UI overlay
@@ -53,6 +54,7 @@ class _GameScreenState extends State<GameScreen> {
   game_model.GameState? _gameState;
 
   late GamePhase _phase;
+  late QuakeConsoleController _consoleController;
   bool _showInspector = false;
   bool _showConsole = false;
   bool _showSettingsOverlay = false;
@@ -97,13 +99,21 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
     _phase = GamePhase.mainMenu;
+    _consoleController = QuakeConsoleController();
 
     // Initialize GameBackend asynchronously
     Future.microtask(() async {
       _backend = await GameBackend.create();
+      _consoleController.info('GameBackend initialized');
       // Optionally pre-load an existing state here.
       setState(() {});
     });
+  }
+
+  @override
+  void dispose() {
+    _consoleController.dispose();
+    super.dispose();
   }
 
   void _setPhase(GamePhase phase) => setState(() => _phase = phase);
@@ -239,7 +249,9 @@ class _GameScreenState extends State<GameScreen> {
               left: 0,
               right: 0,
               child: QuakeConsole(
+                controller: _consoleController,
                 onCommand: _handleConsoleCommand,
+                onClose: () => setState(() => _showConsole = false),
               )
                   .animate()
                   .slideY(
@@ -313,15 +325,89 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _handleConsoleCommand(String command) {
-    // Mock implementation - just print to debug console
-    // TODO: Wire this up to the Rust bridge for actual command execution
-    debugPrint('[Console] Command executed: $command');
-    
-    // Future examples:
-    // - 'spawn entity <type>' -> Call Rust to spawn an entity
-    // - 'set_stat health 100' -> Update player stats
-    // - 'trigger_event <id>' -> Force trigger a storylet
-    // - 'timeskip <days>' -> Advance simulation time
+    final parts = command.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return;
+
+    final cmd = parts[0].toLowerCase();
+    final args = parts.skip(1).toList();
+
+    try {
+      switch (cmd) {
+        // === SIMULATION COMMANDS (via GameBackend/Rust) ===
+        case 'step':
+        case 'tick':
+          final ticks = args.isNotEmpty ? int.tryParse(args[0]) ?? 1 : 1;
+          _consoleController.info('Advancing simulation $ticks tick(s)...');
+          _backend.step(ticks).then((newState) {
+            setState(() => _gameState = newState);
+            _consoleController.info('Simulation advanced (Year ${newState.year}, Age ${newState.age})');
+          }).catchError((e) {
+            _consoleController.error('Failed to advance: $e');
+          });
+          break;
+
+        case 'state':
+          _consoleController.info('Current State:');
+          _consoleController.addLog('  Year: ${_gameState?.year}, Age: ${_gameState?.age}');
+          _consoleController.addLog('  Mood: ${_gameState?.mood}');
+          break;
+
+        case 'event':
+          if (_gameState?.currentEvent != null) {
+            final evt = _gameState!.currentEvent!;
+            _consoleController.info('Active Event: ${evt.title}');
+            _consoleController.addLog('  Choices: ${evt.choices.map((c) => c.text).join(", ")}');
+          } else {
+            _consoleController.warn('No active event');
+          }
+          break;
+
+        // === VISUAL DEBUG COMMANDS (via SynGame/Flame) ===
+        case 'fps':
+          // Toggle FPS display in Flame
+          widget.synGame.debugMode = !widget.synGame.debugMode;
+          _consoleController.info('FPS display ${widget.synGame.debugMode ? "enabled" : "disabled"}');
+          break;
+
+        case 'spawn':
+          if (args.isEmpty) {
+            _consoleController.warn('Usage: spawn <type>');
+          } else {
+            _consoleController.info('Spawning ${args[0]} (visual debug)');
+            // TODO: Call widget.synGame.spawnDebugEntity(args[0]);
+            _consoleController.warn('Not yet implemented');
+          }
+          break;
+
+        case 'layer':
+          if (args.isEmpty) {
+            _consoleController.warn('Usage: layer <name> [on|off]');
+          } else {
+            _consoleController.info('Toggling layer ${args[0]}');
+            // TODO: Call widget.synGame.toggleLayer(args[0], toggle?)
+            _consoleController.warn('Not yet implemented');
+          }
+          break;
+
+        // === UTILITY COMMANDS ===
+        case 'help':
+          _consoleController.info('Available Commands:');
+          _consoleController.addLog('  Simulation: step [n], state, event');
+          _consoleController.addLog('  Visual: fps, spawn <type>, layer <name> [on|off]');
+          _consoleController.addLog('  Utility: help, clear');
+          break;
+
+        case 'clear':
+          _consoleController.clear();
+          break;
+
+        default:
+          _consoleController.warn('Unknown command: $cmd (try "help")');
+      }
+    } catch (e, stack) {
+      _consoleController.error('Command failed: $e');
+      debugPrint('Console command error: $e\n$stack');
+    }
   }
 
   Widget _buildGameplayUi() {
@@ -376,8 +462,8 @@ class _GameScreenState extends State<GameScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        PersonaContainer(
-          color: Colors.black,
+        SynContainer(
+          enableHover: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 24,
@@ -385,17 +471,12 @@ class _GameScreenState extends State<GameScreen> {
             ),
             child: Text(
               'YEAR: ${_gameState!.year} | AGE: ${_gameState!.age}',
-              style: TextStyle(
-                color: Colors.cyanAccent,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
+              style: SynTheme.label(color: SynTheme.accent),
             ),
           ),
         ),
-        PersonaContainer(
-          color: Colors.black,
+        SynContainer(
+          enableHover: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 24,
@@ -403,12 +484,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
             child: Text(
               'MOOD: ${_getMoodLabel(_gameState!.mood)}',
-              style: TextStyle(
-                color: Colors.cyanAccent,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
+              style: SynTheme.label(color: SynTheme.accent),
             ),
           ),
         ),
@@ -417,31 +493,36 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildLeftDock() {
-    return PersonaContainer(
-      color: Colors.black,
+    return SynContainer(
+      enableHover: false,
+      skew: -0.08,
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDockIcon(
-              Icons.bar_chart,
-              'Stats',
-              () => setState(() => _showDetailedStats = true),
+            SynDockIcon(
+              icon: Icons.bar_chart,
+              label: 'Stats',
+              onTap: () => setState(() => _showDetailedStats = true),
             ),
             const SizedBox(height: 16),
-            _buildDockIcon(
-              Icons.inventory_2,
-              'Inventory',
-              () => setState(() => _showInventory = true),
+            SynDockIcon(
+              icon: Icons.inventory_2,
+              label: 'Inventory',
+              onTap: () => setState(() => _showInventory = true),
             ),
             const SizedBox(height: 16),
-            _buildDockIcon(Icons.calendar_today, 'Calendar', () {}),
+            SynDockIcon(
+              icon: Icons.calendar_today,
+              label: 'Calendar',
+              onTap: () {},
+            ),
             const SizedBox(height: 16),
-            _buildDockIcon(
-              Icons.settings,
-              'Settings',
-              () => setState(() => _showSettingsOverlay = true),
+            SynDockIcon(
+              icon: Icons.settings,
+              label: 'Settings',
+              onTap: () => setState(() => _showSettingsOverlay = true),
             ),
           ],
         ),
@@ -450,58 +531,38 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildRightDock() {
-    return PersonaContainer(
-      color: Colors.black,
+    return SynContainer(
+      enableHover: false,
+      skew: 0.08,
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDockIcon(
-              Icons.people,
-              'Relations',
-              () => setState(() => _showRelationshipNetwork = true),
+            SynDockIcon(
+              icon: Icons.people,
+              label: 'Relations',
+              onTap: () => setState(() => _showRelationshipNetwork = true),
             ),
             const SizedBox(height: 16),
-            _buildDockIcon(
-              Icons.map,
-              'Map',
-              () => setState(() => _showWorldMap = true),
+            SynDockIcon(
+              icon: Icons.map,
+              label: 'Map',
+              onTap: () => setState(() => _showWorldMap = true),
             ),
             const SizedBox(height: 16),
-            _buildDockIcon(
-              Icons.book,
-              'Journal',
-              () => setState(() => _showMemoryJournal = true),
+            SynDockIcon(
+              icon: Icons.book,
+              label: 'Journal',
+              onTap: () => setState(() => _showMemoryJournal = true),
             ),
             const SizedBox(height: 16),
-            _buildDockIcon(
-              Icons.sync_alt,
-              'Possession',
-              () => setState(() => _showPossession = true),
+            SynDockIcon(
+              icon: Icons.sync_alt,
+              label: 'Possession',
+              onTap: () => setState(() => _showPossession = true),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDockIcon(IconData icon, String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Tooltip(
-        message: label,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.cyanAccent.withValues(alpha: 0.1),
-            border: Border.all(color: Colors.cyanAccent, width: 1),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.cyanAccent,
-            size: 28,
-          ),
         ),
       ),
     );
@@ -588,6 +649,8 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildMemoryJournalPanel() {
+    // TODO: Convert GameState.memories to panel MemoryEntry format
+    // For now, use mock data
     return MemoryJournalPanel(
       onClose: () => setState(() => _showMemoryJournal = false),
       memories: _memories,
@@ -595,13 +658,35 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildDetailedStatsPanel() {
+    // Convert GameState stats to the format expected by DetailedStatsPanel
+    // These are REAL stats from the Rust simulation backend
+    final stats = _gameState != null ? {
+      'core': {
+        'Health': _gameState!.health.toDouble(),
+        'Energy': _gameState!.energy.toDouble(),
+        'Mood': (_gameState!.mood + 10) * 5.0, // Convert -10..10 to 0..100
+      },
+      'social': {
+        'Charisma': _gameState!.charisma.toDouble(),
+        'Reputation': _gameState!.reputation.toDouble(),
+        'Wealth': _gameState!.wealth.toDouble(),
+      },
+      'skills': {
+        'Intelligence': _gameState!.intelligence.toDouble(),
+        'Wisdom': _gameState!.wisdom.toDouble(),
+        'Curiosity': _gameState!.curiosity.toDouble(),
+      },
+    } : _stats;
+
     return DetailedStatsPanel(
       onClose: () => setState(() => _showDetailedStats = false),
-      stats: _stats,
+      stats: stats,
     );
   }
 
   Widget _buildInventoryPanel() {
+    // TODO: Add inventory field to GameState
+    // For now, use mock data
     return InventoryPanel(
       onClose: () => setState(() => _showInventory = false),
       items: _inventory,
@@ -646,9 +731,18 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildRelationshipNetworkOverlay() {
+    // Convert GameState.relationships (RelationshipData) to CharacterRelationship
+    final relationships = _gameState?.relationships.map((rel) {
+      return CharacterRelationship(
+        name: rel.npcName,
+        role: rel.state, // Friend, CloseFriend, etc.
+        strength: ((rel.affection + rel.trust) / 2 + 10) / 2, // Convert -10..10 to 0..10
+      );
+    }).toList() ?? [];
+    
     return RelationshipNetworkOverlay(
       onClose: () => setState(() => _showRelationshipNetwork = false),
-      relationships: const [], // Use default placeholder data
+      relationships: relationships,
     );
   }
 

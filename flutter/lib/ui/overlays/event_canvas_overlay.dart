@@ -29,30 +29,9 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
   Widget build(BuildContext context) {
     final currentEvent = widget.gameState.currentEvent;
 
-    // Show minimal message if no active event
+    // Show nothing if no active event - let other UI be interactive
     if (currentEvent == null) {
-      return Container(
-        color: Colors.black.withValues(alpha: 0.7),
-        child: Center(
-          child: PersonaContainer(
-            color: Colors.black.withValues(alpha: 0.95),
-            borderColor: Colors.cyanAccent,
-            borderWidth: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(40),
-              child: Text(
-                'NO ACTIVE EVENT',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     final screenWidth = MediaQuery.of(context).size.width;

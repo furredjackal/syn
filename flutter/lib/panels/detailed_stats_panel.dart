@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../ui/widgets/persona_container.dart';
+import '../ui/syn_ui.dart';
 
 /// Detailed Stats Panel - displays comprehensive character statistics
-/// 
-/// Props:
-/// - onClose: Callback to close the panel
-/// - stats: Map of stat categories and values
+/// with Persona 5 × Destiny 2 inspired animations and styling.
+///
+/// Features:
+/// - Staggered entrance animations
+/// - Animated stat bars with glow effects
+/// - Category tabs with hover states
+/// - Keyboard navigation support
 class DetailedStatsPanel extends StatefulWidget {
   final VoidCallback onClose;
   final Map<String, Map<String, double>> stats;
@@ -22,117 +24,136 @@ class DetailedStatsPanel extends StatefulWidget {
   State<DetailedStatsPanel> createState() => _DetailedStatsPanelState();
 }
 
-class _DetailedStatsPanelState extends State<DetailedStatsPanel> {
+class _DetailedStatsPanelState extends State<DetailedStatsPanel>
+    with SingleTickerProviderStateMixin {
   String _selectedCategory = 'core';
+  late AnimationController _entranceController;
+  late Animation<double> _backdropAnimation;
+  late Animation<Offset> _panelSlideAnimation;
+  late Animation<double> _panelScaleAnimation;
 
   List<String> get _categories => widget.stats.keys.toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      duration: SynTheme.slow,
+      vsync: this,
+    );
+
+    _backdropAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    _panelSlideAnimation = Tween<Offset>(
+      begin: const Offset(-1.5, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: SynTheme.snapIn,
+    ));
+
+    _panelScaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.03), weight: 80),
+      TweenSequenceItem(tween: Tween(begin: 1.03, end: 1.0), weight: 20),
+    ]).animate(CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOut,
+    ));
+
+    _entranceController.forward();
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _animateClose() async {
+    await _entranceController.reverse();
+    widget.onClose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
-      child: Container(
-        color: Colors.black.withOpacity(0.85),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900, maxHeight: 800),
-            child: PersonaContainer(
-              skew: -0.15,
-              color: Colors.black.withOpacity(0.95),
-              child: Padding(
-                padding: const EdgeInsets.all(40.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 20),
-                    _buildCategoryTabs(),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: _buildStatsView(),
+      child: AnimatedBuilder(
+        animation: _entranceController,
+        builder: (context, _) {
+          return Container(
+            color: Colors.black.withOpacity(0.9 * _backdropAnimation.value),
+            child: Center(
+              child: SlideTransition(
+                position: _panelSlideAnimation,
+                child: Transform.scale(
+                  scale: _panelScaleAnimation.value,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: 950, maxHeight: 850),
+                    child: SynContainer(
+                      enableHover: false,
+                      child: Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildHeader(),
+                            const SizedBox(height: 24),
+                            _buildCategoryTabs(),
+                            const SizedBox(height: 28),
+                            Expanded(child: _buildStatsView()),
+                            const SizedBox(height: 24),
+                            _buildCloseButton(),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    _buildCloseButton(),
-                  ],
+                  ),
                 ),
               ),
             ),
-          )
-              .animate()
-              .slideX(begin: -1.0, duration: 400.ms, curve: Curves.easeOut)
-              .fadeIn(duration: 300.ms),
-        ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        Icon(
-          Icons.analytics,
-          color: const Color(0xFF00E6FF),
-          size: 40,
-        ),
-        const SizedBox(width: 15),
-        Text(
-          'DETAILED STATISTICS',
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF00E6FF),
-            letterSpacing: 4,
-            shadows: [
-              Shadow(
-                color: const Color(0xFF00E6FF).withOpacity(0.5),
-                blurRadius: 15,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCategoryTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return SynStaggeredEntrance(
+      index: 0,
       child: Row(
-        children: _categories.map((category) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 10.0),
-            child: _buildCategoryTab(category),
-          );
-        }).toList(),
+        children: [
+          Icon(Icons.analytics, color: SynTheme.accent, size: 44),
+          const SizedBox(width: 16),
+          Text('DETAILED STATISTICS', style: SynTheme.display()),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryTab(String category) {
-    final isActive = _selectedCategory == category;
-    
-    return GestureDetector(
-      onTap: () => setState(() => _selectedCategory = category),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFF00E6FF).withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
-          border: Border.all(
-            color: isActive ? const Color(0xFF00E6FF) : Colors.white30,
-            width: 2,
-          ),
-        ),
-        child: Text(
-          category.toUpperCase(),
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: isActive ? const Color(0xFF00E6FF) : Colors.white70,
-            letterSpacing: 1.5,
-          ),
+  Widget _buildCategoryTabs() {
+    return SynStaggeredEntrance(
+      index: 1,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _categories.asMap().entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 12.0),
+              child: _CategoryTab(
+                label: entry.value,
+                isActive: _selectedCategory == entry.value,
+                onTap: () => setState(() => _selectedCategory = entry.value),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -140,129 +161,48 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel> {
 
   Widget _buildStatsView() {
     final categoryStats = widget.stats[_selectedCategory] ?? {};
-    
+
     if (categoryStats.isEmpty) {
       return Center(
         child: Text(
           'No stats available.',
-          style: TextStyle(
-            fontSize: 18,
-            color: Colors.white30,
-            fontStyle: FontStyle.italic,
-          ),
+          style: SynTheme.body(color: SynTheme.textMuted),
         ),
       );
     }
 
-    return ListView(
-      children: categoryStats.entries.map((entry) {
+    final entries = categoryStats.entries.toList();
+
+    return ListView.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 20.0),
-          child: _buildStatBar(entry.key, entry.value),
+          child: SynStaggeredEntrance(
+            index: index + 2, // Offset for header + tabs
+            child: SynStatBar(
+              label: entry.key,
+              value: entry.value, // 0-100 range
+              showValue: true,
+              height: 16,
+            ),
+          ),
         );
-      }).toList(),
-    );
-  }
-
-  Widget _buildStatBar(String statName, double value) {
-    // Normalize value to 0-100 range (assuming stats are 0-100)
-    final percentage = (value / 100).clamp(0.0, 1.0);
-    
-    // Color based on value
-    Color barColor;
-    if (value >= 70) {
-      barColor = Colors.green;
-    } else if (value >= 40) {
-      barColor = const Color(0xFF00E6FF);
-    } else {
-      barColor = Colors.red;
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              statName.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 1.2,
-              ),
-            ),
-            Text(
-              value.toStringAsFixed(1),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: barColor,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Stack(
-          children: [
-            // Background
-            Container(
-              height: 12,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                border: Border.all(color: Colors.white30, width: 1),
-              ),
-            ),
-            // Fill
-            FractionallySizedBox(
-              widthFactor: percentage,
-              child: Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  color: barColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: barColor.withOpacity(0.5),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+      },
     );
   }
 
   Widget _buildCloseButton() {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onClose,
-        child: PersonaContainer(
-          skew: -0.18,
-          color: Colors.black.withOpacity(0.6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.close, color: Colors.white70, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  'CLOSE',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return SynStaggeredEntrance(
+      index: 10,
+      slideFrom: const Offset(0, 0.3),
+      child: Center(
+        child: SynButton(
+          label: 'CLOSE',
+          icon: Icons.close,
+          style: SynButtonStyle.secondary,
+          onPressed: _animateClose,
         ),
       ),
     );
@@ -273,20 +213,97 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel> {
       if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
           event.logicalKey == LogicalKeyboardKey.keyA) {
         final currentIndex = _categories.indexOf(_selectedCategory);
-        final newIndex = (currentIndex - 1) % _categories.length;
-        setState(() {
-          _selectedCategory = _categories[newIndex < 0 ? _categories.length - 1 : newIndex];
-        });
+        final newIndex = (currentIndex - 1 + _categories.length) % _categories.length;
+        setState(() => _selectedCategory = _categories[newIndex]);
+        HapticFeedback.selectionClick();
       } else if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
           event.logicalKey == LogicalKeyboardKey.keyD) {
         final currentIndex = _categories.indexOf(_selectedCategory);
         final newIndex = (currentIndex + 1) % _categories.length;
-        setState(() {
-          _selectedCategory = _categories[newIndex];
-        });
+        setState(() => _selectedCategory = _categories[newIndex]);
+        HapticFeedback.selectionClick();
       } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-        widget.onClose();
+        _animateClose();
       }
     }
+  }
+}
+
+/// Category tab button with hover effects.
+class _CategoryTab extends StatefulWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _CategoryTab({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  State<_CategoryTab> createState() => _CategoryTabState();
+}
+
+class _CategoryTabState extends State<_CategoryTab> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighlighted = widget.isActive || _isHovered;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          widget.onTap();
+        },
+        child: AnimatedContainer(
+          duration: SynTheme.fast,
+          curve: SynTheme.snapIn,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          transform: Matrix4.identity()
+            ..translate(_isHovered ? -2.0 : 0.0, _isHovered ? -2.0 : 0.0),
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? SynTheme.accent.withOpacity(0.25)
+                : _isHovered
+                    ? SynTheme.accent.withOpacity(0.1)
+                    : SynTheme.bgCard,
+            border: Border.all(
+              color: isHighlighted
+                  ? SynTheme.accent
+                  : SynTheme.accent.withOpacity(0.3),
+              width: widget.isActive ? 2 : 1,
+            ),
+            boxShadow: [
+              if (isHighlighted)
+                BoxShadow(
+                  color: SynTheme.accent.withOpacity(0.3),
+                  blurRadius: 12,
+                  spreadRadius: -2,
+                ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.6),
+                offset: Offset(
+                  _isHovered ? 4 : 2,
+                  _isHovered ? 4 : 2,
+                ),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Text(
+            widget.label.toUpperCase(),
+            style: SynTheme.label(
+              color: isHighlighted ? SynTheme.accent : SynTheme.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
