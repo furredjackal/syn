@@ -30,5 +30,14 @@ export 'animations/syn_transitions.dart';
 // Layout
 export 'widgets/magnetic_dock.dart';
 
+// Painters (Instrumentation Layer)
+export 'painters/instrumentation_painters.dart';
+
+// Mixins
+export 'mixins/idle_motion_mixin.dart';
+
+// Overlays
+export 'overlays/instrumentation_hud.dart';
+
 // Legacy (use SynContainer instead)
 export 'widgets/persona_container.dart';

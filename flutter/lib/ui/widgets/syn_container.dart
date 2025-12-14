@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/syn_theme.dart';
-import '../helpers/animated_builder.dart';
+import '../painters/instrumentation_painters.dart';
 
 /// Enhanced Persona-style container with hover effects and micro-interactions.
 ///
@@ -10,6 +10,8 @@ import '../helpers/animated_builder.dart';
 /// - Border pulse animation on focus
 /// - Smooth scale response
 /// - Optional clip path for diagonal cuts
+/// - Station-based styling (observation/intervention/reflection/transit)
+/// - Focus brackets for UI grammar compliance
 class SynContainer extends StatefulWidget {
   /// The widget to display inside the container.
   final Widget child;
@@ -18,9 +20,11 @@ class SynContainer extends StatefulWidget {
   final Color? color;
 
   /// The skew factor. Positive = right, negative = left.
-  final double skew;
+  /// If station is provided, this is overridden by station's skew.
+  final double? skew;
 
   /// The accent/border color.
+  /// If station is provided, this is overridden by station's emphasis color.
   final Color? accentColor;
 
   /// The border width.
@@ -47,11 +51,21 @@ class SynContainer extends StatefulWidget {
   /// Padding inside the container.
   final EdgeInsets padding;
 
+  /// UI Station type for grammar-based styling.
+  /// When set, automatically applies appropriate skew, color, and bracket rules.
+  final SynStation? station;
+
+  /// Whether to show focus brackets (default: based on station).
+  final bool? showBrackets;
+
+  /// Whether this container has focus (shows brackets if enabled).
+  final bool hasFocus;
+
   const SynContainer({
     super.key,
     required this.child,
     this.color,
-    this.skew = SynTheme.skewAngle,
+    this.skew,
     this.accentColor,
     this.borderWidth = SynTheme.borderWidth,
     this.enableHover = true,
@@ -61,6 +75,9 @@ class SynContainer extends StatefulWidget {
     this.clipSize = 20,
     this.onTap,
     this.padding = const EdgeInsets.all(20),
+    this.station,
+    this.showBrackets,
+    this.hasFocus = false,
   });
 
   @override
@@ -68,12 +85,13 @@ class SynContainer extends StatefulWidget {
 }
 
 class _SynContainerState extends State<SynContainer>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _isHovered = false;
   bool _isPressed = false;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
+  late AnimationController _bracketController;
 
   @override
   void initState() {
@@ -85,12 +103,44 @@ class _SynContainerState extends State<SynContainer>
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.6).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+    _bracketController = AnimationController(
+      duration: SynInstrumentation.bracketPulseDuration,
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
     _glowController.dispose();
+    _bracketController.dispose();
     super.dispose();
+  }
+
+  /// Get effective skew based on station or explicit value
+  double get _effectiveSkew {
+    if (widget.station != null) {
+      return widget.station!.skewAngle;
+    }
+    return widget.skew ?? SynTheme.skewAngle;
+  }
+
+  /// Get effective accent color based on station or explicit value
+  Color get _effectiveAccent {
+    if (widget.station != null) {
+      return widget.station!.emphasisColor;
+    }
+    return widget.accentColor ?? SynTheme.accent;
+  }
+
+  /// Whether to show brackets
+  bool get _showBrackets {
+    if (widget.showBrackets != null) {
+      return widget.showBrackets!;
+    }
+    if (widget.station != null) {
+      return widget.station!.showBrackets;
+    }
+    return false;
   }
 
   void _onHoverStart() {
@@ -122,10 +172,14 @@ class _SynContainerState extends State<SynContainer>
   @override
   Widget build(BuildContext context) {
     final bgColor = widget.color ?? SynTheme.bgCard;
-    final accent = widget.accentColor ?? SynTheme.accent;
+    final accent = _effectiveAccent;
+    final skew = _effectiveSkew;
 
     // Calculate scale based on interaction state
     final scale = _isPressed ? 0.98 : (_isHovered ? 1.02 : 1.0);
+
+    // Determine if brackets should be visible
+    final showBracketsNow = _showBrackets && (widget.hasFocus || _isHovered);
 
     Widget container = AnimatedBuilder(
       animation: _glowAnimation,
@@ -173,7 +227,7 @@ class _SynContainerState extends State<SynContainer>
 
     // Apply skew transform
     container = Transform(
-      transform: Matrix4.skewX(widget.skew),
+      transform: Matrix4.skewX(skew),
       alignment: Alignment.center,
       child: container,
     );
@@ -188,7 +242,7 @@ class _SynContainerState extends State<SynContainer>
 
     // Counter-skew the content so text is readable
     // Note: We need to wrap the entire thing so the child counter-skews
-    return MouseRegion(
+    Widget result = MouseRegion(
       onEnter: (_) => _onHoverStart(),
       onExit: (_) => _onHoverEnd(),
       cursor: widget.onTap != null
@@ -199,7 +253,7 @@ class _SynContainerState extends State<SynContainer>
         onTapUp: widget.onTap != null ? (_) => _onTapUp() : null,
         onTapCancel: widget.onTap != null ? _onTapCancel : null,
         child: Transform(
-          transform: Matrix4.skewX(widget.skew),
+          transform: Matrix4.skewX(skew),
           alignment: Alignment.center,
           child: AnimatedBuilder(
             animation: _glowAnimation,
@@ -238,7 +292,7 @@ class _SynContainerState extends State<SynContainer>
                   padding: widget.padding,
                   // Counter-skew the content
                   child: Transform(
-                    transform: Matrix4.skewX(-widget.skew),
+                    transform: Matrix4.skewX(-skew),
                     alignment: Alignment.center,
                     child: widget.child,
                   ),
@@ -249,6 +303,40 @@ class _SynContainerState extends State<SynContainer>
         ),
       ),
     );
+
+    // Add focus brackets overlay if enabled
+    if (_showBrackets) {
+      result = Stack(
+        children: [
+          result,
+          // Bracket overlay (non-interactive)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: showBracketsNow ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                child: AnimatedBuilder(
+                  animation: _bracketController,
+                  builder: (context, _) => CustomPaint(
+                    painter: BracketFramePainter(
+                      bracketSize: SynLineGrammar.bracketSize,
+                      overshoot: SynLineGrammar.overshoot,
+                      strokeWidth: SynLineGrammar.dashedWidth,
+                      color: accent,
+                      opacity: 0.8,
+                      inset: 4,
+                      pulsePhase: _bracketController.value,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return result;
   }
 }
 
@@ -261,26 +349,26 @@ class _DiagonalCornerClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final path = Path();
-    
+
     // Start at top-left, but clipped
     path.moveTo(clipSize, 0);
-    
+
     // Top-right corner clipped
     path.lineTo(size.width - clipSize, 0);
     path.lineTo(size.width, clipSize);
-    
+
     // Bottom-right corner clipped
     path.lineTo(size.width, size.height - clipSize);
     path.lineTo(size.width - clipSize, size.height);
-    
+
     // Bottom-left corner clipped
     path.lineTo(clipSize, size.height);
     path.lineTo(0, size.height - clipSize);
-    
+
     // Back to top-left
     path.lineTo(0, clipSize);
     path.close();
-    
+
     return path;
   }
 

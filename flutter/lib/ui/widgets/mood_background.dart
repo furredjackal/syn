@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 import '../../theme/theme.dart';
+import '../painters/instrumentation_painters.dart';
+import '../theme/syn_theme.dart' as syn_ui;
 
 /// Mood-reactive background wrapper.
 ///
 /// Applies a subtle color tint overlay based on the current mood value.
 /// Creates atmospheric changes as the player's emotional state shifts.
+///
+/// Now includes scanline instrumentation layer for "simulation running" feel.
 class MoodBackground extends StatefulWidget {
   final Widget child;
-  
+
   /// Current mood value (-10 to +10)
   final double mood;
-  
+
   /// Whether to show vignette effect
   final bool showVignette;
-  
+
   /// Intensity of the color overlay (0-1)
   final double intensity;
+
+  /// Whether to show scanline effect (instrumentation layer)
+  final bool showScanline;
+
+  /// Whether to show CRT-style horizontal lines
+  final bool showCRTLines;
 
   const MoodBackground({
     super.key,
@@ -23,6 +33,8 @@ class MoodBackground extends StatefulWidget {
     required this.mood,
     this.showVignette = true,
     this.intensity = 0.3,
+    this.showScanline = true,
+    this.showCRTLines = true,
   });
 
   @override
@@ -30,8 +42,9 @@ class MoodBackground extends StatefulWidget {
 }
 
 class _MoodBackgroundState extends State<MoodBackground>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _transitionController;
+  late AnimationController _scanlineController;
   Color _currentColor = MoodColors.neutral;
   Color _targetColor = MoodColors.neutral;
 
@@ -42,6 +55,10 @@ class _MoodBackgroundState extends State<MoodBackground>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
+    _scanlineController = AnimationController(
+      duration: syn_ui.SynInstrumentation.scanlineDuration,
+      vsync: this,
+    )..repeat();
     _currentColor = MoodColors.forMood(widget.mood);
     _targetColor = _currentColor;
   }
@@ -63,6 +80,7 @@ class _MoodBackgroundState extends State<MoodBackground>
   @override
   void dispose() {
     _transitionController.dispose();
+    _scanlineController.dispose();
     super.dispose();
   }
 
@@ -126,6 +144,24 @@ class _MoodBackgroundState extends State<MoodBackground>
                 child: _buildEdgeGlow(color),
               ),
             ),
+
+            // Scanline instrumentation layer
+            if (widget.showScanline || widget.showCRTLines)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _scanlineController,
+                    builder: (context, _) => CustomPaint(
+                      painter: ScanlinePainter(
+                        progress: _scanlineController.value,
+                        opacity: syn_ui.SynInstrumentation.scanlineOpacity,
+                        color: syn_ui.SynTheme.accent,
+                      ),
+                      size: Size.infinite,
+                    ),
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -164,7 +200,7 @@ class _MoodBackgroundState extends State<MoodBackground>
 /// High negative: Red glitch effects
 class KarmaOverlay extends StatefulWidget {
   final Widget child;
-  
+
   /// Current karma value (-100 to +100)
   final int karma;
 
@@ -274,7 +310,8 @@ class LifeStageThemeProvider extends InheritedWidget {
   });
 
   static LifeStageTheme of(BuildContext context) {
-    final provider = context.dependOnInheritedWidgetOfExactType<LifeStageThemeProvider>();
+    final provider =
+        context.dependOnInheritedWidgetOfExactType<LifeStageThemeProvider>();
     return provider?.theme ?? LifeStageTheme.adult;
   }
 
