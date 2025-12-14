@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../dev_tools/inspectable_mixin.dart';
 import '../widgets/persona_container.dart';
 
 /// Possession Overlay - choose a new host to possess (PostLife mechanic)
@@ -27,23 +28,52 @@ class PossessionOverlay extends StatefulWidget {
 
 class _PossessionOverlayState extends State<PossessionOverlay> {
   int _selectedIndex = 0;
+  final _o = InspectorOverrides.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _o.register('PossessionOverlay', {
+      'backdropOpacity': 0.95,
+      'widthFactor': 0.75,
+      'heightFactor': 0.65,
+      'titleFontSize': 48.0,
+      'subtitleFontSize': 16.0,
+      'titleLeft': 60.0,
+      'titleTop': 40.0,
+    }, onUpdate: () => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _o.unregister('PossessionOverlay');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    
+    final backdropOpacity = _o.get('PossessionOverlay.backdropOpacity', 0.95);
+    final widthFactor = _o.get('PossessionOverlay.widthFactor', 0.75);
+    final heightFactor = _o.get('PossessionOverlay.heightFactor', 0.65);
+    final titleFontSize = _o.get('PossessionOverlay.titleFontSize', 48.0);
+    final subtitleFontSize = _o.get('PossessionOverlay.subtitleFontSize', 16.0);
+    final titleLeft = _o.get('PossessionOverlay.titleLeft', 60.0);
+    final titleTop = _o.get('PossessionOverlay.titleTop', 40.0);
 
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.95),
+        color: Colors.black.withValues(alpha: backdropOpacity),
         child: Stack(
           children: [
             // Title
             Positioned(
-              left: 60,
-              top: 40,
+              left: titleLeft,
+              top: titleTop,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -51,7 +81,7 @@ class _PossessionOverlayState extends State<PossessionOverlay> {
                     'CHOOSE YOUR HOST',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 48,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 4,
                       shadows: [
@@ -67,7 +97,7 @@ class _PossessionOverlayState extends State<PossessionOverlay> {
                     'Your essence will inhabit a new vessel',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
+                      fontSize: subtitleFontSize,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -82,8 +112,8 @@ class _PossessionOverlayState extends State<PossessionOverlay> {
             Center(
               child: Container(
                 constraints: BoxConstraints(
-                  maxWidth: screenWidth * 0.75,
-                  maxHeight: screenHeight * 0.65,
+                  maxWidth: screenWidth * widthFactor,
+                  maxHeight: screenHeight * heightFactor,
                 ),
                 child: widget.hosts.isEmpty
                     ? _buildPlaceholderHosts()

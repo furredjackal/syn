@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../dev_tools/inspectable_mixin.dart';
 import '../ui/syn_ui.dart';
 
 /// Detailed Stats Panel - displays comprehensive character statistics
@@ -10,6 +11,7 @@ import '../ui/syn_ui.dart';
 /// - Animated stat bars with glow effects
 /// - Category tabs with hover states
 /// - Keyboard navigation support
+/// - Live editing via InspectorOverrides
 class DetailedStatsPanel extends StatefulWidget {
   final VoidCallback onClose;
   final Map<String, Map<String, double>> stats;
@@ -32,11 +34,29 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel>
   late Animation<Offset> _panelSlideAnimation;
   late Animation<double> _panelScaleAnimation;
 
+  // Inspector overrides accessor
+  final _o = InspectorOverrides.instance;
+
   List<String> get _categories => widget.stats.keys.toList();
 
   @override
   void initState() {
     super.initState();
+    
+    // Register editable properties with the inspector
+    _o.register('DetailedStatsPanel', {
+      'padding': 40.0,
+      'headerFontSize': 32.0,
+      'tabFontSize': 16.0,
+      'statBarHeight': 24.0,
+      'statFontSize': 18.0,
+      'statSpacing': 20.0,
+      'maxWidth': 950.0,
+      'maxHeight': 850.0,
+      'backdropOpacity': 0.9,
+      'borderRadius': 0.0,
+    }, onUpdate: () => setState(() {}));
+    
     _entranceController = AnimationController(
       duration: SynTheme.slow,
       vsync: this,
@@ -70,6 +90,7 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel>
 
   @override
   void dispose() {
+    _o.unregister('DetailedStatsPanel');
     _entranceController.dispose();
     super.dispose();
   }
@@ -81,6 +102,12 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel>
 
   @override
   Widget build(BuildContext context) {
+    // Read editable values from overrides
+    final padding = _o.get('DetailedStatsPanel.padding', 40.0);
+    final maxWidth = _o.get('DetailedStatsPanel.maxWidth', 950.0);
+    final maxHeight = _o.get('DetailedStatsPanel.maxHeight', 850.0);
+    final backdropOpacity = _o.get('DetailedStatsPanel.backdropOpacity', 0.9);
+    
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
@@ -88,19 +115,18 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel>
         animation: _entranceController,
         builder: (context, _) {
           return Container(
-            color: Colors.black.withOpacity(0.9 * _backdropAnimation.value),
+            color: Colors.black.withOpacity(backdropOpacity * _backdropAnimation.value),
             child: Center(
               child: SlideTransition(
                 position: _panelSlideAnimation,
                 child: Transform.scale(
                   scale: _panelScaleAnimation.value,
                   child: ConstrainedBox(
-                    constraints:
-                        const BoxConstraints(maxWidth: 950, maxHeight: 850),
+                    constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
                     child: SynContainer(
                       enableHover: false,
                       child: Padding(
-                        padding: const EdgeInsets.all(40.0),
+                        padding: EdgeInsets.all(padding),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -132,7 +158,13 @@ class _DetailedStatsPanelState extends State<DetailedStatsPanel>
         children: [
           Icon(Icons.analytics, color: SynTheme.accent, size: 44),
           const SizedBox(width: 16),
-          Text('DETAILED STATISTICS', style: SynTheme.display()),
+          Expanded(
+            child: Text(
+              'DETAILED STATISTICS',
+              style: SynTheme.display(),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

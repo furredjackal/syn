@@ -5,15 +5,32 @@ import 'package:flame/game.dart';
 import 'package:flame/particles.dart';
 import 'package:flutter/material.dart' hide Image;
 
+import '../../../dev_tools/inspectable_mixin.dart';
+
 /// Data motes that float upward (vertical lines)
 /// 
 /// Visual: 5-10px vertical lines (cyan/magenta) that spawn at bottom,
 /// float upward, fade out over ~4s
-class ParticleSystemComponent extends Component {
+class ParticleSystemComponent extends Component with InspectableMixin {
   double _timeSinceLastSpawn = 0;
   final double _spawnInterval = 0.1; // Spawn every 0.1s
   final Random _random = Random();
   Vector2 _gameSize = Vector2.zero();
+  int _particleCount = 0;
+
+  @override
+  String get inspectorName => 'ParticleSystem';
+
+  @override
+  String get inspectorCategory => 'Effects';
+
+  @override
+  List<InspectableProperty> get inspectorProperties => [
+    InspectableProperty.number('SpawnInterval', _spawnInterval, min: 0.01, max: 1.0),
+    InspectableProperty.number('ParticleCount', _particleCount.toDouble()),
+    InspectableProperty.number('TimeSinceSpawn', _timeSinceLastSpawn, min: 0, max: 1),
+    InspectableProperty.size('GameSize', Size(_gameSize.x, _gameSize.y)),
+  ];
 
   @override
   Future<void> onLoad() async {

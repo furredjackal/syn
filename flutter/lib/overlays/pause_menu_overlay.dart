@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../syn_game.dart';
 import '../components/ui/syn_theme.dart';
 import '../components/ui/buttons/menu_button.dart';
+import '../dev_tools/inspectable_mixin.dart';
 
 Widget buildPauseMenuOverlay(BuildContext context, SynGame game) {
   return PauseMenuOverlay(game: game);
@@ -23,6 +24,7 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final _o = InspectorOverrides.instance;
 
   @override
   void initState() {
@@ -34,16 +36,26 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _slideAnimation = Tween<Offset>(begin: const Offset(0, -0.1), end: Offset.zero).animate(_animationController);
     _animationController.forward();
+    
+    _o.register('PauseMenuOverlay', {
+      'backdropOpacity': 0.8,
+      'panelWidth': 460.0,
+      'titleFontSize': 32.0,
+    }, onUpdate: () => setState(() {}));
   }
 
   @override
   void dispose() {
+    _o.unregister('PauseMenuOverlay');
     _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final backdropOpacity = _o.get('PauseMenuOverlay.backdropOpacity', 0.8);
+    final panelWidth = _o.get('PauseMenuOverlay.panelWidth', 460.0);
+
     void resumeGame() {
       widget.game.resumeEngine();
       widget.game.overlays.remove('pause_menu');
@@ -65,7 +77,7 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
           opacity: _fadeAnimation,
           child: GestureDetector(
             onTap: resumeGame,
-            child: Container(color: SynColors.bgDark.withValues(alpha: 0.8)),
+            child: Container(color: SynColors.bgDark.withValues(alpha: backdropOpacity)),
           ),
         ),
         SlideTransition(
@@ -74,7 +86,7 @@ class _PauseMenuOverlayState extends State<PauseMenuOverlay> with SingleTickerPr
             child: ClipPath(
               clipper: _PanelClipper(),
               child: Container(
-                width: 460,
+                width: panelWidth,
                 padding: const EdgeInsets.all(SynLayout.paddingLarge),
                 decoration: BoxDecoration(
                   color: SynColors.bgPanel,

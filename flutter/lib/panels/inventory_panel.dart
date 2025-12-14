@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../dev_tools/inspectable_mixin.dart';
 import '../ui/syn_ui.dart';
 
 /// Inventory Panel - displays character's possessions and items
@@ -10,6 +11,7 @@ import '../ui/syn_ui.dart';
 /// - Hover glow on items
 /// - Smooth category filtering
 /// - Detail panel with parallax effect
+/// - Live editing via InspectorOverrides
 class InventoryPanel extends StatefulWidget {
   final VoidCallback onClose;
   final List<InventoryItem> items;
@@ -33,6 +35,7 @@ class _InventoryPanelState extends State<InventoryPanel>
   late AnimationController _entranceController;
   late Animation<double> _backdropAnimation;
   late Animation<Offset> _panelSlideAnimation;
+  final _o = InspectorOverrides.instance;
 
   List<InventoryItem> get _filteredItems {
     if (_filter == 'all') return widget.items;
@@ -42,6 +45,17 @@ class _InventoryPanelState extends State<InventoryPanel>
   @override
   void initState() {
     super.initState();
+    
+    _o.register('InventoryPanel', {
+      'padding': 40.0,
+      'maxWidth': 950.0,
+      'maxHeight': 850.0,
+      'backdropOpacity': 0.9,
+      'gridSpacing': 16.0,
+      'itemSize': 80.0,
+      'headerFontSize': 28.0,
+    }, onUpdate: () => setState(() {}));
+    
     _entranceController = AnimationController(
       duration: SynTheme.slow,
       vsync: this,
@@ -67,6 +81,7 @@ class _InventoryPanelState extends State<InventoryPanel>
 
   @override
   void dispose() {
+    _o.unregister('InventoryPanel');
     _entranceController.dispose();
     super.dispose();
   }
@@ -78,6 +93,11 @@ class _InventoryPanelState extends State<InventoryPanel>
 
   @override
   Widget build(BuildContext context) {
+    final padding = _o.get('InventoryPanel.padding', 40.0);
+    final maxWidth = _o.get('InventoryPanel.maxWidth', 950.0);
+    final maxHeight = _o.get('InventoryPanel.maxHeight', 850.0);
+    final backdropOpacity = _o.get('InventoryPanel.backdropOpacity', 0.9);
+    
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
@@ -85,17 +105,16 @@ class _InventoryPanelState extends State<InventoryPanel>
         animation: _entranceController,
         builder: (context, _) {
           return Container(
-            color: Colors.black.withOpacity(0.9 * _backdropAnimation.value),
+            color: Colors.black.withOpacity(backdropOpacity * _backdropAnimation.value),
             child: Center(
               child: SlideTransition(
                 position: _panelSlideAnimation,
                 child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(maxWidth: 950, maxHeight: 850),
+                  constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
                   child: SynContainer(
                     enableHover: false,
                     child: Padding(
-                      padding: const EdgeInsets.all(40.0),
+                      padding: EdgeInsets.all(padding),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [

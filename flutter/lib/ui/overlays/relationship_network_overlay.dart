@@ -2,6 +2,7 @@ import 'dart:math' show cos, sin;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../dev_tools/inspectable_mixin.dart';
 import '../widgets/persona_container.dart';
 
 /// Relationship Network Overlay - visualizes character connections
@@ -28,11 +29,27 @@ class _RelationshipNetworkOverlayState
     extends State<RelationshipNetworkOverlay> {
   int? _hoveredNodeIndex;
   final List<Offset> _nodePositions = [];
+  final _o = InspectorOverrides.instance;
 
   @override
   void initState() {
     super.initState();
     _generateNodePositions();
+    
+    _o.register('RelationshipNetworkOverlay', {
+      'backdropOpacity': 0.92,
+      'titleFontSize': 48.0,
+      'subtitleFontSize': 16.0,
+      'nodeRadius': 200.0,
+      'titleLeft': 60.0,
+      'titleTop': 40.0,
+    }, onUpdate: () => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _o.unregister('RelationshipNetworkOverlay');
+    super.dispose();
   }
 
   void _generateNodePositions() {
@@ -54,18 +71,24 @@ class _RelationshipNetworkOverlayState
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    
+    final backdropOpacity = _o.get('RelationshipNetworkOverlay.backdropOpacity', 0.92);
+    final titleFontSize = _o.get('RelationshipNetworkOverlay.titleFontSize', 48.0);
+    final subtitleFontSize = _o.get('RelationshipNetworkOverlay.subtitleFontSize', 16.0);
+    final titleLeft = _o.get('RelationshipNetworkOverlay.titleLeft', 60.0);
+    final titleTop = _o.get('RelationshipNetworkOverlay.titleTop', 40.0);
 
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.92),
+        color: Colors.black.withValues(alpha: backdropOpacity),
         child: Stack(
           children: [
             // Title
             Positioned(
-              left: 60,
-              top: 40,
+              left: titleLeft,
+              top: titleTop,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -73,7 +96,7 @@ class _RelationshipNetworkOverlayState
                     'RELATIONSHIP NETWORK',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 48,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 4,
                       shadows: [
@@ -89,7 +112,7 @@ class _RelationshipNetworkOverlayState
                     'Your social connections visualized',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
+                      fontSize: subtitleFontSize,
                       letterSpacing: 1.2,
                     ),
                   ),

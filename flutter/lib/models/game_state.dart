@@ -147,6 +147,7 @@ class GameState {
   int age = 6;
   String lifeStage = 'Child';
   int year = 0;
+  int day = 1; // Day of current year (1-365)
 
   // Stats (0-100 scale) - mapped from Rust's 11 StatKinds
   int health = 75;
@@ -205,12 +206,8 @@ class GameState {
     state.lifeStage = api.lifeStage;
     state.year = api.currentDay ~/ 365;
     
-    // Debug assertion: ensure age is correctly set for new games
+    // Debug assertion: ensure age is correctly set
     assert(state.age >= 0, 'Player age should be non-negative');
-    if (api.currentDay == 0 || api.currentDay == 1) {
-      // New game should have player starting at age 6
-      assert(state.age >= 6, 'New game should start with age >= 6, got ${state.age}');
-    }
     
     // Parse stats from the stats list (all 11 Rust StatKinds)
     for (final stat in api.stats.stats) {

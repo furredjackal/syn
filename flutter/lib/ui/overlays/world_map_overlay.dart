@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../dev_tools/inspectable_mixin.dart';
 import '../widgets/persona_container.dart';
 
 /// World Map Overlay - shows city districts/regions for navigation
@@ -27,23 +28,52 @@ class WorldMapOverlay extends StatefulWidget {
 
 class _WorldMapOverlayState extends State<WorldMapOverlay> {
   int _selectedIndex = 0;
+  final _o = InspectorOverrides.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _o.register('WorldMapOverlay', {
+      'backdropOpacity': 0.92,
+      'widthFactor': 0.8,
+      'heightFactor': 0.6,
+      'titleFontSize': 48.0,
+      'subtitleFontSize': 16.0,
+      'titleLeft': 60.0,
+      'titleTop': 40.0,
+    }, onUpdate: () => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _o.unregister('WorldMapOverlay');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    
+    final backdropOpacity = _o.get('WorldMapOverlay.backdropOpacity', 0.92);
+    final widthFactor = _o.get('WorldMapOverlay.widthFactor', 0.8);
+    final heightFactor = _o.get('WorldMapOverlay.heightFactor', 0.6);
+    final titleFontSize = _o.get('WorldMapOverlay.titleFontSize', 48.0);
+    final subtitleFontSize = _o.get('WorldMapOverlay.subtitleFontSize', 16.0);
+    final titleLeft = _o.get('WorldMapOverlay.titleLeft', 60.0);
+    final titleTop = _o.get('WorldMapOverlay.titleTop', 40.0);
 
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.92),
+        color: Colors.black.withValues(alpha: backdropOpacity),
         child: Stack(
           children: [
             // Title
             Positioned(
-              left: 60,
-              top: 40,
+              left: titleLeft,
+              top: titleTop,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -51,7 +81,7 @@ class _WorldMapOverlayState extends State<WorldMapOverlay> {
                     'WORLD MAP',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 48,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 4,
                       shadows: [
@@ -67,7 +97,7 @@ class _WorldMapOverlayState extends State<WorldMapOverlay> {
                     'Select a location to visit',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
+                      fontSize: subtitleFontSize,
                       letterSpacing: 1.2,
                     ),
                   ),
@@ -82,8 +112,8 @@ class _WorldMapOverlayState extends State<WorldMapOverlay> {
             Center(
               child: Container(
                 constraints: BoxConstraints(
-                  maxWidth: screenWidth * 0.8,
-                  maxHeight: screenHeight * 0.6,
+                  maxWidth: screenWidth * widthFactor,
+                  maxHeight: screenHeight * heightFactor,
                 ),
                 child: widget.regions.isEmpty
                     ? _buildPlaceholderRegions()

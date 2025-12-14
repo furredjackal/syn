@@ -1,5 +1,6 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../models/game_phase.dart';
@@ -66,7 +67,13 @@ class _GameScreenState extends State<GameScreen> {
   bool _showEventCanvas = false;
   bool _showRelationshipNetwork = false;
   bool _showPossession = false;
+  bool _showKeyboardShortcuts = false;
   String _saveLoadMode = 'load'; // 'save' or 'load'
+
+  // Time control state
+  bool _isPaused = false;
+  int _speedMultiplier = 1;
+  int _currentHour = 8; // 8 AM default
 
   // Mock data for panels
   Map<String, dynamic> _lifeSummary = {};
@@ -188,90 +195,108 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Layer 1 (Bottom): Flame GameWidget Background
-          Positioned.fill(
-            child: GameWidget(
-              game: widget.synGame,
-              overlayBuilderMap: {
-                'text_input': (context, game) =>
-                    buildTextInputOverlay(context, game as SynGame),
-                'pause_menu': (context, game) =>
-                    buildPauseMenuOverlay(context, game as SynGame),
-                'confirm_dialog': (context, game) =>
-                    buildConfirmDialogOverlay(context, game as SynGame),
-                'loading': (context, game) => buildLoadingOverlay(context),
-                'settings_form': (context, game) =>
-                    buildSettingsFormOverlay(context, game as SynGame),
-                'debug_console': (context, game) =>
-                    buildDebugConsoleOverlay(context, game as SynGame),
-              },
-            ),
-          ),
-
-          // Layer 2 (Top): Flutter UI based on phase
-          Positioned.fill(child: _buildPhaseUi()),
-
-          // Overlays (conditional)
-          if (_showSettingsOverlay) _buildSettingsOverlay(),
-          if (_showSaveLoadOverlay) _buildSaveLoadOverlay(),
-          if (_showMemoryJournal) _buildMemoryJournalPanel(),
-          if (_showDetailedStats) _buildDetailedStatsPanel(),
-          if (_showInventory) _buildInventoryPanel(),
-          if (_showWorldMap) _buildWorldMapOverlay(),
-          if (_showEventCanvas) _buildEventCanvasOverlay(),
-          if (_showRelationshipNetwork) _buildRelationshipNetworkOverlay(),
-          if (_showPossession) _buildPossessionOverlay(),
-
-          // Layer 3 (Dev Tools): Inspector Panel (Right)
-          if (_showInspector && _phase == GamePhase.gameplay)
-            Positioned(
-              top: 0,
-              right: 0,
-              bottom: 0,
-              child: InspectorPanel(game: widget.synGame)
-                  .animate()
-                  .slideX(
-                    begin: 1,
-                    duration: 300.ms,
-                    curve: Curves.easeOutExpo,
-                  )
-                  .fadeIn(duration: 200.ms),
+    // Wrap in keyboard listener for global shortcuts
+    return KeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // Layer 1 (Bottom): Flame GameWidget Background
+            Positioned.fill(
+              child: GameWidget(
+                game: widget.synGame,
+                overlayBuilderMap: {
+                  'text_input': (context, game) =>
+                      buildTextInputOverlay(context, game as SynGame),
+                  'pause_menu': (context, game) =>
+                      buildPauseMenuOverlay(context, game as SynGame),
+                  'confirm_dialog': (context, game) =>
+                      buildConfirmDialogOverlay(context, game as SynGame),
+                  'loading': (context, game) => buildLoadingOverlay(context),
+                  'settings_form': (context, game) =>
+                      buildSettingsFormOverlay(context, game as SynGame),
+                  'debug_console': (context, game) =>
+                      buildDebugConsoleOverlay(context, game as SynGame),
+                },
+              ),
             ),
 
-          // Layer 3 (Dev Tools): Quake Console (Top)
-          if (_showConsole && _phase == GamePhase.gameplay)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: QuakeConsole(
-                controller: _consoleController,
-                onCommand: _handleConsoleCommand,
-                onClose: () => setState(() => _showConsole = false),
-              )
-                  .animate()
-                  .slideY(
-                    begin: -1,
-                    duration: 300.ms,
-                    curve: Curves.easeOutExpo,
-                  )
-                  .fadeIn(duration: 200.ms),
-            ),
+            // Layer 1.5: Mood-reactive overlay (only during gameplay)
+            if (_phase == GamePhase.gameplay && _gameState != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: MoodBackground(
+                    mood: _gameState!.mood.toDouble(),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
 
-          // Dev Tools Toggle Buttons (Bottom Right) - Only in gameplay
-          if (_phase == GamePhase.gameplay)
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: _buildDevToolsButtons()
-                  .animate()
-                  .fadeIn(delay: 600.ms, duration: 400.ms),
-            ),
-        ],
+            // Layer 2 (Top): Flutter UI based on phase
+            Positioned.fill(child: _buildPhaseUi()),
+
+            // Overlays (conditional)
+            if (_showSettingsOverlay) _buildSettingsOverlay(),
+            if (_showSaveLoadOverlay) _buildSaveLoadOverlay(),
+            if (_showMemoryJournal) _buildMemoryJournalPanel(),
+            if (_showDetailedStats) _buildDetailedStatsPanel(),
+            if (_showInventory) _buildInventoryPanel(),
+            if (_showWorldMap) _buildWorldMapOverlay(),
+            if (_showEventCanvas) _buildEventCanvasOverlay(),
+            if (_showRelationshipNetwork) _buildRelationshipNetworkOverlay(),
+            if (_showPossession) _buildPossessionOverlay(),
+            if (_showKeyboardShortcuts) _buildKeyboardShortcutsOverlay(),
+
+            // Layer 3 (Dev Tools): Inspector Panel (Right)
+            if (_showInspector && _phase == GamePhase.gameplay)
+              Positioned(
+                top: 0,
+                right: 0,
+                bottom: 0,
+                child: InspectorPanel(game: widget.synGame, appContext: context)
+                    .animate()
+                    .slideX(
+                      begin: 1,
+                      duration: 300.ms,
+                      curve: Curves.easeOutExpo,
+                    )
+                    .fadeIn(duration: 200.ms),
+              ),
+
+            // Layer 3 (Dev Tools): Quake Console (Top)
+            if (_showConsole && _phase == GamePhase.gameplay)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: QuakeConsole(
+                  controller: _consoleController,
+                  onCommand: _handleConsoleCommand,
+                  onClose: () => setState(() => _showConsole = false),
+                )
+                    .animate()
+                    .slideY(
+                      begin: -1,
+                      duration: 300.ms,
+                      curve: Curves.easeOutExpo,
+                    )
+                    .fadeIn(duration: 200.ms),
+              ),
+
+            // Dev Tools Toggle Buttons (Bottom Right) - Only in gameplay
+            if (_phase == GamePhase.gameplay)
+              Positioned(
+                bottom: 100, // Moved up to make room for bottom bar
+                right: 20,
+                child: _buildDevToolsButtons()
+                    .animate()
+                    .fadeIn(delay: 600.ms, duration: 400.ms),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -418,7 +443,7 @@ class _GameScreenState extends State<GameScreen> {
 
     return Stack(
       children: [
-        // Top Bar: DAY and MOOD indicators
+        // Top Bar: DAY and MOOD indicators + Stat Rings
         Positioned(
           top: 20,
           left: 20,
@@ -454,6 +479,17 @@ class _GameScreenState extends State<GameScreen> {
             onChoiceSelected: _handleEventChoiceSelected,
           ),
         ),
+
+        // Bottom Bar: Time controls, quick actions, mini stats
+        Positioned(
+          bottom: 20,
+          left: 20,
+          right: 20,
+          child: _buildBottomBar()
+              .animate()
+              .slideY(begin: 1, duration: 600.ms, curve: Curves.easeOutExpo)
+              .fadeIn(duration: 400.ms),
+        ),
       ],
     );
   }
@@ -462,6 +498,7 @@ class _GameScreenState extends State<GameScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // Left: Year/Age info
         SynContainer(
           enableHover: false,
           child: Padding(
@@ -475,6 +512,40 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
         ),
+        
+        // Center: Stat rings
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SynStatRing(
+              value: _gameState!.health.toDouble().clamp(0, 100),
+              label: 'Health',
+              icon: Icons.favorite,
+              color: SynTheme.accentHot,
+              size: 80,
+              thickness: 6,
+            ),
+            const SizedBox(width: 12),
+            SynStatRing(
+              value: _gameState!.energy.toDouble().clamp(0, 100),
+              label: 'Energy',
+              icon: Icons.bolt,
+              color: SynTheme.accentWarm,
+              size: 80,
+              thickness: 6,
+            ),
+            const SizedBox(width: 12),
+            SynStatRing(
+              value: ((_gameState!.mood + 10) * 5).toDouble().clamp(0, 100),
+              label: 'Mood',
+              icon: Icons.sentiment_satisfied,
+              size: 80,
+              thickness: 6,
+            ),
+          ],
+        ),
+        
+        // Right: Mood label
         SynContainer(
           enableHover: false,
           child: Padding(
@@ -756,5 +827,126 @@ class _GameScreenState extends State<GameScreen> {
       },
       hosts: const [], // Use default placeholder hosts
     );
+  }
+
+  Widget _buildKeyboardShortcutsOverlay() {
+    return KeyboardShortcutsOverlay(
+      onClose: () => setState(() => _showKeyboardShortcuts = false),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return SynBottomBar(
+      day: _gameState!.day,
+      year: _gameState!.year,
+      hour: _currentHour,
+      health: _gameState!.health.toDouble().clamp(0, 100),
+      energy: _gameState!.energy.toDouble().clamp(0, 100),
+      mood: ((_gameState!.mood + 10) * 5).toDouble().clamp(0, 100),
+      isPaused: _isPaused,
+      speedMultiplier: _speedMultiplier,
+      currentActivity: null, // TODO: Wire to current action from backend
+      onAdvanceTime: _handleAdvanceTime,
+      onTogglePause: () => setState(() => _isPaused = !_isPaused),
+      onSpeedChange: (speed) => setState(() => _speedMultiplier = speed),
+      onOpenCalendar: () {
+        // TODO: Implement calendar overlay
+        _consoleController.info('Calendar not yet implemented');
+      },
+      onRest: () => _handleQuickAction('rest'),
+      onWork: () => _handleQuickAction('work'),
+      onSocialize: () => _handleQuickAction('socialize'),
+    );
+  }
+
+  void _handleAdvanceTime() async {
+    if (_isPaused) return;
+    
+    // Advance one tick (1 hour)
+    final newState = await _backend.step(1);
+    setState(() {
+      _gameState = newState;
+      _currentHour = (_currentHour + 1) % 24;
+    });
+  }
+
+  void _handleQuickAction(String action) async {
+    _consoleController.info('Quick action: $action');
+    // TODO: Wire to backend action system
+    // For now, just advance time
+    final newState = await _backend.step(1);
+    setState(() {
+      _gameState = newState;
+      _currentHour = (_currentHour + 1) % 24;
+    });
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    if (_phase != GamePhase.gameplay) return;
+    
+    // Don't handle keys if console is open
+    if (_showConsole) return;
+
+    final key = event.logicalKey;
+
+    // Keyboard shortcuts
+    if (key == LogicalKeyboardKey.slash || key == LogicalKeyboardKey.question) {
+      setState(() => _showKeyboardShortcuts = !_showKeyboardShortcuts);
+      return;
+    }
+
+    if (key == LogicalKeyboardKey.escape) {
+      // Close any open overlay
+      if (_showKeyboardShortcuts) {
+        setState(() => _showKeyboardShortcuts = false);
+      } else if (_showDetailedStats) {
+        setState(() => _showDetailedStats = false);
+      } else if (_showInventory) {
+        setState(() => _showInventory = false);
+      } else if (_showMemoryJournal) {
+        setState(() => _showMemoryJournal = false);
+      } else if (_showWorldMap) {
+        setState(() => _showWorldMap = false);
+      } else if (_showRelationshipNetwork) {
+        setState(() => _showRelationshipNetwork = false);
+      } else if (_showSettingsOverlay) {
+        setState(() => _showSettingsOverlay = false);
+      }
+      return;
+    }
+
+    // Panel shortcuts
+    if (key == LogicalKeyboardKey.keyS) {
+      setState(() => _showDetailedStats = !_showDetailedStats);
+    } else if (key == LogicalKeyboardKey.keyI) {
+      setState(() => _showInventory = !_showInventory);
+    } else if (key == LogicalKeyboardKey.keyJ) {
+      setState(() => _showMemoryJournal = !_showMemoryJournal);
+    } else if (key == LogicalKeyboardKey.keyM) {
+      setState(() => _showWorldMap = !_showWorldMap);
+    } else if (key == LogicalKeyboardKey.keyR) {
+      setState(() => _showRelationshipNetwork = !_showRelationshipNetwork);
+    }
+
+    // Time controls
+    if (key == LogicalKeyboardKey.space) {
+      setState(() => _isPaused = !_isPaused);
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      _handleAdvanceTime();
+    } else if (key == LogicalKeyboardKey.digit1) {
+      setState(() => _speedMultiplier = 1);
+    } else if (key == LogicalKeyboardKey.digit2) {
+      setState(() => _speedMultiplier = 2);
+    } else if (key == LogicalKeyboardKey.digit3) {
+      setState(() => _speedMultiplier = 4);
+    }
+
+    // Dev tools
+    if (key == LogicalKeyboardKey.backquote) {
+      setState(() => _showConsole = !_showConsole);
+    } else if (key == LogicalKeyboardKey.f11) {
+      setState(() => _showInspector = !_showInspector);
+    }
   }
 }

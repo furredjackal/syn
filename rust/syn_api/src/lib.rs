@@ -1663,8 +1663,8 @@ fn build_initial_game_state_from_player(
     Some(ApiSimpleGameState {
         current_day: 1,
         current_tick: 0,
-        player_age: 0,
-        life_stage: "PreSim".to_string(),
+        player_age: 6, // All lives start at age 6 (childhood)
+        life_stage: "Child".to_string(),
         stats: stats_snapshot,
         mood: format!("{:?}", gen.stats.mood_band()),
         karma: gen.karma.0,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../dev_tools/inspectable_mixin.dart';
 import '../widgets/persona_container.dart';
 import 'package:syn/models/game_state.dart';
 
@@ -24,6 +25,29 @@ class EventCanvasOverlay extends StatefulWidget {
 
 class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
   int _selectedChoiceIndex = 0;
+  final _o = InspectorOverrides.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _o.register('EventCanvasOverlay', {
+      'backdropOpacity': 0.7,
+      'widthFactor': 0.6,
+      'heightFactor': 0.75,
+      'padding': 40.0,
+      'titleFontSize': 32.0,
+      'descriptionFontSize': 16.0,
+      'skew': -0.1,
+      'borderWidth': 3.0,
+      'choiceSpacing': 12.0,
+    }, onUpdate: () => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _o.unregister('EventCanvasOverlay');
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,22 +60,32 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Read from overrides
+    final backdropOpacity = _o.get('EventCanvasOverlay.backdropOpacity', 0.7);
+    final widthFactor = _o.get('EventCanvasOverlay.widthFactor', 0.6);
+    final heightFactor = _o.get('EventCanvasOverlay.heightFactor', 0.75);
+    final padding = _o.get('EventCanvasOverlay.padding', 40.0);
+    final titleFontSize = _o.get('EventCanvasOverlay.titleFontSize', 32.0);
+    final descriptionFontSize = _o.get('EventCanvasOverlay.descriptionFontSize', 16.0);
+    final skew = _o.get('EventCanvasOverlay.skew', -0.1);
+    final borderWidth = _o.get('EventCanvasOverlay.borderWidth', 3.0);
 
     return Container(
-      color: Colors.black.withValues(alpha: 0.7),
+      color: Colors.black.withValues(alpha: backdropOpacity),
       child: Center(
         child: Container(
           constraints: BoxConstraints(
-            maxWidth: screenWidth * 0.6,
-            maxHeight: screenHeight * 0.75,
+            maxWidth: screenWidth * widthFactor,
+            maxHeight: screenHeight * heightFactor,
           ),
           child: PersonaContainer(
             color: Colors.black.withValues(alpha: 0.95),
             borderColor: Colors.cyanAccent,
-            borderWidth: 3,
-            skew: -0.1,
+            borderWidth: borderWidth,
+            skew: skew,
             child: Container(
-              padding: const EdgeInsets.all(40),
+              padding: EdgeInsets.all(padding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -59,9 +93,9 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                   // Event Title
                   Text(
                     currentEvent.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2,
                     ),
@@ -82,7 +116,7 @@ class _EventCanvasOverlayState extends State<EventCanvasOverlay> {
                         currentEvent.description,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 16,
+                          fontSize: descriptionFontSize,
                           height: 1.6,
                           letterSpacing: 0.5,
                         ),

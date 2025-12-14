@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 
+import '../../../dev_tools/inspectable_mixin.dart';
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
 import '../buttons/icon_button_component.dart';
@@ -38,7 +39,7 @@ const double _kFlashFadePerSecond = 2.8;
 
 enum _ActionVisualState { idle, hover, active }
 
-class TopBarComponent extends PositionComponent with HasGameReference<SynGame> {
+class TopBarComponent extends PositionComponent with HasGameReference<SynGame>, InspectableMixin {
   TopBarComponent({
     required this.gameState,
     required this.onStats,
@@ -56,6 +57,21 @@ class TopBarComponent extends PositionComponent with HasGameReference<SynGame> {
   final VoidCallback onSave;
   final VoidCallback onPause;
   final VoidCallback onNotifications;
+
+  @override
+  String get inspectorName => 'TopBar';
+
+  @override
+  String get inspectorCategory => 'UI Panels';
+
+  @override
+  List<InspectableProperty> get inspectorProperties => [
+    InspectableProperty.text('LifeStage', gameState.lifeStage),
+    InspectableProperty.number('Age', gameState.age.toDouble()),
+    InspectableProperty.number('Mood', gameState.mood.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('FlashAlpha', _flashAlpha, min: 0, max: 1),
+    InspectableProperty.size('Size', Size(size.x, size.y)),
+  ];
 
   late final LifeStageBadgeComponent _lifeStageBadge;
   late final AgeCounterComponent _ageCounter;

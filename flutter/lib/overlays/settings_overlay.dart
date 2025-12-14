@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../dev_tools/inspectable_mixin.dart';
 import '../ui/widgets/persona_container.dart';
 
 /// Settings Overlay - modal dialog for game settings
@@ -48,6 +49,7 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
   late bool _sfxEnabled;
   late double _musicVolume;
   late double _sfxVolume;
+  final _o = InspectorOverrides.instance;
 
   @override
   void initState() {
@@ -56,23 +58,44 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
     _sfxEnabled = widget.sfxEnabled;
     _musicVolume = widget.musicVolume;
     _sfxVolume = widget.sfxVolume;
+    
+    _o.register('SettingsOverlay', {
+      'backdropOpacity': 0.85,
+      'maxWidth': 600.0,
+      'maxHeight': 700.0,
+      'padding': 40.0,
+      'skew': -0.15,
+      'titleFontSize': 28.0,
+    }, onUpdate: () => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _o.unregister('SettingsOverlay');
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final backdropOpacity = _o.get('SettingsOverlay.backdropOpacity', 0.85);
+    final maxWidth = _o.get('SettingsOverlay.maxWidth', 600.0);
+    final maxHeight = _o.get('SettingsOverlay.maxHeight', 700.0);
+    final padding = _o.get('SettingsOverlay.padding', 40.0);
+    final skew = _o.get('SettingsOverlay.skew', -0.15);
+    
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
       child: Container(
-        color: Colors.black.withOpacity(0.85),
+        color: Colors.black.withOpacity(backdropOpacity),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+            constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
             child: PersonaContainer(
-              skew: -0.15,
+              skew: skew,
               color: Colors.black.withOpacity(0.95),
               child: Padding(
-                padding: const EdgeInsets.all(40.0),
+                padding: EdgeInsets.all(padding),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,

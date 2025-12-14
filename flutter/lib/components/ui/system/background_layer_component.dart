@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart' hide Image;
 
+import '../../../dev_tools/inspectable_mixin.dart';
+
 /// Cyberpunk city background with procedural skyline
 /// 
 /// Architecture:
@@ -10,8 +12,22 @@ import 'package:flutter/material.dart' hide Image;
 /// - Deep purple/black gradient sky
 /// - Cyan/Magenta neon outlines
 /// - Scrolling effect with multiple layers
-class BackgroundLayerComponent extends PositionComponent {
+class BackgroundLayerComponent extends PositionComponent with InspectableMixin {
   late final List<_CityLayer> _layers;
+
+  @override
+  String get inspectorName => 'CityBackground';
+
+  @override
+  String get inspectorCategory => 'Background';
+
+  @override
+  List<InspectableProperty> get inspectorProperties => [
+    InspectableProperty.number('LayerCount', _layers.length.toDouble()),
+    InspectableProperty.size('Size', Size(size.x, size.y)),
+    InspectableProperty.offset('Position', Offset(position.x, position.y)),
+    InspectableProperty.number('Priority', priority.toDouble()),
+  ];
   
   @override
   Future<void> onLoad() async {

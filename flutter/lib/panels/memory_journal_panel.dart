@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../dev_tools/inspectable_mixin.dart';
 import '../ui/syn_ui.dart';
 
 /// Memory Journal Panel - displays character's memories and significant events
@@ -10,6 +11,7 @@ import '../ui/syn_ui.dart';
 /// - Emotional tone color coding
 /// - Staggered entrance animations
 /// - Character tags with glow
+/// - Live editing via InspectorOverrides
 class MemoryJournalPanel extends StatefulWidget {
   final VoidCallback onClose;
   final List<MemoryEntry> memories;
@@ -31,6 +33,7 @@ class _MemoryJournalPanelState extends State<MemoryJournalPanel>
   late AnimationController _entranceController;
   late Animation<double> _backdropAnimation;
   late Animation<Offset> _panelSlideAnimation;
+  final _o = InspectorOverrides.instance;
 
   List<MemoryEntry> get _filteredMemories {
     if (_filter == 'all') return widget.memories;
@@ -40,6 +43,17 @@ class _MemoryJournalPanelState extends State<MemoryJournalPanel>
   @override
   void initState() {
     super.initState();
+    
+    _o.register('MemoryJournalPanel', {
+      'padding': 40.0,
+      'maxWidth': 950.0,
+      'maxHeight': 850.0,
+      'backdropOpacity': 0.9,
+      'cardSpacing': 16.0,
+      'titleFontSize': 28.0,
+      'memoryFontSize': 14.0,
+    }, onUpdate: () => setState(() {}));
+    
     _entranceController = AnimationController(
       duration: SynTheme.slow,
       vsync: this,
@@ -65,6 +79,7 @@ class _MemoryJournalPanelState extends State<MemoryJournalPanel>
 
   @override
   void dispose() {
+    _o.unregister('MemoryJournalPanel');
     _entranceController.dispose();
     super.dispose();
   }
@@ -76,6 +91,11 @@ class _MemoryJournalPanelState extends State<MemoryJournalPanel>
 
   @override
   Widget build(BuildContext context) {
+    final padding = _o.get('MemoryJournalPanel.padding', 40.0);
+    final maxWidth = _o.get('MemoryJournalPanel.maxWidth', 950.0);
+    final maxHeight = _o.get('MemoryJournalPanel.maxHeight', 850.0);
+    final backdropOpacity = _o.get('MemoryJournalPanel.backdropOpacity', 0.9);
+    
     return KeyboardListener(
       focusNode: FocusNode()..requestFocus(),
       onKeyEvent: _handleKeyEvent,
@@ -83,17 +103,16 @@ class _MemoryJournalPanelState extends State<MemoryJournalPanel>
         animation: _entranceController,
         builder: (context, _) {
           return Container(
-            color: Colors.black.withOpacity(0.9 * _backdropAnimation.value),
+            color: Colors.black.withOpacity(backdropOpacity * _backdropAnimation.value),
             child: Center(
               child: SlideTransition(
                 position: _panelSlideAnimation,
                 child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(maxWidth: 950, maxHeight: 850),
+                  constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
                   child: SynContainer(
                     enableHover: false,
                     child: Padding(
-                      padding: const EdgeInsets.all(40.0),
+                      padding: EdgeInsets.all(padding),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [

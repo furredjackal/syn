@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
+import '../../../dev_tools/inspectable_mixin.dart';
 import '../../../models/game_state.dart';
 import '../../../syn_game.dart';
 import '../buttons/icon_button_component.dart';
@@ -11,7 +12,7 @@ import '../syn_theme.dart';
 enum PanelMode { compact, detailed }
 
 class StatPanelComponent extends PositionComponent 
-    with HasGameReference<SynGame>, HasPaint { 
+    with HasGameReference<SynGame>, HasPaint, InspectableMixin { 
     
   StatPanelComponent({
     required this.gameState,
@@ -24,6 +25,25 @@ class StatPanelComponent extends PositionComponent
   final VoidCallback? onClose;
   
   PanelMode _mode = PanelMode.compact;
+
+  @override
+  String get inspectorName => 'StatPanel';
+
+  @override
+  String get inspectorCategory => 'UI Panels';
+
+  @override
+  List<InspectableProperty> get inspectorProperties => [
+    InspectableProperty.text('Mode', _mode.name),
+    InspectableProperty.number('Health', gameState.health.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('Wealth', gameState.wealth.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('Charisma', gameState.charisma.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('Intellect', gameState.intelligence.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('Stability', gameState.stability.toDouble(), min: 0, max: 100),
+    InspectableProperty.number('Creativity', gameState.wisdom.toDouble(), min: 0, max: 100),
+    InspectableProperty.size('Size', Size(size.x, size.y)),
+    InspectableProperty.offset('Position', Offset(position.x, position.y)),
+  ];
   
   final Paint _bgPaint = Paint();
   final Paint _borderPaint = Paint()
